@@ -1,0 +1,46 @@
+# Secrets
+.env
+.env.local
+*.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+build/
+dist/
+
+# Virtualenv
+.venv/
+venv/
+env/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Runtime
+logs/
+*.log
+streamlit_qa.log
+
+# Local data
+data/
+*.db
+*.sqlite
+
+# Web (React)
+web/node_modules/
+web/dist/
+web/.vite/
+
+# Generated schemas
+schemas/*.schema.json

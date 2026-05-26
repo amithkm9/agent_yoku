@@ -1,0 +1,53 @@
+"""Typed exceptions for agent_yoku.
+
+Pattern borrowed from asato-svc/asato_svc/core/exceptions.py: a single
+QueryAsatoError base, with narrow subclasses the agent can catch and
+surface as clean failure signals to the LLM.
+"""
+
+from __future__ import annotations
+
+
+class QueryAsatoError(Exception):
+    """Base class for all agent_yoku domain errors."""
+
+
+# ---------- Not found ----------
+
+
+class NotFoundError(QueryAsatoError):
+    """A requested entity did not exist."""
+
+
+class TicketNotFound(NotFoundError):
+    """JIRA ticket key did not resolve."""
+
+
+class PRNotFound(NotFoundError):
+    """GitHub PR key did not resolve."""
+
+
+class UserNotFound(NotFoundError):
+    """User identifier did not resolve to a unified_users record."""
+
+
+# ---------- Upstream / transient ----------
+
+
+class UpstreamError(QueryAsatoError):
+    """A 4xx/5xx from an external API after retries."""
+
+
+class RateLimited(UpstreamError):
+    """Source API returned 429 or equivalent."""
+
+
+# ---------- Config / data ----------
+
+
+class ConfigError(QueryAsatoError):
+    """Required env / setting missing or invalid."""
+
+
+class IndexEmpty(QueryAsatoError):
+    """Embedding index has no documents — run ingest + embed first."""

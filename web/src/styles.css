@@ -1,0 +1,335 @@
+/* Minimal, clean styling. Easy to swap for a theme/design system later. */
+
+:root {
+  --bg: #fafafa;
+  --bg-elevated: #ffffff;
+  --bg-sidebar: #f3f3f1;
+  --border: #e4e4e1;
+  --text: #1c1c1a;
+  --text-muted: #6b6b66;
+  --primary: #1d4ed8;
+  --primary-hover: #1e40af;
+  --danger: #b91c1c;
+  --bubble-user: #1d4ed8;
+  --bubble-user-text: #ffffff;
+  --bubble-ai: #ffffff;
+  --bubble-ai-text: #1c1c1a;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font);
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-elevated);
+  padding: 6px 12px;
+  color: var(--text);
+}
+button:hover { background: #f1f1ee; }
+button.primary {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+button.primary:hover { background: var(--primary-hover); }
+button.primary:disabled { background: #93a3c4; border-color: #93a3c4; cursor: not-allowed; }
+button.block { width: 100%; }
+button.link {
+  background: transparent;
+  border: none;
+  color: var(--primary);
+  padding: 0;
+  text-decoration: underline;
+}
+
+/* ---------- Auth page ---------- */
+.auth-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  background: var(--bg-sidebar);
+}
+.auth-card {
+  width: 360px;
+  background: var(--bg-elevated);
+  padding: 32px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+.auth-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+}
+.auth-subtitle {
+  margin: 4px 0 24px;
+  color: var(--text-muted);
+}
+.auth-error {
+  color: var(--danger);
+  background: #fef2f2;
+  padding: 8px 12px;
+  border-radius: 6px;
+  margin: 12px 0;
+  font-size: 13px;
+}
+.auth-toggle {
+  margin-top: 16px;
+  text-align: center;
+  color: var(--text-muted);
+}
+.field {
+  display: block;
+  margin-bottom: 12px;
+}
+.field span {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.field input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font: inherit;
+  background: var(--bg-elevated);
+}
+.field input:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: -1px;
+}
+
+/* ---------- Chat shell ---------- */
+.chat-shell {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  height: 100%;
+}
+.sidebar {
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+}
+.brand {
+  font-weight: 600;
+  font-size: 16px;
+}
+.user-row {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 13px;
+}
+.user-name { font-weight: 500; }
+.user-tenant {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin: 2px 0 6px;
+}
+.counts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.counts > div {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+  font-size: 12px;
+  text-align: center;
+}
+.counts strong {
+  display: block;
+  font-size: 16px;
+  margin-top: 2px;
+}
+.section-title {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: 4px;
+}
+.session-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.session-list li {
+  position: relative;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.session-list li:hover { background: var(--bg-elevated); }
+.session-list li.active {
+  background: var(--bg-elevated);
+  border-color: var(--primary);
+}
+.session-list li.empty {
+  color: var(--text-muted);
+  cursor: default;
+  font-style: italic;
+}
+.session-list .title {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-right: 16px;
+}
+.session-list .meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.session-list .del {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 16px;
+  padding: 0 6px;
+  border-radius: 4px;
+}
+.session-list .del:hover { color: var(--danger); background: #fef2f2; }
+
+/* ---------- Chat main pane ---------- */
+.chat-main {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.banner.error {
+  background: #fef2f2;
+  color: var(--danger);
+  padding: 10px 16px;
+  border-bottom: 1px solid #fecaca;
+  cursor: pointer;
+}
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.messages .empty {
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: 80px;
+}
+.turn {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.msg {
+  max-width: 80%;
+  padding: 10px 14px;
+  border-radius: 12px;
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+.msg.user {
+  align-self: flex-end;
+  background: var(--bubble-user);
+  color: var(--bubble-user-text);
+}
+.msg.ai {
+  align-self: flex-start;
+  background: var(--bubble-ai);
+  border: 1px solid var(--border);
+}
+.tool-trace {
+  align-self: flex-start;
+  font-size: 12px;
+  background: var(--bg-elevated);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  max-width: 80%;
+}
+.tool-trace summary {
+  cursor: pointer;
+  color: var(--text-muted);
+}
+.tool-trace ul {
+  margin: 8px 0 0;
+  padding-left: 20px;
+}
+.tool-trace code {
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.tool-trace pre {
+  background: var(--bg);
+  padding: 8px;
+  margin: 4px 0 8px;
+  border-radius: 4px;
+  white-space: pre-wrap;
+  font-size: 11px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+.composer {
+  display: flex;
+  gap: 8px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-elevated);
+}
+.composer textarea {
+  flex: 1;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font: inherit;
+  resize: none;
+  background: var(--bg);
+}
+.composer textarea:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: -1px;
+}
+.composer button {
+  align-self: flex-end;
+}
