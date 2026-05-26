@@ -121,7 +121,7 @@ async def upsert_github(payload: GithubConfigIn, admin: AdminUser) -> ConnectorS
     return _status_doc("github", cc.get_config("github"))
 
 
-@router.delete("/{name}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{name}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def delete_connector(name: str, _: AdminUser) -> None:
     if name not in cc.SUPPORTED_CONNECTORS:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"unknown connector {name!r}")

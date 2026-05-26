@@ -34,6 +34,6 @@ async def get_session(session_id: str, _user: CurrentUser) -> SessionDetail:
     return SessionDetail(**meta, messages=[bson_safe(m) for m in msgs])
 
 
-@router.delete("/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{session_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def delete_session(session_id: str, _user: CurrentUser) -> None:
     sess_mod.delete_session(session_id)

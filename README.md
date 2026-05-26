@@ -189,6 +189,8 @@ JWT secret comes from `settings.jwt_secret` — **rotate before any non-local de
 
 ## Quality gates
 
+CI runs on every push to `main` and every pull request via GitHub Actions.
+
 ```
 make fmt          # autoflake + ruff --fix + black
 make lint         # ruff + black --check
