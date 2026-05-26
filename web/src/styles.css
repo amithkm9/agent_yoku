@@ -140,9 +140,101 @@ button.link {
   min-height: 0;
   overflow: hidden;
 }
-.brand {
-  font-weight: 600;
-  font-size: 16px;
+.sidebar-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.brand-lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: inherit;
+  text-decoration: none;
+  min-width: 0;
+}
+.brand-mark {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #1d4ed8 0%, #0f172a 100%);
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 10px 24px rgba(29, 78, 216, 0.18);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.brand-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.brand-title {
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.brand-subtitle {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+.nav-icon {
+  width: 17px;
+  height: 17px;
+}
+.sidebar-bottom {
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid rgba(28, 28, 26, 0.08);
+}
+.account-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px;
+  box-shadow: var(--shadow);
+}
+.account-email {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  word-break: break-word;
+}
+.account-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 10px;
+}
+.account-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 38px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #334155;
+  text-decoration: none;
+  padding: 0 10px;
+}
+.account-button:hover {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+}
+.account-button span {
+  white-space: nowrap;
+}
+.account-button .nav-icon {
+  width: 16px;
+  height: 16px;
 }
 .user-row {
   background: var(--bg-elevated);
@@ -355,30 +447,67 @@ button.link {
   display: flex;
   gap: 8px;
   align-items: flex-end;
-  padding: 16px 24px;
-  border-top: 1px solid var(--border);
+  padding: 18px 24px 20px;
+  border-top: 1px solid rgba(28, 28, 26, 0.08);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.78) 0%, rgba(250, 250, 250, 0.98) 100%);
+  backdrop-filter: blur(10px);
+}
+.composer-inner {
+  flex: 1;
+  display: flex;
+  gap: 0;
+  align-items: stretch;
+  padding: 10px;
+  border: 1px solid #dbe3f0;
+  border-radius: 22px;
   background: var(--bg-elevated);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+}
+.composer-inner:focus-within {
+  border-color: #93c5fd;
+  box-shadow: 0 14px 34px rgba(29, 78, 216, 0.12);
 }
 .composer textarea {
   flex: 1;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px 12px;
+  border: none;
+  border-radius: 16px;
+  padding: 16px 18px;
   font: inherit;
   resize: none;
-  background: var(--bg);
+  background: transparent;
+  min-height: 72px;
+  line-height: 1.5;
+  transition: background 120ms ease;
 }
 .composer textarea:focus {
-  outline: 2px solid var(--primary);
-  outline-offset: -1px;
-}
-.composer button {
-  align-self: flex-end;
+  outline: none;
+  background: rgba(255, 255, 255, 0.7);
 }
 .composer-actions {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  justify-content: flex-end;
+  align-items: stretch;
+  padding-left: 10px;
+  margin-left: 10px;
+  border-left: 1px solid #e2e8f0;
+  min-width: 132px;
+}
+.send-button {
+  min-height: 100%;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 16px;
+  font-weight: 600;
+  box-shadow: 0 10px 18px rgba(29, 78, 216, 0.18);
+  min-width: 112px;
+}
+.send-button svg {
+  width: 16px;
+  height: 16px;
+}
+.send-button:disabled {
+  box-shadow: none;
 }
 
 /* ---------- Settings page ---------- */
@@ -396,22 +525,30 @@ button.link {
   border-bottom: 1px solid var(--border);
   background: var(--bg-elevated);
 }
-.settings-header .brand {
-  font-weight: 600;
-}
 .settings-header nav {
   display: flex;
-  gap: 16px;
+  gap: 10px;
 }
-.settings-header nav a {
+.nav-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid transparent;
   color: var(--text-muted);
   text-decoration: none;
-  padding: 4px 0;
-  border-bottom: 2px solid transparent;
+  background: transparent;
 }
-.settings-header nav a.active {
-  color: var(--text);
-  border-bottom-color: var(--primary);
+.nav-pill:hover {
+  background: #eef2ff;
+  border-color: #dbe4ff;
+  color: #1e3a8a;
+}
+.nav-pill.active {
+  color: #1e3a8a;
+  background: #eef2ff;
+  border-color: #c7d2fe;
 }
 .settings-header .who {
   margin-left: auto;
@@ -420,7 +557,7 @@ button.link {
 }
 .settings-main {
   flex: 1;
-  max-width: 720px;
+  max-width: 1180px;
   margin: 0 auto;
   padding: 32px 24px;
   width: 100%;
@@ -432,6 +569,19 @@ button.link {
 .settings-main .muted {
   color: var(--text-muted);
   margin-top: 0;
+}
+.settings-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(420px, 1.1fr);
+  gap: 28px;
+  align-items: start;
+}
+.connector-list-column {
+  min-width: 0;
+}
+.connector-panel {
+  position: sticky;
+  top: 24px;
 }
 .connector-hero {
   display: grid;
@@ -460,19 +610,57 @@ button.link {
   border: 1px solid var(--border);
   background: var(--bg-elevated);
   border-radius: 10px;
-  padding: 20px;
+  padding: 18px;
   margin: 16px 0;
   box-shadow: var(--shadow);
+}
+.connector-card.selected {
+  border-color: #93c5fd;
+  box-shadow: 0 14px 32px rgba(29, 78, 216, 0.1);
 }
 .connector-card header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
   margin-bottom: 12px;
+}
+.connector-header-copy {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  column-gap: 12px;
+  align-items: center;
+  min-width: 0;
+}
+.connector-header-copy .connector-source,
+.connector-header-copy h3 {
+  grid-column: 2;
 }
 .connector-card header h3 {
   margin: 0;
   font-size: 16px;
+}
+.connector-logo {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+}
+.connector-logo svg {
+  width: 24px;
+  height: 24px;
+  display: block;
+}
+.connector-logo.jira {
+  background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 55%, #60a5fa 100%);
+  color: white;
+}
+.connector-logo.github {
+  background: linear-gradient(135deg, #111827 0%, #334155 100%);
+  color: white;
 }
 .connector-source {
   margin: 0 0 4px;
@@ -496,6 +684,16 @@ button.link {
   font-size: 12px;
   color: var(--text-muted);
 }
+.connector-error-copy {
+  margin: 0 0 12px;
+  color: var(--danger);
+  font-size: 12px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  padding: 10px 12px;
+  word-break: break-word;
+}
 .badge {
   font-size: 11px;
   padding: 2px 8px;
@@ -513,34 +711,6 @@ button.link {
   background: #fef2f2;
   color: var(--danger);
   border-color: #fecaca;
-}
-.connector-meta {
-  display: grid;
-  grid-template-columns: 140px 1fr;
-  gap: 4px 16px;
-  margin: 0 0 16px;
-  font-size: 13px;
-}
-.connector-meta > div {
-  display: contents;
-}
-.connector-meta dt {
-  color: var(--text-muted);
-}
-.connector-meta dd {
-  margin: 0;
-  word-break: break-all;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.connector-meta dd small {
-  color: var(--text-muted);
-  font-size: 12px;
-  word-break: normal;
-}
-.connector-meta .error-row dd {
-  color: var(--danger);
 }
 .connector-checklist {
   margin: 0 0 16px;
@@ -568,12 +738,27 @@ button.danger:hover {
   background: var(--bg-elevated);
   border-radius: 10px;
   padding: 20px;
-  margin: 16px 0;
   box-shadow: var(--shadow);
 }
+.connector-panel-empty {
+  min-height: 280px;
+}
+.editor-title-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 12px;
+}
 .editor h3 {
-  margin: 0 0 12px;
+  margin: 0;
   font-size: 15px;
+}
+.editor-kicker {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 .editor-copy {
   margin: 0 0 16px;
@@ -589,5 +774,23 @@ button.danger:hover {
 @media (max-width: 900px) {
   .connector-hero {
     grid-template-columns: 1fr;
+  }
+
+  .settings-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .connector-panel {
+    position: static;
+  }
+
+  .settings-header {
+    flex-wrap: wrap;
+  }
+
+  .settings-header .who {
+    margin-left: 0;
+    width: 100%;
+    text-align: left;
   }
 }

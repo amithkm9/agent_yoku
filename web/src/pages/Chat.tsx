@@ -16,6 +16,7 @@ import {
   setToken,
   User,
 } from "../lib/api";
+import { AppBrand, SendIcon, SettingsIcon } from "../components/AppChrome";
 
 function extractText(content: unknown): string {
   if (content == null) return "";
@@ -291,21 +292,9 @@ export function Chat() {
   return (
     <div className="chat-shell">
       <aside className="sidebar">
-        <div className="brand">agent_yoku</div>
-        {user && (
-          <div className="user-row">
-            <div className="user-name">{user.name || user.email}</div>
-            <div className="user-tenant">tenant: {user.tenant_id}</div>
-            <div className="user-row-actions">
-              <Link to="/settings" className="link">
-                Settings
-              </Link>
-              <button className="link" onClick={logout}>
-                Log out
-              </button>
-            </div>
-          </div>
-        )}
+        <div className="sidebar-top">
+          <AppBrand subtitle="Home" />
+        </div>
         <button className="primary block" onClick={newSession}>
           + New session
         </button>
@@ -349,6 +338,25 @@ export function Chat() {
             <li className="empty">No sessions yet</li>
           )}
         </ul>
+
+        {user && (
+          <div className="sidebar-bottom">
+            <div className="account-card">
+              <div className="user-name">{user.name || user.email}</div>
+              <div className="account-email">{user.email}</div>
+              <div className="user-tenant">tenant: {user.tenant_id}</div>
+              <div className="account-actions">
+                <Link to="/settings" className="account-button" aria-label="Open settings">
+                  <SettingsIcon />
+                  <span>Settings</span>
+                </Link>
+                <button className="account-button" onClick={logout}>
+                  <span>Log out</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </aside>
 
       <main className="chat-main">
@@ -399,23 +407,27 @@ export function Chat() {
             void send();
           }}
         >
-          <textarea
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder={busy ? "Agent thinking…" : "Ask about JIRA tickets or GitHub PRs…"}
-            disabled={busy}
-            onKeyDown={(e: KeyboardEvent<HTMLTextAreaElement>) => {
-              if (e.key !== "Enter" || e.shiftKey) return;
-              if (e.nativeEvent.isComposing) return;
-              e.preventDefault();
-              void send();
-            }}
-            rows={2}
-          />
-          <div className="composer-actions">
-            <button className="primary" type="submit" disabled={busy || !draft.trim()}>
-              Send
-            </button>
+          <div className="composer-inner">
+            <textarea
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              placeholder={busy ? "Agent thinking…" : "Ask about JIRA tickets or GitHub PRs…"}
+              disabled={busy}
+              onKeyDown={(e: KeyboardEvent<HTMLTextAreaElement>) => {
+                if (e.key !== "Enter" || e.shiftKey) return;
+                if (e.nativeEvent.isComposing) return;
+                e.preventDefault();
+                void send();
+              }}
+              rows={3}
+              aria-label="Message composer"
+            />
+            <div className="composer-actions">
+              <button className="primary send-button" type="submit" disabled={busy || !draft.trim()}>
+                <SendIcon />
+                <span>Send</span>
+              </button>
+            </div>
           </div>
         </form>
       </main>

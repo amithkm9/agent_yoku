@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import {
   api,
   ConnectorStatus,
@@ -7,6 +7,7 @@ import {
   JiraConfigIn,
   User,
 } from "../lib/api";
+import { AppBrand, SettingsIcon } from "../components/AppChrome";
 
 type EditingName = "jira" | "github" | null;
 
@@ -31,6 +32,9 @@ export function Settings() {
     api.me().then(setUser).catch(() => nav("/login"));
     refresh();
   }, [nav, refresh]);
+
+  const activeConnector =
+    editing == null ? null : connectors?.find((connector) => connector.name === editing) || null;
 
   async function onDelete(name: string) {
     if (!confirm(`Disconnect ${name}? This won't delete already-ingested data.`)) return;
@@ -102,38 +106,46 @@ export function Settings() {
           </div>
         )}
 
-        {connectors === null && <p className="muted">Loading…</p>}
-        {connectors?.map((c) => (
-          <ConnectorCard
-            key={c.name}
-            status={c}
-            busy={busy}
-            onConnect={() => setEditing(c.name as EditingName)}
-            onDelete={() => onDelete(c.name)}
-            onSync={() => onSync(c.name)}
-          />
-        ))}
+        <section className="settings-workspace">
+          <div className="connector-list-column">
+            {connectors === null && <p className="muted">Loading…</p>}
+            {connectors?.map((c) => (
+              <ConnectorCard
+                key={c.name}
+                status={c}
+                busy={busy}
+                selected={editing === c.name}
+                onConnect={() => setEditing(c.name as EditingName)}
+                onDelete={() => onDelete(c.name)}
+                onSync={() => onSync(c.name)}
+              />
+            ))}
+          </div>
 
-        {editing === "jira" && (
-          <JiraEditor
-            initial={connectors?.find((c) => c.name === "jira")}
-            onCancel={() => setEditing(null)}
-            onSaved={async () => {
-              setEditing(null);
-              await refresh();
-            }}
-          />
-        )}
-        {editing === "github" && (
-          <GithubEditor
-            initial={connectors?.find((c) => c.name === "github")}
-            onCancel={() => setEditing(null)}
-            onSaved={async () => {
-              setEditing(null);
-              await refresh();
-            }}
-          />
-        )}
+          <aside className="connector-panel">
+            {activeConnector == null ? (
+              <ConnectorPanelIntro />
+            ) : activeConnector.name === "jira" ? (
+              <JiraEditor
+                initial={activeConnector}
+                onCancel={() => setEditing(null)}
+                onSaved={async () => {
+                  setEditing(null);
+                  await refresh();
+                }}
+              />
+            ) : (
+              <GithubEditor
+                initial={activeConnector}
+                onCancel={() => setEditing(null)}
+                onSaved={async () => {
+                  setEditing(null);
+                  await refresh();
+                }}
+              />
+            )}
+          </aside>
+        </section>
       </main>
     </div>
   );
@@ -142,12 +154,15 @@ export function Settings() {
 function SettingsHeader({ user }: { user: User }) {
   return (
     <header className="settings-header">
-      <div className="brand">agent_yoku</div>
+      <AppBrand subtitle="Tenant settings" />
       <nav>
-        <Link to="/">Chat</Link>
-        <Link to="/settings" className="active">
-          Settings
-        </Link>
+        <NavLink
+          to="/settings"
+          className={({ isActive }) => `nav-pill${isActive ? " active" : ""}`}
+        >
+          <SettingsIcon />
+          <span>Settings</span>
+        </NavLink>
       </nav>
       <div className="who">
         <div className="user-name">{user.name || user.email}</div>
@@ -160,12 +175,14 @@ function SettingsHeader({ user }: { user: User }) {
 function ConnectorCard({
   status,
   busy,
+  selected,
   onConnect,
   onDelete,
   onSync,
 }: {
   status: ConnectorStatus;
   busy: string | null;
+  selected: boolean;
   onConnect: () => void;
   onDelete: () => void;
   onSync: () => void;
@@ -173,9 +190,10 @@ function ConnectorCard({
   const syncing = busy === `sync:${status.name}`;
   const deleting = busy === `delete:${status.name}`;
   return (
-    <section className="connector-card">
+    <section className={`connector-card${selected ? " selected" : ""}`}>
       <header>
-        <div>
+        <div className="connector-header-copy">
+          <ConnectorLogo name={status.name} />
           <p className="connector-source">{status.guide.source}</p>
           <h3>{status.guide.display_name}</h3>
         </div>
@@ -194,27 +212,9 @@ function ConnectorCard({
             ) : (
               <span>Connected, but initial sync has not run yet.</span>
             )}
-            <span>{status.guide.setup_steps.at(-1)}</span>
+            <span>Edit on the right to update credentials.</span>
           </div>
-          <dl className="connector-meta">
-            {Object.entries(status.config).map(([k, v]) => (
-              <div key={k}>
-                <dt>{labelForField(k)}</dt>
-                <dd>
-                  <span>{String(v)}</span>
-                  {status.guide.field_help[k] && (
-                    <small>{status.guide.field_help[k]}</small>
-                  )}
-                </dd>
-              </div>
-            ))}
-            {status.last_sync_error && (
-              <div className="error-row">
-                <dt>Last error</dt>
-                <dd>{status.last_sync_error}</dd>
-              </div>
-            )}
-          </dl>
+          {status.last_sync_error && <p className="connector-error-copy">{status.last_sync_error}</p>}
           <div className="connector-actions">
             <button onClick={onSync} disabled={syncing}>
               {syncing ? "Sync starting…" : "Sync now"}
@@ -243,6 +243,24 @@ function ConnectorCard({
   );
 }
 
+function ConnectorPanelIntro() {
+  return (
+    <section className="editor connector-panel-empty">
+      <h3>Choose a connector</h3>
+      <p className="editor-copy">
+        Select <strong>Connect</strong> or <strong>Edit</strong> on the left to open a
+        configuration workspace here. This keeps setup anchored while preserving
+        status and sync history beside it.
+      </p>
+      <ul className="connector-checklist">
+        <li>Use JIRA to index tickets, assignees, and project activity.</li>
+        <li>Use GitHub to index pull requests, contributors, and repo activity.</li>
+        <li>After saving, run a sync once and return to Home to query the data.</li>
+      </ul>
+    </section>
+  );
+}
+
 function Badge({ status }: { status: ConnectorStatus }) {
   if (!status.configured) return <span className="badge muted">Not connected</span>;
   if (status.last_sync_status === "error")
@@ -250,6 +268,31 @@ function Badge({ status }: { status: ConnectorStatus }) {
   if (status.last_synced_at)
     return <span className="badge ok">Synced</span>;
   return <span className="badge muted">Connected · never synced</span>;
+}
+
+function ConnectorLogo({ name }: { name: string }) {
+  if (name === "jira") {
+    return (
+      <span className="connector-logo jira" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none">
+          <path d="M4 9.2 11.2 2H22l-7.2 7.2H4Z" fill="currentColor" />
+          <path d="M8.2 13.4 15.4 6.2h4.2L12.4 13.4H8.2Z" fill="currentColor" opacity="0.75" />
+          <path d="M2 11.6h10.8L20 18.8H9.2L2 11.6Z" fill="currentColor" opacity="0.55" />
+        </svg>
+      </span>
+    );
+  }
+
+  return (
+    <span className="connector-logo github" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none">
+        <path
+          d="M12 3.2a8.8 8.8 0 0 0-2.78 17.15c.44.08.6-.19.6-.43v-1.52c-2.43.53-2.94-1.03-2.94-1.03-.4-1-.97-1.28-.97-1.28-.79-.55.06-.54.06-.54.88.06 1.35.91 1.35.91.78 1.33 2.05.94 2.55.72.08-.57.31-.94.56-1.16-1.94-.22-3.98-.97-3.98-4.3 0-.95.34-1.73.9-2.34-.1-.22-.39-1.11.08-2.32 0 0 .73-.24 2.4.89a8.3 8.3 0 0 1 4.38 0c1.67-1.13 2.4-.89 2.4-.89.47 1.21.18 2.1.09 2.32.56.61.9 1.39.9 2.34 0 3.34-2.05 4.07-4 4.29.31.26.59.78.59 1.58v2.34c0 .24.16.52.6.43A8.8 8.8 0 0 0 12 3.2Z"
+          fill="currentColor"
+        />
+      </svg>
+    </span>
+  );
 }
 
 function JiraEditor({
@@ -290,7 +333,13 @@ function JiraEditor({
 
   return (
     <form className="editor" onSubmit={save}>
-      <h3>{initial?.configured ? "Edit JIRA" : "Connect JIRA"}</h3>
+      <div className="editor-title-row">
+        <ConnectorLogo name="jira" />
+        <div>
+          <h3>{initial?.configured ? "Edit JIRA" : "Connect JIRA"}</h3>
+          <p className="editor-kicker">Atlassian JIRA</p>
+        </div>
+      </div>
       <p className="editor-copy">
         JIRA powers ticket search, assignment lookups, and team activity summaries for
         this tenant.
@@ -385,7 +434,13 @@ function GithubEditor({
 
   return (
     <form className="editor" onSubmit={save}>
-      <h3>{initial?.configured ? "Edit GitHub" : "Connect GitHub"}</h3>
+      <div className="editor-title-row">
+        <ConnectorLogo name="github" />
+        <div>
+          <h3>{initial?.configured ? "Edit GitHub" : "Connect GitHub"}</h3>
+          <p className="editor-kicker">GitHub</p>
+        </div>
+      </div>
       <p className="editor-copy">
         GitHub powers pull request search, contributor lookups, and engineering activity
         questions for this tenant.
@@ -447,23 +502,6 @@ function GithubEditor({
         </button>
       </div>
     </form>
-  );
-}
-
-function titleCase(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
-function labelForField(name: string): string {
-  return (
-    {
-      base_url: "Base URL",
-      email: "Email",
-      project: "Project key",
-      api_base: "API base",
-      org: "Organisation",
-      pr_lookback_days: "PR lookback days",
-    }[name] || titleCase(name.replaceAll("_", " "))
   );
 }
 
