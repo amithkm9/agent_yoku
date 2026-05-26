@@ -71,6 +71,29 @@ export interface PersistedMessage {
   msg_idx: number;
 }
 
+// Turn a FastAPI error body into something fit for a form banner. Pydantic 422s
+// arrive as {detail: [{msg, loc}, ...]}; plain HTTPExceptions as {detail: "..."}.
+function errorMessage(status: number, statusText: string, text: string): string {
+  try {
+    const detail = (JSON.parse(text) as { detail?: unknown }).detail;
+    if (typeof detail === "string") return detail;
+    if (Array.isArray(detail)) {
+      const msg = detail
+        .map((e) =>
+          typeof (e as { msg?: unknown }).msg === "string"
+            ? (e as { msg: string }).msg.replace(/^Value error,\s*/, "")
+            : null
+        )
+        .filter(Boolean)
+        .join("; ");
+      if (msg) return msg;
+    }
+  } catch {
+    // Body wasn't JSON — fall back to the raw text below.
+  }
+  return text || `${status} ${statusText}`;
+}
+
 async function request<T>(
   path: string,
   init: RequestInit & { json?: unknown; tenantQuery?: boolean } = {}
@@ -101,7 +124,7 @@ async function request<T>(
   }
   if (!r.ok) {
     const text = await r.text();
-    throw new Error(`${r.status} ${r.statusText}: ${text}`);
+    throw new Error(errorMessage(r.status, r.statusText, text));
   }
   if (r.status === 204) return undefined as T;
   return (await r.json()) as T;

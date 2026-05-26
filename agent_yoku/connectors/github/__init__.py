@@ -17,7 +17,7 @@ META: ConnectorMeta = {
     ],
     "field_help": {
         "api_base": "Use the public GitHub API unless you run GitHub Enterprise.",
-        "org": "The GitHub organization whose repositories should be indexed.",
+        "org": "Just the org slug from the URL (e.g. 'AsatoCorp'), not the full link.",
         "pr_lookback_days": "How many days of pull request history to ingest on sync.",
         "token": "GitHub personal access token. Stored encrypted and never returned to the UI.",
     },

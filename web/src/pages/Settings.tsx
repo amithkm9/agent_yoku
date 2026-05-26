@@ -459,7 +459,7 @@ function GithubEditor({
         <input
           value={form.org}
           onChange={(e) => setForm({ ...form, org: e.target.value })}
-          placeholder="github org name"
+          placeholder="e.g. AsatoCorp"
           required
         />
         <small>{initial?.guide.field_help.org || defaultFieldHelp.org}</small>
@@ -511,6 +511,6 @@ const defaultFieldHelp: Record<string, string> = {
   token: "Stored encrypted and never returned to the UI.",
   project: "The JIRA project key agent_yoku should index.",
   api_base: "Use the public GitHub API unless you run GitHub Enterprise.",
-  org: "The GitHub organization to index.",
+  org: "Just the org slug from the URL (e.g. AsatoCorp), not the full link.",
   pr_lookback_days: "How many days of pull request history to ingest on sync.",
 };

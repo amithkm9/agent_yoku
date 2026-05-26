@@ -67,7 +67,9 @@ def test_github_main_ignores_process_argv(monkeypatch):
 def test_jira_cli_main_uses_explicit_argv(monkeypatch):
     seen: dict[str, str] = {}
 
-    monkeypatch.setattr(jira_ingest, "main", lambda extra=None: seen.setdefault("extra", extra or ""))
+    monkeypatch.setattr(
+        jira_ingest, "main", lambda extra=None: seen.setdefault("extra", extra or "")
+    )
     jira_ingest.cli_main(["updated >= -7d"])
 
     assert seen["extra"] == "updated >= -7d"
@@ -76,7 +78,9 @@ def test_jira_cli_main_uses_explicit_argv(monkeypatch):
 def test_github_cli_main_uses_explicit_argv(monkeypatch):
     seen: dict[str, list[str]] = {}
 
-    monkeypatch.setattr(gh_ingest, "main", lambda filters=None: seen.setdefault("filters", filters or []))
+    monkeypatch.setattr(
+        gh_ingest, "main", lambda filters=None: seen.setdefault("filters", filters or [])
+    )
     gh_ingest.cli_main(["repo-a", "repo-b"])
 
     assert seen["filters"] == ["repo-a", "repo-b"]
