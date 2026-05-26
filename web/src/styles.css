@@ -333,3 +333,141 @@ button.link {
 .composer button {
   align-self: flex-end;
 }
+
+/* ---------- Settings page ---------- */
+.settings-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.settings-header {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elevated);
+}
+.settings-header .brand {
+  font-weight: 600;
+}
+.settings-header nav {
+  display: flex;
+  gap: 16px;
+}
+.settings-header nav a {
+  color: var(--text-muted);
+  text-decoration: none;
+  padding: 4px 0;
+  border-bottom: 2px solid transparent;
+}
+.settings-header nav a.active {
+  color: var(--text);
+  border-bottom-color: var(--primary);
+}
+.settings-header .who {
+  margin-left: auto;
+  text-align: right;
+  font-size: 12px;
+}
+.settings-main {
+  flex: 1;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 32px 24px;
+  width: 100%;
+  overflow-y: auto;
+}
+.settings-main h2 {
+  margin: 0 0 4px;
+}
+.settings-main .muted {
+  color: var(--text-muted);
+  margin-top: 0;
+}
+.user-row-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+.connector-card {
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  border-radius: 10px;
+  padding: 20px;
+  margin: 16px 0;
+  box-shadow: var(--shadow);
+}
+.connector-card header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.connector-card header h3 {
+  margin: 0;
+  font-size: 16px;
+}
+.badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-muted);
+}
+.badge.ok {
+  background: #ecfdf5;
+  color: #047857;
+  border-color: #a7f3d0;
+}
+.badge.danger {
+  background: #fef2f2;
+  color: var(--danger);
+  border-color: #fecaca;
+}
+.connector-meta {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 4px 16px;
+  margin: 0 0 16px;
+  font-size: 13px;
+}
+.connector-meta > div {
+  display: contents;
+}
+.connector-meta dt {
+  color: var(--text-muted);
+}
+.connector-meta dd {
+  margin: 0;
+  word-break: break-all;
+}
+.connector-meta .error-row dd {
+  color: var(--danger);
+}
+.connector-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+button.danger {
+  border-color: #fecaca;
+  color: var(--danger);
+  background: #fef2f2;
+}
+button.danger:hover {
+  background: #fee2e2;
+}
+.editor {
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  border-radius: 10px;
+  padding: 20px;
+  margin: 16px 0;
+  box-shadow: var(--shadow);
+}
+.editor h3 {
+  margin: 0 0 12px;
+  font-size: 15px;
+}

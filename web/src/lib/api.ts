@@ -132,4 +132,42 @@ export const api = {
     request<ChatResponse>("/api/chat", { method: "POST", json: { session_id, query } }),
 
   counts: () => request<Counts>("/api/stats/counts"),
+
+  listConnectors: () => request<ConnectorStatus[]>("/api/connectors"),
+  saveJiraConfig: (cfg: JiraConfigIn) =>
+    request<ConnectorStatus>("/api/connectors/jira", { method: "PUT", json: cfg }),
+  saveGithubConfig: (cfg: GithubConfigIn) =>
+    request<ConnectorStatus>("/api/connectors/github", { method: "PUT", json: cfg }),
+  deleteConnector: (name: string) =>
+    request<void>(`/api/connectors/${name}`, { method: "DELETE" }),
+  syncConnector: (name: string) =>
+    request<{ name: string; status: "started" }>(`/api/connectors/${name}/sync`, {
+      method: "POST",
+    }),
 };
+
+export interface JiraConfigIn {
+  base_url: string;
+  email: string;
+  /** Blank/omitted on edit = keep existing stored token. Required on first connect. */
+  token?: string;
+  project: string;
+}
+
+export interface GithubConfigIn {
+  api_base: string;
+  /** Blank/omitted on edit = keep existing stored token. Required on first connect. */
+  token?: string;
+  org: string;
+  pr_lookback_days: number;
+}
+
+export interface ConnectorStatus {
+  name: string;
+  configured: boolean;
+  config: Record<string, unknown>;
+  last_synced_at: string | null;
+  last_sync_status: string | null;
+  last_sync_error: string | null;
+  updated_at: string | null;
+}

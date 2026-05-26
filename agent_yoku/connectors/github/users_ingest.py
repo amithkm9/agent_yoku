@@ -1,4 +1,4 @@
-"""Pull AsatoCorp org members + their public profiles into mongo.
+"""Pull org members + their public profiles into mongo.
 
 For each member we capture: login, id, name, email (if public), type (User|Bot),
 upsert by login. Run once, then occasionally re-run to refresh joiners/leavers.
@@ -15,22 +15,24 @@ from datetime import UTC, datetime
 import requests
 from pymongo import UpdateOne
 
-from agent_yoku.config import GITHUB_API_BASE, GITHUB_ORG, github_users_collection
+from agent_yoku.connectors._runtime import current_github_config
 from agent_yoku.connectors.github.client import _get, _paginate
 from agent_yoku.log import get_logger
+from agent_yoku.storage.mongo import github_users_collection
 
 log = get_logger("ingest_gh_users")
 
 
 def _user_profile(login: str) -> dict:
     """Hit /users/{login} for the public profile, including email if exposed."""
-    url = f"{GITHUB_API_BASE}/users/{login}"
+    url = f"{current_github_config().api_base_clean}/users/{login}"
     return _get(url).json()
 
 
 def main() -> None:
-    log.info("listing members of %s", GITHUB_ORG)
-    members_url = f"{GITHUB_API_BASE}/orgs/{GITHUB_ORG}/members"
+    cfg = current_github_config()
+    log.info("listing members of %s", cfg.org)
+    members_url = f"{cfg.api_base_clean}/orgs/{cfg.org}/members"
     members = list(_paginate(members_url, {"per_page": 100, "filter": "all"}))
     log.info("found %d members", len(members))
 

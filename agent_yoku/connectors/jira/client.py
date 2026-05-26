@@ -1,4 +1,8 @@
-"""Minimal JIRA REST v3 client: paginated search + ADF -> plain text."""
+"""Minimal JIRA REST v3 client: paginated search + ADF -> plain text.
+
+Reads connection details from `current_jira_config()` on every call so a
+multi-tenant ingest can rebind creds per tenant via `use_jira(cfg)`.
+"""
 
 from __future__ import annotations
 
@@ -7,7 +11,7 @@ from typing import Any
 
 import requests
 
-from agent_yoku.config import JIRA_BASE_URL, JIRA_EMAIL, JIRA_TOKEN
+from agent_yoku.connectors._runtime import current_jira_config
 from agent_yoku.log import get_logger
 from agent_yoku.utils import make_retry
 
@@ -16,7 +20,8 @@ _retry_log = get_logger("jira_client.retry")
 
 @make_retry("jira", _retry_log)
 def _jira_get(url: str, params: dict[str, Any]) -> requests.Response:
-    r = requests.get(url, params=params, auth=_auth(), timeout=30)
+    cfg = current_jira_config()
+    r = requests.get(url, params=params, auth=(cfg.email, cfg.token), timeout=30)
     r.raise_for_status()
     return r
 
@@ -34,10 +39,6 @@ _FIELDS = [
     "updated",
     "fixVersions",
 ]
-
-
-def _auth() -> tuple[str, str]:
-    return (JIRA_EMAIL, JIRA_TOKEN)
 
 
 def adf_to_text(node: Any) -> str:
@@ -60,7 +61,7 @@ def adf_to_text(node: Any) -> str:
 
 def search_issues(jql: str, page_size: int = 100) -> Iterator[dict]:
     """Yield issues page by page using the new /search/jql endpoint."""
-    url = f"{JIRA_BASE_URL}/rest/api/3/search/jql"
+    url = f"{current_jira_config().base_url_clean}/rest/api/3/search/jql"
     next_token: str | None = None
     while True:
         params: dict[str, Any] = {
@@ -108,5 +109,5 @@ def issue_to_doc(issue: dict) -> dict:
         "created": f.get("created"),
         "updated": f.get("updated"),
         "text": text,
-        "url": f"{JIRA_BASE_URL}/browse/{issue['key']}",
+        "url": f"{current_jira_config().base_url_clean}/browse/{issue['key']}",
     }

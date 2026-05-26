@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 
-from agent_yoku.config import JIRA_BASE_URL
+from agent_yoku.connectors._runtime import current_jira_config
 from agent_yoku.connectors.jira.client import _jira_get
 
 
 def search_users(page_size: int = 200) -> Iterator[dict]:
     """Yield every user in the JIRA instance via /rest/api/3/users/search."""
-    url = f"{JIRA_BASE_URL}/rest/api/3/users/search"
+    url = f"{current_jira_config().base_url_clean}/rest/api/3/users/search"
     start_at = 0
     while True:
         params = {"query": "", "startAt": start_at, "maxResults": page_size}
@@ -27,6 +27,7 @@ def search_users(page_size: int = 200) -> Iterator[dict]:
 def user_to_doc(user: dict) -> dict:
     """Flatten a JIRA user payload into our mongo doc shape."""
     avatars = user.get("avatarUrls") or {}
+    base = current_jira_config().base_url_clean
     return {
         "accountId": user.get("accountId"),
         "displayName": user.get("displayName"),
@@ -36,9 +37,5 @@ def user_to_doc(user: dict) -> dict:
         "timeZone": user.get("timeZone"),
         "locale": user.get("locale"),
         "avatarUrl": avatars.get("48x48"),
-        "url": (
-            f"{JIRA_BASE_URL}/jira/people/{user.get('accountId')}"
-            if user.get("accountId")
-            else None
-        ),
+        "url": (f"{base}/jira/people/{user.get('accountId')}" if user.get("accountId") else None),
     }

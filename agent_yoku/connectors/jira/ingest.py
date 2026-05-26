@@ -1,8 +1,12 @@
 """Fetch all tickets from JIRA project and upsert into mongo.
 
 Usage:
-    python ingest.py                # all AS tickets, ordered by updated
+    python ingest.py                # all <project> tickets, ordered by updated
     python ingest.py 'updated >= -7d'  # custom JQL fragment appended
+
+The JIRA project + credentials come from `current_jira_config()` — i.e. either
+the per-tenant config bound by the connectors router, or the env-driven default
+for CLI invocations.
 """
 
 from __future__ import annotations
@@ -13,15 +17,17 @@ from datetime import UTC, datetime
 
 from pymongo import UpdateOne
 
-from agent_yoku.config import JIRA_PROJECT, tickets_collection
+from agent_yoku.connectors._runtime import current_jira_config
 from agent_yoku.connectors.jira.client import issue_to_doc, search_issues
 from agent_yoku.log import get_logger
+from agent_yoku.storage.mongo import tickets_collection
 
 log = get_logger("ingest")
 
 
 def build_jql(extra: str | None) -> str:
-    base = f'project = "{JIRA_PROJECT}"'
+    project = current_jira_config().project
+    base = f'project = "{project}"'
     if extra:
         base = f"{base} AND ({extra})"
     return f"{base} ORDER BY updated DESC"

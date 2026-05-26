@@ -69,6 +69,43 @@ class ChatResponse(BaseModel):
     tool_calls: list[ToolCallSummary] = Field(default_factory=list)
 
 
+# ---------- Connectors ----------
+
+
+class JiraConfigIn(BaseModel):
+    """Inbound JIRA config. `token` is optional on edit — blank means
+    'keep the previously stored token'. Required on first-time setup."""
+
+    base_url: str
+    email: str
+    token: str | None = None
+    project: str
+
+
+class GithubConfigIn(BaseModel):
+    """Inbound GitHub config. See `JiraConfigIn.token` for blank-token semantics."""
+
+    api_base: str = "https://api.github.com"
+    token: str | None = None
+    org: str
+    pr_lookback_days: int = 365
+
+
+class ConnectorStatus(BaseModel):
+    name: str
+    configured: bool
+    config: dict[str, Any] = Field(default_factory=dict)  # non-secret fields only
+    last_synced_at: datetime | None = None
+    last_sync_status: str | None = None
+    last_sync_error: str | None = None
+    updated_at: datetime | None = None
+
+
+class ConnectorSyncResponse(BaseModel):
+    name: str
+    status: Literal["started"]
+
+
 # ---------- Stats ----------
 
 

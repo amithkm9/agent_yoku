@@ -1,7 +1,8 @@
 """Minimal GitHub REST v3 client: list non-archived repos + paginated PRs.
 
 Mirrors jira_client.py: thin wrapper around requests, returns flattened mongo
-docs ready for upsert.
+docs ready for upsert. Connection details come from `current_github_config()`
+so a multi-tenant ingest can rebind creds per tenant via `use_github(cfg)`.
 """
 
 from __future__ import annotations
@@ -12,7 +13,7 @@ from typing import Any
 
 import requests
 
-from agent_yoku.config import GITHUB_API_BASE, GITHUB_ORG, GITHUB_PR_LOOKBACK_DAYS, GITHUB_TOKEN
+from agent_yoku.connectors._runtime import current_github_config
 from agent_yoku.log import get_logger
 from agent_yoku.utils import extract_jira_keys, make_retry
 
@@ -30,7 +31,7 @@ BOT_AUTHORS = {
 
 def _headers() -> dict[str, str]:
     return {
-        "Authorization": f"Bearer {GITHUB_TOKEN}",
+        "Authorization": f"Bearer {current_github_config().token}",
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
     }
@@ -57,7 +58,8 @@ def _paginate(url: str, params: dict[str, Any] | None = None) -> Iterator[dict]:
 
 def list_non_archived_repos() -> Iterator[dict]:
     """Yield each non-archived repo in the configured org."""
-    url = f"{GITHUB_API_BASE}/orgs/{GITHUB_ORG}/repos"
+    cfg = current_github_config()
+    url = f"{cfg.api_base_clean}/orgs/{cfg.org}/repos"
     for repo in _paginate(url, {"type": "all", "per_page": 100, "sort": "updated"}):
         if repo.get("archived"):
             continue
@@ -71,7 +73,7 @@ def list_pulls(repo_full_name: str, since: datetime) -> Iterator[dict]:
     short-circuit at the cutoff. A 404/403/410 on the repo is logged and
     skipped so one bad repo doesn't kill an org-wide ingest.
     """
-    url = f"{GITHUB_API_BASE}/repos/{repo_full_name}/pulls"
+    url = f"{current_github_config().api_base_clean}/repos/{repo_full_name}/pulls"
     params = {
         "state": "all",
         "per_page": 100,
@@ -164,4 +166,4 @@ def is_bot(pr: dict) -> bool:
 
 
 def lookback_cutoff() -> datetime:
-    return datetime.now(UTC) - timedelta(days=GITHUB_PR_LOOKBACK_DAYS)
+    return datetime.now(UTC) - timedelta(days=current_github_config().pr_lookback_days)

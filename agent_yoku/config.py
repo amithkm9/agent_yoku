@@ -68,6 +68,11 @@ class Settings(BaseSettings):
     )
     jwt_ttl_hours: int = 24
 
+    # Optional dedicated key for encrypting per-tenant connector secrets at rest.
+    # Falls back to `jwt_secret` if unset — fine for dev. Override in prod so
+    # rotating JWT secrets doesn't invalidate stored connector tokens.
+    connector_secret_key: SecretStr | None = None
+
     # Multi-tenancy — single mongo cluster, db per tenant. The configured
     # default tenant maps to the bare `mongo_db`; all others get a suffix.
     default_tenant_id: str = "default"

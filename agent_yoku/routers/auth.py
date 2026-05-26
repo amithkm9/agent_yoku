@@ -35,6 +35,24 @@ def _to_user_out(doc: dict) -> UserOut:
     )
 
 
+def _bind_tenant(tenant: str | None) -> None:
+    """Normalize + validate a tenant query param, then bind it for this request.
+
+    Empty/None falls back to `settings.default_tenant_id`. Anything that doesn't
+    match the tenant regex is rejected up-front so we never materialize a mongo
+    db from untrusted input.
+    """
+    if not tenant:
+        return
+    normalized = tenancy.normalize_tenant_id(tenant)
+    if not tenancy.is_valid_tenant_id(normalized):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "invalid tenant id (allowed: 2-40 chars, a-z0-9_-, must start alphanumeric)",
+        )
+    tenancy.set_tenant(normalized)
+
+
 # ---------- OAuth2-compatible token endpoint (for FastAPI Swagger + clients) ----------
 
 
@@ -50,8 +68,7 @@ async def login(
     Uses the OAuth2PasswordRequestForm so it's compatible with the FastAPI
     Swagger 'Authorize' button. JSON variant lives at /auth/login-json.
     """
-    if tenant:
-        tenancy.set_tenant(tenant)
+    _bind_tenant(tenant)
     doc = auth_users_collection().find_one({"email": form.username.lower()})
     if not doc or not verify_password(form.password, doc["password_hash"]):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid credentials")
@@ -69,8 +86,7 @@ async def login(
 @router.post("/login-json", response_model=TokenResponse)
 async def login_json(req: LoginRequest, tenant: str = Query(default=None)) -> TokenResponse:
     """JSON-bodied variant — the React UI uses this."""
-    if tenant:
-        tenancy.set_tenant(tenant)
+    _bind_tenant(tenant)
     doc = auth_users_collection().find_one({"email": req.email.lower()})
     if not doc or not verify_password(req.password, doc["password_hash"]):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid credentials")
@@ -99,8 +115,7 @@ async def signup(
     The first user of a tenant becomes its admin automatically. Tenant ids
     are case-insensitive and lowercased.
     """
-    if tenant:
-        tenancy.set_tenant(tenant.lower())
+    _bind_tenant(tenant)
 
     coll = auth_users_collection()
     if coll.find_one({"email": req.email.lower()}):

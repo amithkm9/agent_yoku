@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from agent_yoku.log import get_logger
 from agent_yoku.middleware import RequestContext
-from agent_yoku.routers import auth, chat, sessions, stats
+from agent_yoku.routers import auth, chat, connectors, sessions, stats
 
 log = get_logger("api.main")
 
@@ -37,6 +37,7 @@ def create_app() -> FastAPI:
     app.include_router(sessions.router, prefix="/api")
     app.include_router(chat.router, prefix="/api")
     app.include_router(stats.router, prefix="/api")
+    app.include_router(connectors.router, prefix="/api")
 
     @app.get("/healthz", tags=["health"])
     async def healthz() -> dict:

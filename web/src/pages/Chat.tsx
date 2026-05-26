@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   api,
   ChatResponse,
@@ -144,9 +144,14 @@ export function Chat() {
           <div className="user-row">
             <div className="user-name">{user.name || user.email}</div>
             <div className="user-tenant">tenant: {user.tenant_id}</div>
-            <button className="link" onClick={logout}>
-              Log out
-            </button>
+            <div className="user-row-actions">
+              <Link to="/settings" className="link">
+                Settings
+              </Link>
+              <button className="link" onClick={logout}>
+                Log out
+              </button>
+            </div>
           </div>
         )}
         <button className="primary block" onClick={newSession}>

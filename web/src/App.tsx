@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { Login } from "./pages/Login";
 import { Chat } from "./pages/Chat";
+import { Settings } from "./pages/Settings";
 import { getToken } from "./lib/api";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -16,6 +17,14 @@ export function App() {
         element={
           <RequireAuth>
             <Chat />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <RequireAuth>
+            <Settings />
           </RequireAuth>
         }
       />

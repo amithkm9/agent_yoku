@@ -13,11 +13,26 @@ Set the tenant in three places:
 
 from __future__ import annotations
 
+import re
 from contextvars import ContextVar
 
 from agent_yoku.config import settings
 
 _current: ContextVar[str | None] = ContextVar("tenant_id", default=None)
+
+# Lowercase alphanumeric + `-` / `_`, 2-40 chars, must start with alphanumeric.
+# Keeps tenant ids URL-safe and rules out trailing-whitespace / unicode-
+# lookalike weirdness at the boundary.
+_TENANT_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{1,39}$")
+
+
+def is_valid_tenant_id(tenant_id: str) -> bool:
+    return bool(_TENANT_RE.match(tenant_id))
+
+
+def normalize_tenant_id(tenant_id: str) -> str:
+    """Lowercase + strip. Caller should validate the result with `is_valid_tenant_id`."""
+    return tenant_id.strip().lower()
 
 
 def set_tenant(tenant_id: str | None) -> None:

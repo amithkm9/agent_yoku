@@ -1,4 +1,4 @@
-"""Fetch GitHub PRs from all non-archived AsatoCorp repos into mongo.
+"""Fetch GitHub PRs from all non-archived org repos into mongo.
 
 Usage:
     python ingest_github.py                     # all non-archived repos, last N days
@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 
 from pymongo import UpdateOne
 
-from agent_yoku.config import GITHUB_ORG, github_prs_collection
+from agent_yoku.connectors._runtime import current_github_config
 from agent_yoku.connectors.github.client import (
     is_bot,
     list_non_archived_repos,
@@ -22,6 +22,7 @@ from agent_yoku.connectors.github.client import (
     pr_to_doc,
 )
 from agent_yoku.log import get_logger
+from agent_yoku.storage.mongo import github_prs_collection
 
 log = get_logger("ingest_github")
 
@@ -29,8 +30,9 @@ BATCH = 100
 
 
 def _repos_to_scan(filter_names: list[str]) -> list[str]:
+    org = current_github_config().org
     if filter_names:
-        return [f"{GITHUB_ORG}/{n}" for n in filter_names]
+        return [f"{org}/{n}" for n in filter_names]
     return [r["full_name"] for r in list_non_archived_repos()]
 
 
@@ -39,7 +41,7 @@ def main() -> None:
     cutoff = lookback_cutoff()
     log.info(
         "starting gh ingest org=%s cutoff=%s filter=%s",
-        GITHUB_ORG,
+        current_github_config().org,
         cutoff.isoformat(),
         filter_names or "<all non-archived>",
     )

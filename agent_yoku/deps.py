@@ -80,3 +80,13 @@ async def current_user(token: Annotated[str, Depends(_oauth2)]) -> UserOut:
 
 
 CurrentUser = Annotated[UserOut, Depends(current_user)]
+
+
+async def require_admin(user: CurrentUser) -> UserOut:
+    """Gate endpoints behind tenant-admin. 403s ordinary users."""
+    if not user.is_admin:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "admin privilege required")
+    return user
+
+
+AdminUser = Annotated[UserOut, Depends(require_admin)]

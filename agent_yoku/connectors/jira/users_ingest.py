@@ -11,9 +11,9 @@ from datetime import UTC, datetime
 
 from pymongo import UpdateOne
 
-from agent_yoku.config import users_collection
 from agent_yoku.connectors.jira.users_client import search_users, user_to_doc
 from agent_yoku.log import get_logger
+from agent_yoku.storage.mongo import users_collection
 
 log = get_logger("ingest_users")
 
