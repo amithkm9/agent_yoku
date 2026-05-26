@@ -91,8 +91,18 @@ class GithubConfigIn(BaseModel):
     pr_lookback_days: int = 365
 
 
+class ConnectorGuide(BaseModel):
+    source: str
+    display_name: str
+    description: str
+    sync_summary: str | None = None
+    setup_steps: list[str] = Field(default_factory=list)
+    field_help: dict[str, str] = Field(default_factory=dict)
+
+
 class ConnectorStatus(BaseModel):
     name: str
+    guide: ConnectorGuide
     configured: bool
     config: dict[str, Any] = Field(default_factory=dict)  # non-secret fields only
     last_synced_at: datetime | None = None

@@ -70,6 +70,9 @@ def test_list_requires_admin(client):
         # Nothing configured yet.
         for c in r.json():
             assert c["configured"] is False
+            assert c["guide"]["display_name"]
+            assert isinstance(c["guide"]["setup_steps"], list)
+            assert isinstance(c["guide"]["field_help"], dict)
     finally:
         _drop(tenant)
 
@@ -97,6 +100,7 @@ def test_upsert_jira_then_list_shows_no_secret(client):
         assert jira["configured"] is True
         assert jira["config"]["project"] == "AC"
         assert "token" not in jira["config"]
+        assert jira["guide"]["display_name"] == "JIRA"
     finally:
         _drop(tenant)
 

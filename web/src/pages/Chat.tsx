@@ -1,4 +1,11 @@
-import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import {
+  KeyboardEvent,
+  ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   api,
@@ -34,6 +41,152 @@ interface ChatTurn {
   question: string;
   answer: string;
   toolCalls: ChatResponse["tool_calls"];
+}
+
+type AnswerBlock =
+  | { type: "paragraph"; text: string }
+  | { type: "ul"; items: string[] }
+  | { type: "ol"; items: string[] };
+
+function parseAnswerBlocks(text: string): AnswerBlock[] {
+  const normalized = text.replace(/\r\n/g, "\n").trim();
+  if (!normalized) return [];
+
+  const lines = normalized.split("\n");
+  const blocks: AnswerBlock[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i].trim();
+    if (!line) {
+      i += 1;
+      continue;
+    }
+
+    const unordered = line.match(/^[-*]\s+(.*)$/);
+    if (unordered) {
+      const items: string[] = [];
+      while (i < lines.length) {
+        const match = lines[i].trim().match(/^[-*]\s+(.*)$/);
+        if (!match) break;
+        items.push(match[1].trim());
+        i += 1;
+      }
+      blocks.push({ type: "ul", items });
+      continue;
+    }
+
+    const ordered = line.match(/^\d+\.\s+(.*)$/);
+    if (ordered) {
+      const items: string[] = [];
+      while (i < lines.length) {
+        const match = lines[i].trim().match(/^\d+\.\s+(.*)$/);
+        if (!match) break;
+        items.push(match[1].trim());
+        i += 1;
+      }
+      blocks.push({ type: "ol", items });
+      continue;
+    }
+
+    const paragraph: string[] = [];
+    while (i < lines.length) {
+      const current = lines[i].trim();
+      if (
+        !current ||
+        /^[-*]\s+/.test(current) ||
+        /^\d+\.\s+/.test(current)
+      ) {
+        break;
+      }
+      paragraph.push(current);
+      i += 1;
+    }
+    blocks.push({ type: "paragraph", text: paragraph.join(" ") });
+  }
+
+  return blocks;
+}
+
+function renderInline(text: string, keyPrefix: string): ReactNode[] {
+  const nodes: ReactNode[] = [];
+  const pattern = /(\*\*.+?\*\*|`.+?`|\*[^*\n]+\*)/g;
+  let lastIndex = 0;
+  let tokenIndex = 0;
+
+  for (const match of text.matchAll(pattern)) {
+    const [token] = match;
+    const start = match.index ?? 0;
+
+    if (start > lastIndex) {
+      nodes.push(text.slice(lastIndex, start));
+    }
+
+    if (token.startsWith("**")) {
+      nodes.push(
+        <strong key={`${keyPrefix}-strong-${tokenIndex}`}>
+          {token.slice(2, -2)}
+        </strong>
+      );
+    } else if (token.startsWith("`")) {
+      nodes.push(
+        <code key={`${keyPrefix}-code-${tokenIndex}`}>{token.slice(1, -1)}</code>
+      );
+    } else {
+      nodes.push(
+        <em key={`${keyPrefix}-em-${tokenIndex}`}>{token.slice(1, -1)}</em>
+      );
+    }
+
+    lastIndex = start + token.length;
+    tokenIndex += 1;
+  }
+
+  if (lastIndex < text.length) {
+    nodes.push(text.slice(lastIndex));
+  }
+
+  return nodes;
+}
+
+function AnswerContent({ text }: { text: string }) {
+  const blocks = parseAnswerBlocks(text);
+
+  if (blocks.length === 0) {
+    return <p>{text}</p>;
+  }
+
+  return (
+    <div className="rich-text">
+      {blocks.map((block, index) => {
+        if (block.type === "paragraph") {
+          return <p key={index}>{renderInline(block.text, `p-${index}`)}</p>;
+        }
+
+        if (block.type === "ol") {
+          return (
+            <ol key={index}>
+              {block.items.map((item, itemIndex) => (
+                <li key={itemIndex}>
+                  {renderInline(item, `ol-${index}-${itemIndex}`)}
+                </li>
+              ))}
+            </ol>
+          );
+        }
+
+        return (
+          <ul key={index}>
+            {block.items.map((item, itemIndex) => (
+              <li key={itemIndex}>
+                {renderInline(item, `ul-${index}-${itemIndex}`)}
+              </li>
+            ))}
+          </ul>
+        );
+      })}
+    </div>
+  );
 }
 
 export function Chat() {
@@ -98,8 +251,7 @@ export function Chat() {
     refresh();
   }
 
-  async function send(e: FormEvent) {
-    e.preventDefault();
+  async function send() {
     if (!draft.trim()) return;
     let sid = activeSession;
     if (!sid) {
@@ -232,26 +384,39 @@ export function Chat() {
                   </ul>
                 </details>
               )}
-              <div className="msg ai">{turn.answer}</div>
+              <div className="msg ai">
+                <AnswerContent text={turn.answer} />
+              </div>
             </div>
           ))}
           <div ref={bottomRef} />
         </div>
 
-        <form className="composer" onSubmit={send}>
+        <form
+          className="composer"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void send();
+          }}
+        >
           <textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             placeholder={busy ? "Agent thinking…" : "Ask about JIRA tickets or GitHub PRs…"}
             disabled={busy}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) send(e);
+            onKeyDown={(e: KeyboardEvent<HTMLTextAreaElement>) => {
+              if (e.key !== "Enter" || e.shiftKey) return;
+              if (e.nativeEvent.isComposing) return;
+              e.preventDefault();
+              void send();
             }}
             rows={2}
           />
-          <button className="primary" type="submit" disabled={busy || !draft.trim()}>
-            Send
-          </button>
+          <div className="composer-actions">
+            <button className="primary" type="submit" disabled={busy || !draft.trim()}>
+              Send
+            </button>
+          </div>
         </form>
       </main>
     </div>

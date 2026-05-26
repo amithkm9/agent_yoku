@@ -22,8 +22,12 @@ from typing import Protocol, TypedDict
 class ConnectorMeta(TypedDict, total=False):
     name: str  # short identifier, e.g. "jira", "github"
     source: str  # external system human name
+    display_name: str  # UI label
     description: str  # one-line
     entity: str  # primary entity, e.g. "tickets", "pull_requests"
+    sync_summary: str  # what a sync will ingest
+    setup_steps: list[str]  # short admin-facing setup checklist
+    field_help: dict[str, str]  # field name -> explanation for setup UIs
 
 
 class IngestModule(Protocol):

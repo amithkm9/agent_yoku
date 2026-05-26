@@ -27,9 +27,11 @@ from agent_yoku.connectors._runtime import (
     use_github,
     use_jira,
 )
+from agent_yoku.connectors.base import list_connectors as discover_connectors
 from agent_yoku.deps import AdminUser
 from agent_yoku.log import get_logger
 from agent_yoku.schemas import (
+    ConnectorGuide,
     ConnectorStatus,
     ConnectorSyncResponse,
     GithubConfigIn,
@@ -46,11 +48,27 @@ log = get_logger("connectors")
 # ---------- Listing ----------
 
 
+_CONNECTOR_META = {meta["name"]: meta for meta in discover_connectors() if meta.get("name")}
+
+
+def _guide_for(name: str) -> ConnectorGuide:
+    meta = _CONNECTOR_META.get(name, {})
+    return ConnectorGuide(
+        source=meta.get("source", name.title()),
+        display_name=meta.get("display_name", name.title()),
+        description=meta.get("description", ""),
+        sync_summary=meta.get("sync_summary"),
+        setup_steps=meta.get("setup_steps") or [],
+        field_help=meta.get("field_help") or {},
+    )
+
+
 def _status_doc(name: str, doc: dict | None) -> ConnectorStatus:
     if not doc:
-        return ConnectorStatus(name=name, configured=False)
+        return ConnectorStatus(name=name, guide=_guide_for(name), configured=False)
     return ConnectorStatus(
         name=name,
+        guide=_guide_for(name),
         configured=True,
         config=doc.get("config") or {},
         last_synced_at=doc.get("last_synced_at"),

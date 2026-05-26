@@ -127,7 +127,8 @@ button.link {
 .chat-shell {
   display: grid;
   grid-template-columns: 280px 1fr;
-  height: 100%;
+  height: 100dvh;
+  overflow: hidden;
 }
 .sidebar {
   background: var(--bg-sidebar);
@@ -136,7 +137,8 @@ button.link {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  overflow-y: auto;
+  min-height: 0;
+  overflow: hidden;
 }
 .brand {
   font-weight: 600;
@@ -187,6 +189,10 @@ button.link {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 .session-list li {
   position: relative;
@@ -235,7 +241,8 @@ button.link {
 .chat-main {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 .banner.error {
   background: #fef2f2;
@@ -246,6 +253,7 @@ button.link {
 }
 .messages {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 24px;
   display: flex;
@@ -266,18 +274,51 @@ button.link {
   max-width: 80%;
   padding: 10px 14px;
   border-radius: 12px;
-  white-space: pre-wrap;
   line-height: 1.5;
 }
 .msg.user {
   align-self: flex-end;
   background: var(--bubble-user);
   color: var(--bubble-user-text);
+  white-space: pre-wrap;
 }
 .msg.ai {
   align-self: flex-start;
   background: var(--bubble-ai);
   border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  padding: 14px 16px;
+  max-width: min(880px, 82%);
+}
+.rich-text {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.rich-text p,
+.rich-text ul,
+.rich-text ol {
+  margin: 0;
+}
+.rich-text ul,
+.rich-text ol {
+  padding-left: 20px;
+}
+.rich-text li + li {
+  margin-top: 6px;
+}
+.rich-text strong {
+  font-weight: 650;
+}
+.rich-text em {
+  color: #374151;
+}
+.rich-text code {
+  font-family: var(--mono);
+  font-size: 0.92em;
+  background: #f3f4f6;
+  border-radius: 4px;
+  padding: 0.1em 0.35em;
 }
 .tool-trace {
   align-self: flex-start;
@@ -313,6 +354,7 @@ button.link {
 .composer {
   display: flex;
   gap: 8px;
+  align-items: flex-end;
   padding: 16px 24px;
   border-top: 1px solid var(--border);
   background: var(--bg-elevated);
@@ -333,12 +375,18 @@ button.link {
 .composer button {
   align-self: flex-end;
 }
+.composer-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
 
 /* ---------- Settings page ---------- */
 .settings-shell {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  height: 100dvh;
+  overflow: hidden;
 }
 .settings-header {
   display: flex;
@@ -385,6 +433,24 @@ button.link {
   color: var(--text-muted);
   margin-top: 0;
 }
+.connector-hero {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 20px;
+  align-items: start;
+  margin-bottom: 20px;
+}
+.hero-steps {
+  margin: 0;
+  padding: 16px 18px 16px 36px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #ffffff 0%, #f7f8fb 100%);
+  box-shadow: var(--shadow);
+}
+.hero-steps li + li {
+  margin-top: 8px;
+}
 .user-row-actions {
   display: flex;
   gap: 12px;
@@ -407,6 +473,28 @@ button.link {
 .connector-card header h3 {
   margin: 0;
   font-size: 16px;
+}
+.connector-source {
+  margin: 0 0 4px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.connector-description,
+.connector-sync-summary {
+  margin: 0 0 10px;
+}
+.connector-sync-summary {
+  color: var(--text-muted);
+}
+.connector-state {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 0 0 14px;
+  font-size: 12px;
+  color: var(--text-muted);
 }
 .badge {
   font-size: 11px;
@@ -442,12 +530,28 @@ button.link {
 .connector-meta dd {
   margin: 0;
   word-break: break-all;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.connector-meta dd small {
+  color: var(--text-muted);
+  font-size: 12px;
+  word-break: normal;
 }
 .connector-meta .error-row dd {
   color: var(--danger);
 }
+.connector-checklist {
+  margin: 0 0 16px;
+  padding-left: 20px;
+}
+.connector-checklist li + li {
+  margin-top: 8px;
+}
 .connector-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 8px;
 }
@@ -470,4 +574,20 @@ button.danger:hover {
 .editor h3 {
   margin: 0 0 12px;
   font-size: 15px;
+}
+.editor-copy {
+  margin: 0 0 16px;
+  color: var(--text-muted);
+}
+.field small {
+  display: block;
+  margin-top: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+@media (max-width: 900px) {
+  .connector-hero {
+    grid-template-columns: 1fr;
+  }
 }

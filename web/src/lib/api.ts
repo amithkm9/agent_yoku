@@ -162,8 +162,18 @@ export interface GithubConfigIn {
   pr_lookback_days: number;
 }
 
+export interface ConnectorGuide {
+  source: string;
+  display_name: string;
+  description: string;
+  sync_summary: string | null;
+  setup_steps: string[];
+  field_help: Record<string, string>;
+}
+
 export interface ConnectorStatus {
   name: string;
+  guide: ConnectorGuide;
   configured: boolean;
   config: Record<string, unknown>;
   last_synced_at: string | null;

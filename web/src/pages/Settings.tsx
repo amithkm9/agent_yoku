@@ -80,11 +80,21 @@ export function Settings() {
     <div className="settings-shell">
       <SettingsHeader user={user} />
       <main className="settings-main">
-        <h2>Connectors</h2>
-        <p className="muted">
-          Plug your tenant's JIRA and GitHub into agent_yoku. Tokens are encrypted at
-          rest and isolated to your tenant.
-        </p>
+        <section className="connector-hero">
+          <div>
+            <h2>Tenant data connectors</h2>
+            <p className="muted">
+              Connect the systems your team already works in so agent_yoku can answer
+              questions from live JIRA and GitHub data. Tokens are encrypted at rest
+              and kept inside this tenant only.
+            </p>
+          </div>
+          <ol className="hero-steps">
+            <li>Connect JIRA and GitHub with read-only credentials.</li>
+            <li>Run an initial sync to ingest tickets, PRs, and users.</li>
+            <li>Return to chat and ask questions against tenant data.</li>
+          </ol>
+        </section>
 
         {error && (
           <div className="banner error" onClick={() => setError(null)}>
@@ -165,28 +175,42 @@ function ConnectorCard({
   return (
     <section className="connector-card">
       <header>
-        <h3>{titleCase(status.name)}</h3>
+        <div>
+          <p className="connector-source">{status.guide.source}</p>
+          <h3>{status.guide.display_name}</h3>
+        </div>
         <Badge status={status} />
       </header>
+      <p className="connector-description">{status.guide.description}</p>
+      {status.guide.sync_summary && (
+        <p className="connector-sync-summary">{status.guide.sync_summary}</p>
+      )}
 
       {status.configured ? (
         <>
+          <div className="connector-state">
+            {status.last_synced_at ? (
+              <span>Last synced {new Date(status.last_synced_at).toLocaleString()}</span>
+            ) : (
+              <span>Connected, but initial sync has not run yet.</span>
+            )}
+            <span>{status.guide.setup_steps.at(-1)}</span>
+          </div>
           <dl className="connector-meta">
             {Object.entries(status.config).map(([k, v]) => (
               <div key={k}>
-                <dt>{k}</dt>
-                <dd>{String(v)}</dd>
+                <dt>{labelForField(k)}</dt>
+                <dd>
+                  <span>{String(v)}</span>
+                  {status.guide.field_help[k] && (
+                    <small>{status.guide.field_help[k]}</small>
+                  )}
+                </dd>
               </div>
             ))}
-            {status.last_synced_at && (
-              <div>
-                <dt>last synced</dt>
-                <dd>{new Date(status.last_synced_at).toLocaleString()}</dd>
-              </div>
-            )}
             {status.last_sync_error && (
               <div className="error-row">
-                <dt>last error</dt>
+                <dt>Last error</dt>
                 <dd>{status.last_sync_error}</dd>
               </div>
             )}
@@ -203,7 +227,11 @@ function ConnectorCard({
         </>
       ) : (
         <>
-          <p className="muted">Not connected.</p>
+          <ul className="connector-checklist">
+            {status.guide.setup_steps.map((step) => (
+              <li key={step}>{step}</li>
+            ))}
+          </ul>
           <div className="connector-actions">
             <button className="primary" onClick={onConnect}>
               Connect
@@ -263,6 +291,10 @@ function JiraEditor({
   return (
     <form className="editor" onSubmit={save}>
       <h3>{initial?.configured ? "Edit JIRA" : "Connect JIRA"}</h3>
+      <p className="editor-copy">
+        JIRA powers ticket search, assignment lookups, and team activity summaries for
+        this tenant.
+      </p>
       <label className="field">
         <span>Base URL</span>
         <input
@@ -270,6 +302,7 @@ function JiraEditor({
           onChange={(e) => setForm({ ...form, base_url: e.target.value })}
           required
         />
+        <small>{initial?.guide.field_help.base_url || defaultFieldHelp.base_url}</small>
       </label>
       <label className="field">
         <span>Email</span>
@@ -279,6 +312,7 @@ function JiraEditor({
           onChange={(e) => setForm({ ...form, email: e.target.value })}
           required
         />
+        <small>{initial?.guide.field_help.email || defaultFieldHelp.email}</small>
       </label>
       <label className="field">
         <span>API token</span>
@@ -289,6 +323,7 @@ function JiraEditor({
           placeholder={initial?.configured ? "leave blank to keep existing" : ""}
           required={!initial?.configured}
         />
+        <small>{initial?.guide.field_help.token || defaultFieldHelp.token}</small>
       </label>
       <label className="field">
         <span>Project key</span>
@@ -298,6 +333,7 @@ function JiraEditor({
           placeholder="e.g. AS"
           required
         />
+        <small>{initial?.guide.field_help.project || defaultFieldHelp.project}</small>
       </label>
       {err && <div className="auth-error">{err}</div>}
       <div className="connector-actions">
@@ -350,6 +386,10 @@ function GithubEditor({
   return (
     <form className="editor" onSubmit={save}>
       <h3>{initial?.configured ? "Edit GitHub" : "Connect GitHub"}</h3>
+      <p className="editor-copy">
+        GitHub powers pull request search, contributor lookups, and engineering activity
+        questions for this tenant.
+      </p>
       <label className="field">
         <span>API base</span>
         <input
@@ -357,6 +397,7 @@ function GithubEditor({
           onChange={(e) => setForm({ ...form, api_base: e.target.value })}
           required
         />
+        <small>{initial?.guide.field_help.api_base || defaultFieldHelp.api_base}</small>
       </label>
       <label className="field">
         <span>Organisation</span>
@@ -366,6 +407,7 @@ function GithubEditor({
           placeholder="github org name"
           required
         />
+        <small>{initial?.guide.field_help.org || defaultFieldHelp.org}</small>
       </label>
       <label className="field">
         <span>Personal access token</span>
@@ -376,6 +418,7 @@ function GithubEditor({
           placeholder={initial?.configured ? "leave blank to keep existing" : ""}
           required={!initial?.configured}
         />
+        <small>{initial?.guide.field_help.token || defaultFieldHelp.token}</small>
       </label>
       <label className="field">
         <span>PR lookback days</span>
@@ -389,6 +432,10 @@ function GithubEditor({
           }
           required
         />
+        <small>
+          {initial?.guide.field_help.pr_lookback_days ||
+            defaultFieldHelp.pr_lookback_days}
+        </small>
       </label>
       {err && <div className="auth-error">{err}</div>}
       <div className="connector-actions">
@@ -406,3 +453,26 @@ function GithubEditor({
 function titleCase(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
+
+function labelForField(name: string): string {
+  return (
+    {
+      base_url: "Base URL",
+      email: "Email",
+      project: "Project key",
+      api_base: "API base",
+      org: "Organisation",
+      pr_lookback_days: "PR lookback days",
+    }[name] || titleCase(name.replaceAll("_", " "))
+  );
+}
+
+const defaultFieldHelp: Record<string, string> = {
+  base_url: "Your Atlassian site URL.",
+  email: "The account email tied to the token.",
+  token: "Stored encrypted and never returned to the UI.",
+  project: "The JIRA project key agent_yoku should index.",
+  api_base: "Use the public GitHub API unless you run GitHub Enterprise.",
+  org: "The GitHub organization to index.",
+  pr_lookback_days: "How many days of pull request history to ingest on sync.",
+};
