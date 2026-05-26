@@ -11,7 +11,6 @@ for CLI invocations.
 
 from __future__ import annotations
 
-import sys
 import time
 from datetime import UTC, datetime
 
@@ -33,8 +32,7 @@ def build_jql(extra: str | None) -> str:
     return f"{base} ORDER BY updated DESC"
 
 
-def main() -> None:
-    extra = sys.argv[1] if len(sys.argv) > 1 else None
+def main(extra: str | None = None) -> None:
     jql = build_jql(extra)
     log.info("starting ingest jql=%s", jql)
     t0 = time.monotonic()
@@ -76,5 +74,13 @@ def main() -> None:
     log.info("ingest done total=%d new_or_changed=%d elapsed=%.1fs", count, new_or_changed, elapsed)
 
 
+def cli_main(argv: list[str] | None = None) -> None:
+    import sys
+
+    args = sys.argv[1:] if argv is None else argv
+    extra = args[0] if args else None
+    main(extra)
+
+
 if __name__ == "__main__":
-    main()
+    cli_main()

@@ -7,7 +7,6 @@ Usage:
 
 from __future__ import annotations
 
-import sys
 import time
 from datetime import UTC, datetime
 
@@ -36,19 +35,19 @@ def _repos_to_scan(filter_names: list[str]) -> list[str]:
     return [r["full_name"] for r in list_non_archived_repos()]
 
 
-def main() -> None:
-    filter_names = sys.argv[1:]
+def main(filter_names: list[str] | None = None) -> None:
+    filters = filter_names or []
     cutoff = lookback_cutoff()
     log.info(
         "starting gh ingest org=%s cutoff=%s filter=%s",
         current_github_config().org,
         cutoff.isoformat(),
-        filter_names or "<all non-archived>",
+        filters or "<all non-archived>",
     )
     t0 = time.monotonic()
 
     coll = github_prs_collection()
-    repos = _repos_to_scan(filter_names)
+    repos = _repos_to_scan(filters)
     log.info("scanning %d repos", len(repos))
 
     now = datetime.now(UTC)
@@ -99,5 +98,12 @@ def main() -> None:
     )
 
 
+def cli_main(argv: list[str] | None = None) -> None:
+    import sys
+
+    args = sys.argv[1:] if argv is None else argv
+    main(args)
+
+
 if __name__ == "__main__":
-    main()
+    cli_main()
