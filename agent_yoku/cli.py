@@ -23,10 +23,27 @@ import click
 _HERE = Path(__file__).resolve().parent
 
 
+def _normalize_cli_tenant(tenant: str) -> str:
+    from agent_yoku.storage import tenancy
+
+    normalized = tenancy.normalize_tenant_id(tenant)
+    if not tenancy.is_valid_tenant_id(normalized):
+        raise click.BadParameter(
+            "tenant must be 2-40 chars of a-z0-9, '-' or '_', starting alphanumeric",
+            param_hint="--tenant",
+        )
+    return normalized
+
+
 @click.group()
+@click.option("--tenant", default=None, help="Tenant id for commands that access tenant data.")
 @click.option("--log-level", default=None, help="Override LOG_LEVEL (DEBUG/INFO/WARNING/ERROR)")
-def cli(log_level: str | None) -> None:
+def cli(tenant: str | None, log_level: str | None) -> None:
     """agent_yoku — JIRA + GitHub deepagent."""
+    if tenant:
+        from agent_yoku.storage import tenancy
+
+        tenancy.set_tenant(_normalize_cli_tenant(tenant))
     if log_level:
         os.environ["LOG_LEVEL"] = log_level.upper()
 
@@ -244,7 +261,7 @@ def auth() -> None:
 @click.option("--email", required=True)
 @click.option("--password", required=True, hide_input=True, prompt=True, confirmation_prompt=True)
 @click.option("--name", default=None)
-@click.option("--tenant", default=None, help="Tenant id (defaults to settings.default_tenant_id)")
+@click.option("--tenant", required=True, help="Tenant id")
 @click.option("--admin/--no-admin", default=False)
 def auth_create_user(
     email: str, password: str, name: str | None, tenant: str | None, admin: bool
@@ -258,8 +275,7 @@ def auth_create_user(
     from agent_yoku.storage import tenancy
     from agent_yoku.storage.mongo import auth_users_collection
 
-    if tenant:
-        tenancy.set_tenant(tenant.lower())
+    tenancy.set_tenant(_normalize_cli_tenant(tenant))
     coll = auth_users_collection()
     if coll.find_one({"email": email.lower()}):
         click.secho(
@@ -283,14 +299,13 @@ def auth_create_user(
 
 
 @auth.command("list-users")
-@click.option("--tenant", default=None)
+@click.option("--tenant", required=True)
 def auth_list_users(tenant: str | None) -> None:
     """List users in the named tenant."""
     from agent_yoku.storage import tenancy
     from agent_yoku.storage.mongo import auth_users_collection
 
-    if tenant:
-        tenancy.set_tenant(tenant.lower())
+    tenancy.set_tenant(_normalize_cli_tenant(tenant))
     for u in auth_users_collection().find({}, {"_id": 0, "password_hash": 0}):
         click.echo(
             f"  {u.get('email'):30s}  admin={u.get('is_admin'):<5}  "

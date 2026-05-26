@@ -108,9 +108,9 @@ async function request<T>(
 }
 
 export const api = {
-  login: (email: string, password: string, tenant?: string) =>
+  login: (email: string, password: string, tenant: string) =>
     request<{ access_token: string; user: User }>(
-      "/api/auth/login-json" + (tenant ? `?tenant=${encodeURIComponent(tenant)}` : ""),
+      `/api/auth/login-json?tenant=${encodeURIComponent(tenant)}`,
       { method: "POST", json: { email, password } }
     ),
   signup: (email: string, password: string, name: string, tenant: string) =>

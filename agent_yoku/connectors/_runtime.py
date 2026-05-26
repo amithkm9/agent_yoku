@@ -13,11 +13,11 @@ connector:
   for the duration of a `with` block.
 - `current_jira_config()` / `current_github_config()` are called inside client
   functions and return the bound config, falling back to the env-driven
-  defaults from `settings` so existing CLI workflows keep working for the
-  configured `default_tenant_id`.
+  defaults from `settings` so existing CLI workflows still work without
+  per-tenant connector configs in mongo.
 
-The fallback path is deliberate: dev / single-tenant deploys still work the
-old way without populating any per-tenant config in mongo.
+The fallback path is deliberate: dev workflows still work the old way without
+populating any per-tenant config in mongo.
 """
 
 from __future__ import annotations

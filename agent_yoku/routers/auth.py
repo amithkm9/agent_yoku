@@ -36,14 +36,14 @@ def _to_user_out(doc: dict) -> UserOut:
 
 
 def _bind_tenant(tenant: str | None) -> None:
-    """Normalize + validate a tenant query param, then bind it for this request.
+    """Normalize + validate a required tenant query param, then bind it.
 
-    Empty/None falls back to `settings.default_tenant_id`. Anything that doesn't
-    match the tenant regex is rejected up-front so we never materialize a mongo
-    db from untrusted input.
+    Auth flows require the caller to choose a tenant explicitly. Anything that
+    doesn't match the tenant regex is rejected up-front so we never materialize
+    a mongo db from untrusted input.
     """
-    if not tenant:
-        return
+    if not tenant or not tenant.strip():
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "tenant is required")
     normalized = tenancy.normalize_tenant_id(tenant)
     if not tenancy.is_valid_tenant_id(normalized):
         raise HTTPException(
@@ -59,9 +59,7 @@ def _bind_tenant(tenant: str | None) -> None:
 @router.post("/login", response_model=TokenResponse)
 async def login(
     form: Annotated[OAuth2PasswordRequestForm, Depends()],
-    tenant: str = Query(
-        default=None, description="Tenant id; defaults to settings.default_tenant_id"
-    ),
+    tenant: str = Query(..., description="Tenant id to authenticate against"),
 ) -> TokenResponse:
     """Trade email+password for a JWT.
 
@@ -84,7 +82,10 @@ async def login(
 
 
 @router.post("/login-json", response_model=TokenResponse)
-async def login_json(req: LoginRequest, tenant: str = Query(default=None)) -> TokenResponse:
+async def login_json(
+    req: LoginRequest,
+    tenant: str = Query(..., description="Tenant id to authenticate against"),
+) -> TokenResponse:
     """JSON-bodied variant — the React UI uses this."""
     _bind_tenant(tenant)
     doc = auth_users_collection().find_one({"email": req.email.lower()})
@@ -107,7 +108,7 @@ async def login_json(req: LoginRequest, tenant: str = Query(default=None)) -> To
 @router.post("/signup", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 async def signup(
     req: LoginRequest,
-    tenant: str = Query(default=None, description="Tenant id to create the account in"),
+    tenant: str = Query(..., description="Tenant id to create the account in"),
     name: str | None = Query(default=None),
 ) -> TokenResponse:
     """Create an account in the specified tenant's db.

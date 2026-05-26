@@ -53,7 +53,7 @@ class Settings(BaseSettings):
     chat_model_provider: str = "openai"
 
     # Mongo
-    mongo_uri: str = "mongodb://localhost:27017"
+    mongo_uri: str = "mongodb://localhost:27017/"
     mongo_db: str = "agent_yoku"
 
     # Observability
@@ -72,10 +72,6 @@ class Settings(BaseSettings):
     # Falls back to `jwt_secret` if unset — fine for dev. Override in prod so
     # rotating JWT secrets doesn't invalidate stored connector tokens.
     connector_secret_key: SecretStr | None = None
-
-    # Multi-tenancy — single mongo cluster, db per tenant. The configured
-    # default tenant maps to the bare `mongo_db`; all others get a suffix.
-    default_tenant_id: str = "default"
 
     # Derived
     @property

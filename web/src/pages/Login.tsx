@@ -7,7 +7,7 @@ type Mode = "login" | "signup";
 export function Login() {
   const nav = useNavigate();
   const [mode, setMode] = useState<Mode>("login");
-  const [tenant, setTenantInput] = useState("asato");
+  const [tenant, setTenantInput] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -16,13 +16,18 @@ export function Login() {
 
   async function submit(e: FormEvent) {
     e.preventDefault();
+    const normalizedTenant = tenant.trim().toLowerCase();
+    if (!normalizedTenant) {
+      setError("Tenant is required.");
+      return;
+    }
     setError(null);
     setLoading(true);
     try {
       const result =
         mode === "login"
-          ? await api.login(email, password, tenant)
-          : await api.signup(email, password, name || email, tenant);
+          ? await api.login(email, password, normalizedTenant)
+          : await api.signup(email, password, name || email, normalizedTenant);
       setToken(result.access_token);
       setTenant(result.user.tenant_id);
       nav("/");
@@ -40,6 +45,11 @@ export function Login() {
         <p className="auth-subtitle">
           {mode === "login" ? "Sign in to your tenant" : "Create an account"}
         </p>
+        <p className="auth-subtitle">
+          {mode === "signup"
+            ? "Choose a new tenant name to create your workspace, or an existing one if you were invited."
+            : "Enter the exact tenant name for your workspace."}
+        </p>
 
         <form onSubmit={submit}>
           <label className="field">
@@ -48,8 +58,10 @@ export function Login() {
               type="text"
               value={tenant}
               onChange={(e) => setTenantInput(e.target.value)}
-              placeholder="asato"
+              placeholder="acme"
               required
+              autoCapitalize="none"
+              autoCorrect="off"
             />
           </label>
 

@@ -34,7 +34,7 @@ agent_yoku/
 ├── README.md  .env.example  .gitignore  .python-version
 ├── .pre-commit-config.yaml
 ├── agent_yoku/                    ← installable Python package
-│   ├── config.py                   # Pydantic Settings (incl. jwt_secret, default_tenant_id)
+│   ├── config.py                   # Pydantic Settings (JWT secret, Mongo, OpenAI, etc.)
 │   ├── exceptions.py
 │   ├── log.py                      # session_id ContextVar + optional Sentry
 │   ├── cli.py                      # Click entry: `agent-yoku …`
@@ -104,7 +104,7 @@ make web                           # http://localhost:5173  (React UI)
 make web-lint                      # TypeScript static checks for the React app
 ```
 
-Sign in at `http://localhost:5173` with `tenant: asato` + the email/password you just set.
+Sign in at `http://localhost:5173` with the exact tenant name you created.
 
 ## CLI
 
@@ -135,8 +135,8 @@ Commands:
 ## Auth + multi-tenancy
 
 One mongo cluster, one db per tenant:
-- `tenant_id == "asato"` (default) → the existing `agent_yoku` db (legacy, no rename).
-- Any other id → `agent_yoku_<tenant_id>` (auto-created on first signup).
+- every tenant gets its own db: `agent_yoku_<tenant_id>`
+- the db is auto-created on first signup for that tenant
 
 Tenant flow:
 1. **Signup** at `POST /api/auth/signup?tenant=<id>` → first user becomes admin.

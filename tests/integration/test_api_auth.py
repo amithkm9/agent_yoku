@@ -78,6 +78,14 @@ def test_login_wrong_password_401(client):
         _drop(tenant)
 
 
+def test_login_requires_explicit_tenant(client):
+    r = client.post(
+        "/api/auth/login-json",
+        json={"email": "alice@example.com", "password": "pw-strong-123"},
+    )
+    assert r.status_code == 422
+
+
 def test_duplicate_signup_409(client):
     tenant = _tenant()
     try:
@@ -90,6 +98,15 @@ def test_duplicate_signup_409(client):
         assert r.status_code == 409
     finally:
         _drop(tenant)
+
+
+def test_signup_requires_explicit_tenant(client):
+    r = client.post(
+        "/api/auth/signup",
+        params={"name": "Alice"},
+        json={"email": "alice@example.com", "password": "pw-strong-123"},
+    )
+    assert r.status_code == 422
 
 
 def test_me_without_token_401(client):
