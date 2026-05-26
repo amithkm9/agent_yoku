@@ -5,7 +5,8 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from agent_yoku.deps import CurrentUser
-from agent_yoku.schemas import CountsResponse
+from agent_yoku.schemas import CountsResponse, SourceFreshness
+from agent_yoku.storage.freshness import source_freshness
 from agent_yoku.storage.mongo import (
     chat_messages_collection,
     chat_sessions_collection,
@@ -30,3 +31,9 @@ async def counts(_user: CurrentUser) -> CountsResponse:
         chat_sessions=chat_sessions_collection().count_documents({}),
         chat_messages=chat_messages_collection().count_documents({}),
     )
+
+
+@router.get("/freshness", response_model=list[SourceFreshness])
+async def freshness(_user: CurrentUser) -> list[SourceFreshness]:
+    """How current each data source is — drives the sidebar 'synced X ago' badge."""
+    return [SourceFreshness(**row) for row in source_freshness()]

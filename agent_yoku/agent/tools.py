@@ -27,6 +27,7 @@ from agent_yoku.config import (
     unified_users_collection,
 )
 from agent_yoku.log import get_logger
+from agent_yoku.storage.freshness import source_freshness
 from agent_yoku.utils import bson_safe
 
 log = get_logger("tools")
@@ -754,6 +755,19 @@ def mongo_query(
     return {"results": cleaned, "count": len(cleaned), "pipeline": pipeline}
 
 
+@tool
+def data_freshness() -> list[dict]:
+    """Report how current each data source is: document count, when it last
+    synced, the relative age, and the last sync status.
+
+    Call this before concluding a source has no data — an empty result can mean
+    the source is unsynced or stale, not that the work doesn't exist. Surface
+    the age in your answer (e.g. "no GitHub data — last synced 6 days ago")
+    rather than guessing.
+    """
+    return source_freshness()
+
+
 # ---------- Tool groupings for the deepagent ----------
 
 GENERIC_MONGO_TOOLS = [list_collections, describe_collection, mongo_count, mongo_query]
@@ -764,6 +778,7 @@ JIRA_TOOLS = [
     linked,
     resolve_user,
     semantic_search,
+    data_freshness,
     *GENERIC_MONGO_TOOLS,
 ]
 GITHUB_TOOLS = [
@@ -773,6 +788,7 @@ GITHUB_TOOLS = [
     list_repos,
     resolve_user,
     semantic_search,
+    data_freshness,
     *GENERIC_MONGO_TOOLS,
 ]
 ALL_TOOLS = [
@@ -783,5 +799,6 @@ ALL_TOOLS = [
     filter_prs,
     linked,
     list_repos,
+    data_freshness,
     *GENERIC_MONGO_TOOLS,
 ]

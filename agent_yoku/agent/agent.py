@@ -45,6 +45,8 @@ answers.
 - `filter_jira / filter_prs` — exact filters on common fields.
 - `list_repos()` — repo inventory.
 - `resolve_user(query)` — name/login/email → unified user record.
+- `data_freshness()` — per-source counts + last sync time; check before
+  declaring a source empty.
 
 **Generic mongo escape hatch** (for anything narrow tools can't express)
 - `list_collections()` — see what's available.
@@ -71,6 +73,8 @@ candidates rather than reading them all.
 - Cite every claim inline with its key (`AS-1234`, `AsatoCorp/repo#123`).
 - If a JIRA ticket has linked PRs (or vice versa), mention both.
 - If the data doesn't answer the question, say so explicitly. Do not invent.
+- Before declaring a source empty, call `data_freshness`. If it's unsynced or
+  stale, say so (e.g. "no GitHub data — last synced 6 days ago") not just "none".
 - Keep the final answer tight: a 2–6 sentence summary, then a bulleted list of
   the most relevant items with their keys, status, and a one-line note each.
 """
@@ -98,7 +102,9 @@ Workflow:
 4. Read full text for the top ~5 candidates; drop the rest.
 5. If the user asked about progress / implementation status, also call
    `linked` to see if code exists.
-6. Return a concise findings report citing each ticket by key with its status.
+6. If a search comes back empty, call `data_freshness` before reporting "none" —
+   the source may be unsynced or stale.
+7. Return a concise findings report citing each ticket by key with its status.
 """
 
 GITHUB_RESEARCHER_PROMPT = """You are the GitHub PR specialist for agent_yoku.
@@ -125,7 +131,9 @@ Workflow:
 3. For simple author/status/repo filters, use `filter_prs` directly.
 4. For "what code addresses AS-XXXX?" briefs, use `filter_prs(has_jira_link=True)`
    or follow links from a known PR.
-5. Report each PR with its key, repo, status, author, and any linked JIRA keys.
+5. If a search comes back empty, call `data_freshness` before reporting "none" —
+   the source may be unsynced or stale.
+6. Report each PR with its key, repo, status, author, and any linked JIRA keys.
 """
 
 JIRA_RESEARCHER = SubAgent(

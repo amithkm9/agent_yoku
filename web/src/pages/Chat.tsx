@@ -13,6 +13,7 @@ import {
   Counts,
   PersistedMessage,
   SessionSummary,
+  SourceFreshness,
   setToken,
   User,
 } from "../lib/api";
@@ -244,6 +245,7 @@ export function Chat() {
   const [user, setUser] = useState<User | null>(null);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [counts, setCounts] = useState<Counts | null>(null);
+  const [freshness, setFreshness] = useState<SourceFreshness[]>([]);
   const [activeSession, setActiveSession] = useState<string | null>(null);
   const [history, setHistory] = useState<ChatTurn[]>([]);
   const [draft, setDraft] = useState("");
@@ -265,9 +267,14 @@ export function Chat() {
 
   const refresh = useCallback(async () => {
     try {
-      const [s, c] = await Promise.all([api.listSessions(), api.counts()]);
+      const [s, c, f] = await Promise.all([
+        api.listSessions(),
+        api.counts(),
+        api.freshness(),
+      ]);
       setSessions(s);
       setCounts(c);
+      setFreshness(f);
       if (!activeSession && s.length > 0) selectSession(s[0].session_id);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -357,6 +364,20 @@ export function Chat() {
               <span>PRs</span>
               <strong>{counts.github_prs.toLocaleString()}</strong>
             </div>
+          </div>
+        )}
+        {freshness.length > 0 && (
+          <div className="freshness">
+            {freshness.map((f) => (
+              <span
+                key={f.source}
+                className={`fresh-badge${f.last_sync_status === "error" ? " stale" : ""}`}
+                title={f.last_synced_at ? `last synced ${f.last_synced_at}` : "never synced"}
+              >
+                {f.source === "jira" ? "JIRA" : "GitHub"}{" "}
+                {f.synced_ago === "never" ? "not synced" : `· ${f.synced_ago}`}
+              </span>
+            ))}
           </div>
         )}
         <div className="section-title">Sessions</div>

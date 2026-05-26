@@ -61,6 +61,14 @@ export interface Counts {
   chat_messages: number;
 }
 
+export interface SourceFreshness {
+  source: string;
+  count: number;
+  last_synced_at: string | null;
+  synced_ago: string | null;
+  last_sync_status: string | null;
+}
+
 export interface PersistedMessage {
   role: "human" | "ai" | "tool" | "system";
   content: unknown;
@@ -155,6 +163,7 @@ export const api = {
     request<ChatResponse>("/api/chat", { method: "POST", json: { session_id, query } }),
 
   counts: () => request<Counts>("/api/stats/counts"),
+  freshness: () => request<SourceFreshness[]>("/api/stats/freshness"),
 
   listConnectors: () => request<ConnectorStatus[]>("/api/connectors"),
   saveJiraConfig: (cfg: JiraConfigIn) =>
