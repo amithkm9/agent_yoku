@@ -31,7 +31,7 @@ from agent_yoku.utils import bson_safe
 
 log = get_logger("tools")
 
-# ---------- Lazy-loaded singleton cosine index (28k × 1536) ----------
+# ---------- Lazy-loaded singleton hybrid index (vector + keyword) ----------
 _INDEX_LOCK = threading.Lock()
 _INDEX: dict[str, Any] = {"loaded": False}
 
@@ -73,8 +73,24 @@ def _ensure_index() -> None:
             d.pop("embedding", None)
             d.pop("_id", None)
 
+        # Keyword half of hybrid search: an inverted index over identifier +
+        # summary tokens, idf-weighted so rare tokens (a ticket key, a repo
+        # name) outweigh common words.
+        inverted: dict[str, list[int]] = {}
+        for i, d in enumerate(docs):
+            for tok in _tokenize(_doc_keyword_text(d)):
+                inverted.setdefault(tok, []).append(i)
+        # Drop ubiquitous tokens (the `as` project prefix, `asatocorp` org) — they
+        # match nearly everything and let vector-top docs piggyback a keyword hit,
+        # drowning out the true exact match. Absolute floor keeps tiny corpora intact.
+        stop_df = max(_STOP_DF_MIN, int(_STOP_DF_RATIO * len(docs)))
+        inverted = {tok: post for tok, post in inverted.items() if len(post) <= stop_df}
+        idf = {tok: float(np.log(1.0 + len(docs) / len(post))) for tok, post in inverted.items()}
+
         _INDEX["docs"] = docs
         _INDEX["matrix"] = matrix
+        _INDEX["inverted"] = inverted
+        _INDEX["idf"] = idf
         _INDEX["loaded"] = True
         log.info("index loaded jira=%d github=%d", len(jira), len(gh))
 
@@ -96,25 +112,96 @@ def _clean(doc: dict, drop: tuple[str, ...] = ()) -> dict:
     return bson_safe(out)
 
 
+# ---------- Hybrid search internals (keyword + RRF) ----------
+
+# Tokens are kept whole (``as-1234``, ``dc-okta-user``, ``asatocorp/repo#12``)
+# and also split into pieces, so a query for "okta" still hits "dc-okta-user".
+_TOKEN_RE = re.compile(r"[a-z0-9]+(?:[-/#._][a-z0-9]+)*")
+_SPLIT_RE = re.compile(r"[-/#._]+")
+_RRF_K = 60  # rank-fusion damping constant (the RRF paper's default).
+_KEYWORD_WEIGHT = 2.0  # bias fusion toward exact-token hits (keys, repos, names).
+_STOP_DF_RATIO = 0.1  # tokens in >10% of docs are noise...
+_STOP_DF_MIN = 100  # ...but only once the corpus is large enough to judge.
+
+
+def _tokenize(text: str) -> set[str]:
+    toks: set[str] = set()
+    for whole in _TOKEN_RE.findall(text.lower()):
+        toks.add(whole)
+        toks.update(p for p in _SPLIT_RE.split(whole) if p)
+    return toks
+
+
+def _doc_keyword_text(doc: dict) -> str:
+    """The fields worth exact-matching: identifiers plus the human summary."""
+    return " ".join(
+        [
+            str(doc.get("key") or ""),
+            str(doc.get("summary") or ""),
+            str(doc.get("repo") or ""),
+            str(doc.get("assignee") or ""),
+            " ".join(str(x) for x in (doc.get("jira_keys") or [])),
+        ]
+    )
+
+
+def _keyword_scores(query: str) -> dict[int, float]:
+    """idf-weighted token-overlap score, keyed by doc index (matches only)."""
+    inverted = _INDEX["inverted"]
+    idf = _INDEX["idf"]
+    scores: dict[int, float] = {}
+    for tok in _tokenize(query):
+        weight = idf.get(tok)
+        if weight is None:
+            continue
+        for i in inverted[tok]:
+            scores[i] = scores.get(i, 0.0) + weight
+    return scores
+
+
+def _rrf_fuse(
+    ranked_lists: list[list[int]], weights: list[float] | None = None
+) -> dict[int, float]:
+    """Weighted Reciprocal Rank Fusion: score = Σ wᵢ/(K + rank), rank from 1.
+
+    Rank-based, so it needs no normalization between the wildly different
+    cosine and idf-overlap scales — it only cares about position in each list.
+    """
+    if weights is None:
+        weights = [1.0] * len(ranked_lists)
+    fused: dict[int, float] = {}
+    for ranked, w in zip(ranked_lists, weights):
+        for rank, i in enumerate(ranked, start=1):
+            fused[i] = fused.get(i, 0.0) + w / (_RRF_K + rank)
+    return fused
+
+
 # =================== SEMANTIC ===================
 
 
 @tool
 def semantic_search(query: str, k: int = 50, source: str = "both") -> list[dict]:
-    """Cosine-similarity search over the unified JIRA + GitHub PR index.
+    """Hybrid (vector + keyword) search over the unified JIRA + GitHub PR index.
 
-    Returns lightweight cards (key, summary, status, assignee, score, url, source)
-    sorted by relevance. Use this to *discover* candidate items, then call
-    get(key) to read full content for the ones you care about.
+    Combines cosine similarity (meaning) with an idf-weighted keyword match
+    (exact tokens — ticket keys, repo names, people, error strings) and fuses
+    the two rankings with Reciprocal Rank Fusion. This surfaces exact-identifier
+    hits that pure vector search ranks too low, without hurting semantic recall.
+
+    Returns lightweight cards sorted by relevance. Use this to *discover*
+    candidate items, then call get(key) to read full content.
 
     Args:
-        query: Natural-language search string.
+        query: Natural-language or identifier search string.
         k: Number of results to return. Default 50, max 200.
         source: "jira" | "github" | "both" (default).
 
     Returns:
         List of {key, summary, status, assignee, score, url, source, jira_keys?, repo?}.
+        `score` is the cosine similarity; ordering is the fused rank.
     """
+    if not query or not query.strip():
+        raise ValueError("query must not be empty")
     _ensure_index()
     k = max(1, min(int(k), 200))
     if source not in ("jira", "github", "both"):
@@ -122,20 +209,33 @@ def semantic_search(query: str, k: int = 50, source: str = "both") -> list[dict]
 
     docs = _INDEX["docs"]
     matrix = _INDEX["matrix"]
-    q = _embed_query(query)
-    scores = matrix @ q
+    cos = matrix @ _embed_query(query)  # cosine vs every doc (matrix is normalized)
 
+    # Fuse more candidates than k from each ranking, so a strong keyword hit
+    # outside the vector top-k still reaches the fusion step.
+    pool = max(k * 5, 100)
+
+    # Vector ranking (optionally restricted to one source).
     if source == "both":
-        top = np.argsort(-scores)[: k * 2]  # over-fetch then filter
-        picks = [(i, scores[i]) for i in top][:k]
+        vec_order = np.argsort(-cos)[:pool].tolist()
     else:
-        mask = np.array([d["source"] == source for d in docs])
-        masked = np.where(mask, scores, -np.inf)
-        top = np.argsort(-masked)[:k]
-        picks = [(i, scores[i]) for i in top]
+        elig = [i for i, d in enumerate(docs) if d["source"] == source]
+        elig.sort(key=lambda i: -cos[i])
+        vec_order = elig[:pool]
+
+    # Keyword ranking, restricted to the same source.
+    kw = {
+        i: s
+        for i, s in _keyword_scores(query).items()
+        if source == "both" or docs[i]["source"] == source
+    }
+    kw_order = sorted(kw, key=lambda i: -kw[i])[:pool]
+
+    fused = _rrf_fuse([vec_order, kw_order], weights=[1.0, _KEYWORD_WEIGHT])
+    ranked = sorted(fused, key=lambda i: -fused[i])[:k]
 
     out = []
-    for i, s in picks:
+    for i in ranked:
         d = docs[i]
         card = {
             "key": d["key"],
@@ -144,7 +244,7 @@ def semantic_search(query: str, k: int = 50, source: str = "both") -> list[dict]
             "assignee": d.get("assignee"),
             "url": d.get("url"),
             "source": d["source"],
-            "score": round(float(s), 4),
+            "score": round(float(cos[i]), 4),
         }
         if d["source"] == "github":
             card["repo"] = d.get("repo")
