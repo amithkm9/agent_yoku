@@ -41,6 +41,7 @@ data/
 web/node_modules/
 web/dist/
 web/.vite/
+web/*.tsbuildinfo
 
 # Generated schemas
 schemas/*.schema.json

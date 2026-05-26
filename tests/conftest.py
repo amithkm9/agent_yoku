@@ -42,6 +42,8 @@ def scratch_db(scratch_db_name):
     try:
         client.admin.command("ping")
     except Exception:
+        if os.getenv("CI"):
+            pytest.fail("Mongo is required in CI but was not reachable on localhost:27017")
         pytest.skip("local mongo not available")
     db = client[scratch_db_name]
     yield db

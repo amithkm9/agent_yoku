@@ -101,6 +101,7 @@ poetry run agent-yoku auth create-user --email you@asato.ai --tenant asato --adm
 make api                           # http://localhost:8000  (FastAPI + Swagger /docs)
 make web-install                   # one-time: npm install in web/
 make web                           # http://localhost:5173  (React UI)
+make web-lint                      # TypeScript static checks for the React app
 ```
 
 Sign in at `http://localhost:5173` with `tenant: asato` + the email/password you just set.
@@ -191,7 +192,10 @@ JWT secret comes from `settings.jwt_secret` — **rotate before any non-local de
 ```
 make fmt          # autoflake + ruff --fix + black
 make lint         # ruff + black --check
-make test         # pytest (71 tests, ~5s)
+make test         # pytest
+make pre-commit   # all pre-commit hooks
+make web-lint     # TypeScript static checks
+make web-build    # React production build
 make schemas      # regenerate JSON Schema docs under ./schemas/
 make agent-smoke  # 5-query agent regression suite (hits OpenAI)
 ```

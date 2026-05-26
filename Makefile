@@ -1,6 +1,7 @@
-.PHONY: help install install-dev fmt lint test ingest-jira ingest-github ingest-users embed link refresh-all status ui api web web-install chat clean schemas agent-smoke
+.PHONY: help install install-dev fmt lint test pre-commit web-lint web-build ingest-jira ingest-github ingest-users embed link refresh-all status ui api web web-install chat clean schemas agent-smoke
 
-PY := python
+POETRY := poetry run
+PY := $(POETRY) python
 CLI := $(PY) -m agent_yoku.cli
 
 help:
@@ -14,6 +15,9 @@ help:
 	@echo "  make fmt             black + ruff --fix + autoflake"
 	@echo "  make lint            ruff + black --check"
 	@echo "  make test            pytest"
+	@echo "  make pre-commit      run all pre-commit hooks"
+	@echo "  make web-lint        TypeScript static checks"
+	@echo "  make web-build       production frontend build"
 	@echo
 	@echo "Data:"
 	@echo "  make ingest-jira     pull JIRA tickets"
@@ -50,6 +54,15 @@ lint:
 
 test:
 	$(PY) -m pytest
+
+pre-commit:
+	$(PY) -m pre_commit run --all-files
+
+web-lint:
+	cd web && npm run lint
+
+web-build:
+	cd web && npm run build
 
 schemas:
 	$(PY) scripts/dump_schemas.py
