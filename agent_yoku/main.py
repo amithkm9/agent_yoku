@@ -5,7 +5,11 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from agent_yoku.log import get_logger
+from agent_yoku.middleware import RequestContext
 from agent_yoku.routers import auth, chat, sessions, stats
+
+log = get_logger("api.main")
 
 
 def create_app() -> FastAPI:
@@ -15,6 +19,10 @@ def create_app() -> FastAPI:
         description="JIRA + GitHub deepagent — REST surface.",
         # FastAPI mounts /docs and /redoc by default; that's fine here.
     )
+
+    # Request-correlation middleware must run before CORS so log records
+    # emitted during preflight responses still carry the IDs.
+    app.add_middleware(RequestContext)
 
     # Vite dev server runs on 5173; allow it + same-origin.
     app.add_middleware(
@@ -34,6 +42,7 @@ def create_app() -> FastAPI:
     async def healthz() -> dict:
         return {"status": "ok"}
 
+    log.info("FastAPI app initialised — routers + middleware wired")
     return app
 
 
