@@ -109,6 +109,51 @@ function parseAnswerBlocks(text: string): AnswerBlock[] {
   return blocks;
 }
 
+// The agent cites its sources inline as `AS-1234` (JIRA) and
+// `AsatoCorp/repo#123` (GitHub PR). Linkify those to the actual ticket / PR so
+// every claim is one click from its source. JIRA_BASE matches the default
+// Asato Atlassian site; change here if a tenant uses a different host.
+const JIRA_BASE = "https://asato-ai.atlassian.net";
+const CITATION_RE = /\bAS-\d+\b|\b[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+#\d+\b/g;
+
+function citationHref(token: string): string | null {
+  if (/^AS-\d+$/.test(token)) return `${JIRA_BASE}/browse/${token}`;
+  const pr = token.match(/^([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)#(\d+)$/);
+  if (pr) return `https://github.com/${pr[1]}/pull/${pr[2]}`;
+  return null;
+}
+
+function linkifyCitations(text: string, keyPrefix: string): ReactNode[] {
+  const nodes: ReactNode[] = [];
+  let lastIndex = 0;
+  let tokenIndex = 0;
+
+  for (const match of text.matchAll(CITATION_RE)) {
+    const token = match[0];
+    const href = citationHref(token);
+    if (href === null) continue;
+    const start = match.index ?? 0;
+
+    if (start > lastIndex) nodes.push(text.slice(lastIndex, start));
+    nodes.push(
+      <a
+        key={`${keyPrefix}-cite-${tokenIndex}`}
+        className="citation"
+        href={href}
+        target="_blank"
+        rel="noreferrer"
+      >
+        {token}
+      </a>
+    );
+    lastIndex = start + token.length;
+    tokenIndex += 1;
+  }
+
+  if (lastIndex < text.length) nodes.push(text.slice(lastIndex));
+  return nodes;
+}
+
 function renderInline(text: string, keyPrefix: string): ReactNode[] {
   const nodes: ReactNode[] = [];
   const pattern = /(\*\*.+?\*\*|`.+?`|\*[^*\n]+\*)/g;
@@ -120,13 +165,15 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
     const start = match.index ?? 0;
 
     if (start > lastIndex) {
-      nodes.push(text.slice(lastIndex, start));
+      nodes.push(
+        ...linkifyCitations(text.slice(lastIndex, start), `${keyPrefix}-pre-${tokenIndex}`)
+      );
     }
 
     if (token.startsWith("**")) {
       nodes.push(
         <strong key={`${keyPrefix}-strong-${tokenIndex}`}>
-          {token.slice(2, -2)}
+          {linkifyCitations(token.slice(2, -2), `${keyPrefix}-strong-${tokenIndex}`)}
         </strong>
       );
     } else if (token.startsWith("`")) {
@@ -135,7 +182,9 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
       );
     } else {
       nodes.push(
-        <em key={`${keyPrefix}-em-${tokenIndex}`}>{token.slice(1, -1)}</em>
+        <em key={`${keyPrefix}-em-${tokenIndex}`}>
+          {linkifyCitations(token.slice(1, -1), `${keyPrefix}-em-${tokenIndex}`)}
+        </em>
       );
     }
 
@@ -144,7 +193,7 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
   }
 
   if (lastIndex < text.length) {
-    nodes.push(text.slice(lastIndex));
+    nodes.push(...linkifyCitations(text.slice(lastIndex), `${keyPrefix}-tail`));
   }
 
   return nodes;

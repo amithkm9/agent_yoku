@@ -412,6 +412,15 @@ button.link {
   border-radius: 4px;
   padding: 0.1em 0.35em;
 }
+.msg.ai a.citation {
+  color: #1d4ed8;
+  text-decoration: none;
+  font-weight: 550;
+  border-bottom: 1px solid #c7d2fe;
+}
+.msg.ai a.citation:hover {
+  border-bottom-color: #1d4ed8;
+}
 .tool-trace {
   align-self: flex-start;
   font-size: 12px;
