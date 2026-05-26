@@ -40,10 +40,9 @@ answers.
 
 **Narrow / fast path** (preferred — validated, auto-resolves user aliases)
 - `semantic_search(query, k=50, source=...)` — by meaning, across both sources.
-- `get_jira(key)` / `get_pr(key)` — point lookup.
-- `linked_prs_for_jira(key)` / `linked_jira_for_pr(key)` — cross-source link hops.
+- `get(key)` — point lookup; auto-routes JIRA ticket vs PR by key shape.
+- `linked(key)` — cross-source link hop; JIRA key → PRs, PR key → JIRA tickets.
 - `filter_jira / filter_prs` — exact filters on common fields.
-- `count_jira / count_prs` — totals only.
 - `list_repos()` — repo inventory.
 - `resolve_user(query)` — name/login/email → unified user record.
 
@@ -64,8 +63,8 @@ Rules of thumb:
 ## Search budget
 
 Default `semantic_search` k=50. Bump to 100–200 only for org-wide questions.
-After search, read fewer than 10 full items with `get_jira` / `get_pr`. Drop
-irrelevant candidates rather than reading them all.
+After search, read fewer than 10 full items with `get`. Drop irrelevant
+candidates rather than reading them all.
 
 ## Output
 
@@ -80,11 +79,10 @@ JIRA_RESEARCHER_PROMPT = """You are the JIRA specialist for agent_yoku.
 
 Narrow tools (fast path):
 - `semantic_search(query, k=50, source="jira")` — find candidate tickets.
-- `get_jira(key)` — read a ticket in full (incl. its `linked_prs` array).
+- `get(key)` — read a ticket in full (incl. its `linked_prs` array).
 - `filter_jira(status=, assignee=, label=, issuetype=, fix_version=,
    since_days=, limit=)` — exact filters.
-- `count_jira(...)` — totals.
-- `linked_prs_for_jira(key)` — PRs that reference a ticket.
+- `linked(key)` — PRs that reference a ticket.
 - `resolve_user(name)` — translate human name to JIRA displayName.
 
 Power tools (for analytics narrow tools don't cover):
@@ -94,12 +92,12 @@ Power tools (for analytics narrow tools don't cover):
   $lookup, custom projections.
 
 Workflow:
-1. If the brief names a specific key, `get_jira` it directly.
-2. For "how many" / grouping questions, prefer `count_jira` / `mongo_count`.
+1. If the brief names a specific key, `get` it directly.
+2. For "how many" / grouping questions, prefer `mongo_count`.
 3. Otherwise narrow with `semantic_search` or `filter_jira` first.
 4. Read full text for the top ~5 candidates; drop the rest.
 5. If the user asked about progress / implementation status, also call
-   `linked_prs_for_jira` to see if code exists.
+   `linked` to see if code exists.
 6. Return a concise findings report citing each ticket by key with its status.
 """
 
@@ -107,11 +105,10 @@ GITHUB_RESEARCHER_PROMPT = """You are the GitHub PR specialist for agent_yoku.
 
 Narrow tools (fast path):
 - `semantic_search(query, k=50, source="github")` — find candidate PRs.
-- `get_pr(key)` — read a PR in full (body, branch, jira_keys).
+- `get(key)` — read a PR in full (body, branch, jira_keys).
 - `filter_prs(repo=, status=, author=, has_jira_link=, since_days=, limit=)` —
   exact filters.
-- `count_prs(...)` — totals.
-- `linked_jira_for_pr(key)` — JIRA tickets a PR references.
+- `linked(key)` — JIRA tickets a PR references.
 - `list_repos(min_prs=, limit=)` — repo inventory.
 - `resolve_user(name)` — translate human name to GitHub login.
 
@@ -122,7 +119,7 @@ Power tools (for analytics narrow tools don't cover):
   by repo, author, status; $lookup joins, custom projections.
 
 Workflow:
-1. If the brief names a specific PR key (e.g. `AsatoCorp/repo#N`), `get_pr` it.
+1. If the brief names a specific PR key (e.g. `AsatoCorp/repo#N`), `get` it.
 2. For "merged PRs by X" / "avg PR age" / similar analytics, reach for
    `mongo_query` or `mongo_count`.
 3. For simple author/status/repo filters, use `filter_prs` directly.

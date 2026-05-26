@@ -105,7 +105,7 @@ def semantic_search(query: str, k: int = 50, source: str = "both") -> list[dict]
 
     Returns lightweight cards (key, summary, status, assignee, score, url, source)
     sorted by relevance. Use this to *discover* candidate items, then call
-    get_jira / get_pr to read full content for the ones you care about.
+    get(key) to read full content for the ones you care about.
 
     Args:
         query: Natural-language search string.
@@ -224,63 +224,61 @@ def resolve_user(query: str) -> dict:
 # =================== POINT LOOKUPS ===================
 
 
-@tool
-def get_jira(key: str) -> dict:
-    """Fetch a single JIRA ticket by its key (e.g. 'AS-4163').
+def _is_pr_key(key: str) -> bool:
+    """PR keys look like 'org/repo#123'; JIRA keys look like 'AS-4163'.
 
-    Returns full ticket fields including the description text and `linked_prs`
-    (a list of PRs that reference this ticket, populated by link_prs_to_jira.py).
+    The '#' separator is unique to PR keys, so it disambiguates the two sources.
     """
-    coll = tickets_collection()
-    doc = coll.find_one({"key": key}, {"embedding": 0})
+    return "#" in key
+
+
+@tool
+def get(key: str) -> dict:
+    """Fetch a single JIRA ticket or GitHub PR by key, auto-routed by key shape.
+
+    - JIRA ticket key (e.g. 'AS-4163') → full ticket fields including the
+      description text and `linked_prs` (PRs that reference this ticket).
+    - GitHub PR key (e.g. 'AsatoCorp/agent-svc#173') → full PR fields including
+      body, branch, status, jira_keys, etc.
+
+    Raises ValueError if no item matches the key.
+    """
+    if _is_pr_key(key):
+        doc = github_prs_collection().find_one({"key": key}, {"embedding": 0})
+        if not doc:
+            raise ValueError(f"PR {key!r} not found")
+        return _clean(doc)
+    doc = tickets_collection().find_one({"key": key}, {"embedding": 0})
     if not doc:
         raise ValueError(f"JIRA ticket {key!r} not found")
-    return _clean(doc)
-
-
-@tool
-def get_pr(key: str) -> dict:
-    """Fetch a single GitHub PR by its key (e.g. 'AsatoCorp/agent-svc#173').
-
-    Returns full PR fields including body, branch, status, jira_keys, etc.
-    """
-    coll = github_prs_collection()
-    doc = coll.find_one({"key": key}, {"embedding": 0})
-    if not doc:
-        raise ValueError(f"PR {key!r} not found")
     return _clean(doc)
 
 
 # =================== CROSS-SOURCE LINKS ===================
 
 
-@tool
-def linked_prs_for_jira(jira_key: str, limit: int = 20) -> list[dict]:
-    """All GitHub PRs whose branch/title/body references the given JIRA key.
-
-    Use this when the user mentions a JIRA ticket and you need the code that
-    addresses it.
-    """
-    coll = github_prs_collection()
-    cursor = coll.find(
-        {"jira_keys": jira_key},
-        {
-            "key": 1,
-            "repo": 1,
-            "summary": 1,
-            "status": 1,
-            "url": 1,
-            "author": 1,
-            "merged": 1,
-            "updated": 1,
-        },
-    ).limit(int(limit))
+def _prs_for_jira(jira_key: str, limit: int) -> list[dict]:
+    cursor = (
+        github_prs_collection()
+        .find(
+            {"jira_keys": jira_key},
+            {
+                "key": 1,
+                "repo": 1,
+                "summary": 1,
+                "status": 1,
+                "url": 1,
+                "author": 1,
+                "merged": 1,
+                "updated": 1,
+            },
+        )
+        .limit(int(limit))
+    )
     return [_clean(d) for d in cursor]
 
 
-@tool
-def linked_jira_for_pr(pr_key: str) -> list[dict]:
-    """All JIRA tickets referenced by a given PR (resolves the PR's jira_keys)."""
+def _jira_for_pr(pr_key: str) -> list[dict]:
     pr = github_prs_collection().find_one({"key": pr_key}, {"jira_keys": 1})
     if not pr:
         raise ValueError(f"PR {pr_key!r} not found")
@@ -292,6 +290,21 @@ def linked_jira_for_pr(pr_key: str) -> list[dict]:
         {"key": 1, "summary": 1, "status": 1, "assignee": 1, "url": 1},
     )
     return [_clean(d) for d in cursor]
+
+
+@tool
+def linked(key: str, limit: int = 20) -> list[dict]:
+    """Cross-source link hop, auto-routed by key shape.
+
+    - JIRA key (e.g. 'AS-4163') → GitHub PRs whose branch/title/body references
+      it. Use when you have a ticket and need the code that addresses it.
+    - PR key (e.g. 'AsatoCorp/agent-svc#173') → JIRA tickets the PR references.
+
+    `limit` applies only to the JIRA → PRs direction.
+    """
+    if _is_pr_key(key):
+        return _jira_for_pr(key)
+    return _prs_for_jira(key, limit)
 
 
 # =================== STRUCTURED FILTERS ===================
@@ -420,64 +433,10 @@ def filter_prs(
     return [_clean(d) for d in cursor]
 
 
-# =================== COUNTS / STATS ===================
-
-
-@tool
-def count_jira(
-    status: str | None = None,
-    assignee: str | None = None,
-    label: str | None = None,
-    issuetype: str | None = None,
-    fix_version: str | None = None,
-    since_days: int | None = None,
-) -> int:
-    """Count JIRA tickets matching criteria. Same filters as filter_jira."""
-    q: dict = {}
-    if status:
-        q["status"] = status
-    if assignee:
-        u = _resolve_user_doc(assignee)
-        jira_name = (u.get("jira") or {}).get("displayName") if u else None
-        q["assignee"] = jira_name or assignee
-    if label:
-        q["labels"] = label
-    if issuetype:
-        q["issuetype"] = issuetype
-    if fix_version:
-        q["fix_versions"] = fix_version
-    since = _since(since_days)
-    if since:
-        q["updated"] = {"$gte": since.isoformat()}
-    return tickets_collection().count_documents(q)
-
-
-@tool
-def count_prs(
-    repo: str | None = None,
-    status: str | None = None,
-    author: str | None = None,
-    has_jira_link: bool | None = None,
-    since_days: int | None = None,
-) -> int:
-    """Count GitHub PRs matching criteria. Same filters as filter_prs."""
-    q: dict = {}
-    if repo:
-        q["repo"] = repo if "/" in repo else f"AsatoCorp/{repo}"
-    if status:
-        q["status"] = status
-    if author:
-        u = _resolve_user_doc(author)
-        gh_login = (u.get("github") or {}).get("login") if u else None
-        q["author"] = gh_login or author
-    if has_jira_link is True:
-        q["jira_keys"] = {"$ne": []}
-    elif has_jira_link is False:
-        q["jira_keys"] = []
-    since = _since(since_days)
-    if since:
-        q["updated"] = {"$gte": since.isoformat()}
-    return github_prs_collection().count_documents(q)
+# =================== STATS ===================
+#
+# Counts are intentionally not narrow tools: `mongo_count` (generic escape
+# hatch) covers any count over either collection with arbitrary filters.
 
 
 @tool
@@ -700,19 +659,17 @@ def mongo_query(
 GENERIC_MONGO_TOOLS = [list_collections, describe_collection, mongo_count, mongo_query]
 
 JIRA_TOOLS = [
-    get_jira,
+    get,
     filter_jira,
-    count_jira,
-    linked_prs_for_jira,
+    linked,
     resolve_user,
     semantic_search,
     *GENERIC_MONGO_TOOLS,
 ]
 GITHUB_TOOLS = [
-    get_pr,
+    get,
     filter_prs,
-    count_prs,
-    linked_jira_for_pr,
+    linked,
     list_repos,
     resolve_user,
     semantic_search,
@@ -721,14 +678,10 @@ GITHUB_TOOLS = [
 ALL_TOOLS = [
     semantic_search,
     resolve_user,
-    get_jira,
-    get_pr,
+    get,
     filter_jira,
     filter_prs,
-    count_jira,
-    count_prs,
-    linked_prs_for_jira,
-    linked_jira_for_pr,
+    linked,
     list_repos,
     *GENERIC_MONGO_TOOLS,
 ]

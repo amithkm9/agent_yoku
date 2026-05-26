@@ -17,17 +17,17 @@ def test_human_roundtrip():
 def test_ai_with_tool_calls_roundtrip():
     msg = AIMessage(
         content="",
-        tool_calls=[{"id": "c1", "name": "get_pr", "args": {"key": "x"}}],
+        tool_calls=[{"id": "c1", "name": "get", "args": {"key": "x"}}],
     )
     out = _serialize_msg(msg)
-    assert out["tool_calls"][0]["name"] == "get_pr"
+    assert out["tool_calls"][0]["name"] == "get"
     rebuilt = _deserialize_msg(out)
     assert rebuilt.type == "ai"
-    assert rebuilt.tool_calls[0]["name"] == "get_pr"
+    assert rebuilt.tool_calls[0]["name"] == "get"
 
 
 def test_tool_roundtrip():
-    msg = ToolMessage(content="result", tool_call_id="c1", name="get_pr")
+    msg = ToolMessage(content="result", tool_call_id="c1", name="get")
     out = _serialize_msg(msg)
     assert out["tool_call_id"] == "c1"
     rebuilt = _deserialize_msg(out)

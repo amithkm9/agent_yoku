@@ -61,9 +61,9 @@ def test_save_then_load_history(temp_session):
         [
             HumanMessage(content="get AS-1"),
             AIMessage(
-                content="", tool_calls=[{"id": "c1", "name": "get_jira", "args": {"key": "AS-1"}}]
+                content="", tool_calls=[{"id": "c1", "name": "get", "args": {"key": "AS-1"}}]
             ),
-            ToolMessage(content='{"key":"AS-1"}', tool_call_id="c1", name="get_jira"),
+            ToolMessage(content='{"key":"AS-1"}', tool_call_id="c1", name="get"),
             AIMessage(content="here is AS-1"),
         ],
     )

@@ -53,7 +53,7 @@ def test_chat_message_with_tool_call():
         msg_idx=0,
         role="ai",
         content="",
-        tool_calls=[{"id": "c", "name": "get_pr", "args": {}}],
+        tool_calls=[{"id": "c", "name": "get", "args": {}}],
         created_at=now,
     )
-    assert m.tool_calls[0]["name"] == "get_pr"
+    assert m.tool_calls[0]["name"] == "get"

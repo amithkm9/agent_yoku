@@ -33,19 +33,19 @@ def test_filter_prs_translates_jira_displayname_to_gh_login(fake_collections):
     assert last_find["author"] == "internet-zero"
 
 
-def test_count_jira_applies_fix_version(fake_collections):
-    tools.count_jira.invoke({"fix_version": "release-05-26-2026"})
-    last_count = fake_collections["jira_tickets"].count_calls[-1]
-    assert last_count == {"fix_versions": "release-05-26-2026"}
+def test_filter_jira_applies_fix_version(fake_collections):
+    tools.filter_jira.invoke({"fix_version": "release-05-26-2026", "limit": 5})
+    last_find = fake_collections["jira_tickets"].find_calls[-1][0]
+    assert last_find["fix_versions"] == "release-05-26-2026"
 
 
-def test_count_prs_has_jira_link_true(fake_collections):
-    tools.count_prs.invoke({"has_jira_link": True})
-    last_count = fake_collections["github_prs"].count_calls[-1]
-    assert last_count["jira_keys"] == {"$ne": []}
+def test_filter_prs_has_jira_link_true(fake_collections):
+    tools.filter_prs.invoke({"has_jira_link": True, "limit": 5})
+    last_find = fake_collections["github_prs"].find_calls[-1][0]
+    assert last_find["jira_keys"] == {"$ne": []}
 
 
-def test_count_prs_has_jira_link_false(fake_collections):
-    tools.count_prs.invoke({"has_jira_link": False})
-    last_count = fake_collections["github_prs"].count_calls[-1]
-    assert last_count["jira_keys"] == []
+def test_filter_prs_has_jira_link_false(fake_collections):
+    tools.filter_prs.invoke({"has_jira_link": False, "limit": 5})
+    last_find = fake_collections["github_prs"].find_calls[-1][0]
+    assert last_find["jira_keys"] == []

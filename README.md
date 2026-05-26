@@ -12,7 +12,7 @@ into MongoDB, indexes them with OpenAI embeddings, and exposes a deepagent
 ```
   ┌──────────────┐    JWT      ┌────────────────────┐    invoke    ┌──────────────────┐
   │  React UI    │ ──────────▶ │  FastAPI           │ ───────────▶ │ deepagent        │
-  │  (Vite :5173)│             │  (uvicorn :8000)   │              │ + 14 tools       │
+  │  (Vite :5173)│             │  (uvicorn :8000)   │              │ + 11 tools       │
   └──────────────┘             │  + tenant ContextVar│              │ + 2 sub-agents   │
                                └──────┬─────────────┘              └──────┬───────────┘
                                       │                                    │
@@ -60,7 +60,7 @@ agent_yoku/
 │   ├── agent/
 │   │   ├── agent.py                # deepagent factory
 │   │   ├── chat.py                 # CLI ask/final_answer helpers
-│   │   └── tools.py                # 14 tools (narrow + generic mongo)
+│   │   └── tools.py                # 11 tools (narrow + generic mongo)
 │   └── utils/                      # cross-cutting helpers
 │       ├── bson.py · jira_keys.py · http.py
 ├── web/                            # React + Vite frontend
@@ -167,7 +167,8 @@ JWT secret comes from `settings.jwt_secret` — **rotate before any non-local de
   `embedding` field on each doc; cosine runs in-memory via numpy.
 - **Two-layer agent.** Main orchestrator + `jira_researcher` + `github_researcher`
   sub-agents (isolated context).
-- **Narrow tools + generic escape hatch.** 10 narrow tools for common queries;
+- **Narrow tools + generic escape hatch.** 7 narrow tools for common queries
+  (`get` / `linked` auto-route by key shape across both sources);
   `mongo_query` / `mongo_count` / `describe_collection` / `list_collections`
   for analytics the narrow tools don't cover. Tool errors return
   `{"error": "..."}` so the agent can adapt rather than crash.

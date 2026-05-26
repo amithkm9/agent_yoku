@@ -26,13 +26,13 @@ CASES: list[dict] = [
     {
         "name": "point lookup by JIRA key",
         "query": "tell me about AS-4143",
-        "expect_tools": {"get_jira"},
+        "expect_tools": {"get"},
         "expect_in_answer": ["AS-4143"],
     },
     {
         "name": "count tickets by fix_version",
         "query": "how many JIRA tickets target release-05-26-2026?",
-        "expect_tools": {"count_jira", "mongo_count"},  # either is fine
+        "expect_tools": {"mongo_count", "filter_jira"},  # either is fine
         "tools_mode": "any",
         "expect_in_answer": ["release-05-26-2026"],
     },
@@ -46,13 +46,13 @@ CASES: list[dict] = [
     {
         "name": "cross-source link via JIRA key",
         "query": "what PRs reference AS-4143?",
-        "expect_tools": {"linked_prs_for_jira"},
+        "expect_tools": {"linked"},
         "expect_in_answer": ["AsatoCorp/"],
     },
     {
         "name": "graceful not-found",
         "query": "tell me about AS-99999",
-        "expect_tools": {"get_jira"},
+        "expect_tools": {"get"},
         "expect_in_answer": ["not", "found"],  # accept various phrasings
         "any_of": True,  # match any one of the expected words
     },
