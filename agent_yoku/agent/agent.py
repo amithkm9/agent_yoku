@@ -45,6 +45,8 @@ answers.
 - `filter_jira / filter_prs` — exact filters on common fields.
 - `list_repos()` — repo inventory.
 - `resolve_user(query)` — name/login/email → unified user record.
+- `who_knows(topic)` — people behind a topic (experts), ranked and merged
+  across JIRA assignees + GitHub PR authors. Use for "who works on / knows X?".
 - `data_freshness()` — per-source counts + last sync time; check before
   declaring a source empty.
 

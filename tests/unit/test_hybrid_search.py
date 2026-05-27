@@ -150,3 +150,88 @@ def test_ubiquitous_token_dropped_at_scale(isolated_index, monkeypatch):
     assert "shared" not in inverted, "ubiquitous token should be stopworded"
     assert "as" not in inverted, "project prefix should be stopworded"
     assert "uniqueword" in inverted, "rare token should be kept"
+
+
+# ---------- second-stage reranker ----------
+
+
+@pytest.mark.unit
+def test_lexical_overlap_scores_phrase_and_tokens():
+    q = "payment gateway"
+    qt = tools._tokenize(q)
+    assert tools._lexical_overlap(q, qt, "new payment gateway service") == 1.0
+    partial = tools._lexical_overlap(
+        "payment timeout", tools._tokenize("payment timeout"), "payment service"
+    )
+    assert 0.0 < partial < 1.0
+    assert tools._lexical_overlap(q, qt, "totally unrelated") == 0.0
+
+
+@pytest.mark.unit
+def test_feature_rerank_promotes_corroborated_doc(monkeypatch):
+    monkeypatch.setattr(
+        tools,
+        "_INDEX",
+        {
+            "loaded": True,
+            "docs": [
+                {"key": "AS-1", "summary": "same", "source": "jira", "has_links": False},
+                {"key": "AS-2", "summary": "same", "source": "jira", "has_links": True},
+            ],
+        },
+    )
+    # Equal first-stage score; the cross-linked doc should be reranked first.
+    order = tools._feature_rerank("same", [(0, 0.01), (1, 0.01)])
+    assert order[0] == 1
+
+
+@pytest.mark.unit
+def test_rerank_does_not_overturn_clear_leader(monkeypatch):
+    # The 0.045 vs 0.032 gap mirrors the real bug: a keyword-#1 exact PR match
+    # (high fused) vs a vec-ranked doc ~28% lower. The original additive boost
+    # (+0.05 lexical) flipped these; the multiplicative boost must not. doc 1
+    # here maxes out lexical + corroboration and still must stay below doc 0.
+    monkeypatch.setattr(
+        tools,
+        "_INDEX",
+        {
+            "loaded": True,
+            "docs": [
+                {
+                    "key": "EXACT",
+                    "summary": "no overlap here",
+                    "source": "github",
+                    "has_links": True,
+                },
+                {
+                    "key": "LEXY",
+                    "summary": "payment gateway",
+                    "source": "github",
+                    "has_links": True,
+                },
+            ],
+        },
+    )
+    # doc 0 leads fusion clearly; doc 1 maxes out lexical + corroboration.
+    order = tools._feature_rerank("payment gateway", [(0, 0.045), (1, 0.032)])
+    assert order[0] == 0
+
+
+@pytest.mark.unit
+def test_rerank_corroboration_changes_search_order(isolated_index, monkeypatch):
+    # Two otherwise-identical tickets; only AS-2 has linked PRs. Fusion alone
+    # would tie them (AS-1 marginally ahead by insertion order); the reranker's
+    # corroboration boost must lift AS-2 to the top.
+    jira = [
+        {"key": "AS-1", "summary": "shared topic", "embedding": [1.0, 0.0, 0.0]},
+        {
+            "key": "AS-2",
+            "summary": "shared topic",
+            "embedding": [1.0, 0.0, 0.0],
+            "linked_prs": [{"key": "AsatoCorp/r#1"}],
+        },
+    ]
+    _seed_index(monkeypatch, jira=jira, query_vec=(1.0, 0.0, 0.0))
+
+    out = tools.semantic_search.invoke({"query": "shared topic", "k": 5})
+    assert out[0]["key"] == "AS-2"

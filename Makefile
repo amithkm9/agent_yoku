@@ -1,4 +1,4 @@
-.PHONY: help install install-dev fmt lint test pre-commit web-lint web-build ingest-jira ingest-github ingest-users embed link refresh-all status ui api web web-install chat clean schemas agent-smoke
+.PHONY: help install install-dev fmt lint test pre-commit web-lint web-build ingest-jira ingest-github ingest-users embed link refresh-all status ui api web web-install chat clean schemas agent-smoke retrieval-eval
 
 POETRY := poetry run
 PY := $(POETRY) python
@@ -35,6 +35,7 @@ help:
 	@echo "  make ui              Legacy Streamlit UI on :8501"
 	@echo "  make chat Q='...'    one-shot CLI query"
 	@echo "  make agent-smoke     Run the agent regression suite"
+	@echo "  make retrieval-eval TENANT=asato  Score retrieval on golden queries"
 
 install:
 	poetry install --no-root --without dev
@@ -69,6 +70,9 @@ schemas:
 
 agent-smoke:
 	$(PY) scripts/agent_smoke.py
+
+retrieval-eval:
+	$(PY) scripts/retrieval_eval.py --tenant $(TENANT)
 
 ingest-jira:
 	$(CLI) ingest jira

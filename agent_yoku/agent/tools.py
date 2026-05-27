@@ -53,6 +53,7 @@ def _ensure_index() -> None:
             "url": 1,
             "embedding": 1,
             "jira_keys": 1,
+            "linked_prs": 1,
             "repo": 1,
         }
 
@@ -73,6 +74,12 @@ def _ensure_index() -> None:
         for d in docs:
             d.pop("embedding", None)
             d.pop("_id", None)
+            # Cross-source corroboration flag for reranking: a JIRA ticket with
+            # linked PRs, or a PR that references tickets, is better-evidenced.
+            d["has_links"] = bool(
+                d.get("jira_keys") if d["source"] == "github" else d.get("linked_prs")
+            )
+            d.pop("linked_prs", None)
 
         # Keyword half of hybrid search: an inverted index over identifier +
         # summary tokens, idf-weighted so rare tokens (a ticket key, a repo
@@ -177,6 +184,54 @@ def _rrf_fuse(
     return fused
 
 
+# ---------- Second-stage reranker ----------
+
+# Rerank at least this many fused candidates even when k is small, so the second
+# stage has room to reorder; for larger k the whole top-k is reranked.
+_RERANK_MIN_WINDOW = 30
+# Boosts are *relative* (multiplicative, +7% combined max) so they reorder
+# near-ties but can't lift a candidate over one that's more than ~7% ahead in
+# fusion — e.g. an exact-key hit won't be demoted by a doc that merely shares a
+# common summary word (that gap is ~28%).
+_W_LEX = 0.05  # up to +5% for summary overlap (incl. a phrase-match bonus).
+_W_CORR = 0.02  # up to +2% for cross-source corroboration (linked PR / JIRA).
+
+
+def _lexical_overlap(query: str, query_tokens: set[str], summary: str) -> float:
+    """0..1 signal: token overlap with the summary, plus a phrase-match bonus."""
+    summ = (summary or "").lower()
+    overlap = (len(query_tokens & _tokenize(summ)) / len(query_tokens)) if query_tokens else 0.0
+    phrase = 0.5 if query.strip().lower() in summ else 0.0
+    return min(1.0, overlap + phrase)
+
+
+def _feature_rerank(query: str, candidates: list[tuple[int, float]]) -> list[int]:
+    """Rescore first-stage (doc_index, fused_score) pairs with richer signals.
+
+    Refines — not replaces — fusion: the fused score is the base, scaled by a
+    small multiplicative boost from lexical overlap with the summary and
+    cross-source corroboration. Multiplicative keeps the boost proportional, so
+    it reorders near-ties but can't lift a candidate over one materially (more
+    than ~7%) ahead in fusion. This is the seam where a cross-encoder or hosted
+    reranker could drop in later.
+    """
+    qtokens = _tokenize(query)
+    docs = _INDEX["docs"]
+    scored = []
+    for i, base in candidates:
+        d = docs[i]
+        lex = _lexical_overlap(query, qtokens, d.get("summary") or "")
+        corr = 1.0 if d.get("has_links") else 0.0
+        scored.append((i, base * (1.0 + _W_LEX * lex + _W_CORR * corr)))
+    scored.sort(key=lambda x: -x[1])
+    return [i for i, _ in scored]
+
+
+# Pluggable so a neural / hosted reranker can replace the default without
+# touching the search path.
+_RERANKER = _feature_rerank
+
+
 # =================== SEMANTIC ===================
 
 
@@ -188,6 +243,8 @@ def semantic_search(query: str, k: int = 50, source: str = "both") -> list[dict]
     (exact tokens — ticket keys, repo names, people, error strings) and fuses
     the two rankings with Reciprocal Rank Fusion. This surfaces exact-identifier
     hits that pure vector search ranks too low, without hurting semantic recall.
+    A lightweight second-stage reranker then refines the top window using
+    summary overlap and cross-source links before returning k results.
 
     Returns lightweight cards sorted by relevance. Use this to *discover*
     candidate items, then call get(key) to read full content.
@@ -233,7 +290,10 @@ def semantic_search(query: str, k: int = 50, source: str = "both") -> list[dict]
     kw_order = sorted(kw, key=lambda i: -kw[i])[:pool]
 
     fused = _rrf_fuse([vec_order, kw_order], weights=[1.0, _KEYWORD_WEIGHT])
-    ranked = sorted(fused, key=lambda i: -fused[i])[:k]
+
+    # Second stage: rerank the fused top window with richer signals, then cut to k.
+    window = sorted(fused, key=lambda i: -fused[i])[: max(k, _RERANK_MIN_WINDOW)]
+    ranked = _RERANKER(query, [(i, fused[i]) for i in window])[:k]
 
     out = []
     for i in ranked:
@@ -768,6 +828,93 @@ def data_freshness() -> list[dict]:
     return source_freshness()
 
 
+def _identity_maps() -> tuple[dict[str, dict], dict[str, dict]]:
+    """Lookup tables {jira displayName -> unified user} and {gh login -> unified}."""
+    by_jira: dict[str, dict] = {}
+    by_gh: dict[str, dict] = {}
+    for u in unified_users_collection().find({}, {"_id": 0, "embedding": 0}):
+        jname = (u.get("jira") or {}).get("displayName")
+        glogin = (u.get("github") or {}).get("login")
+        if jname:
+            by_jira[jname] = u
+        if glogin:
+            by_gh[glogin] = u
+    return by_jira, by_gh
+
+
+@tool
+def who_knows(topic: str, limit: int = 5) -> list[dict]:
+    """Find who works on a topic — the people behind the most relevant tickets
+    and PRs, merged across their JIRA + GitHub identities.
+
+    Runs a hybrid search for `topic`, tallies JIRA assignees and PR authors over
+    the matches, and joins the two identities via unified_users so one person
+    counts once. Use for "who's the expert on X?" / "who should I ask about Y?".
+
+    Returns people ranked by activity:
+    [{name, email, jira_name, github_login, jira_items, github_items, total, sample_keys}].
+    """
+    topic = (topic or "").strip()
+    if not topic:
+        raise ValueError("topic must not be empty")
+    limit = max(1, min(int(limit), 25))
+
+    cards = semantic_search.invoke({"query": topic, "k": 40, "source": "both"})
+    # JIRA assignees ride on the card; PR authors need a lookup.
+    contributions: list[tuple[str, str, str]] = [  # (kind, raw_identifier, key)
+        ("jira", c["assignee"], c["key"])
+        for c in cards
+        if c["source"] == "jira" and c.get("assignee")
+    ]
+    gh_keys = [c["key"] for c in cards if c["source"] == "github"]
+    if gh_keys:
+        for d in github_prs_collection().find(
+            {"key": {"$in": gh_keys}}, {"_id": 0, "key": 1, "author": 1}
+        ):
+            if d.get("author"):
+                contributions.append(("github", d["author"], d["key"]))
+
+    by_jira, by_gh = _identity_maps()
+    tallies: dict[str, dict] = {}
+    for kind, raw, key in contributions:
+        unified = (by_jira if kind == "jira" else by_gh).get(raw)
+        if unified and unified.get("is_bot"):
+            continue  # don't surface bots as experts
+        if unified:
+            # user_id is the stable primary key; fall back to email then raw so
+            # two distinct people can't collapse onto a shared display name.
+            ident = unified.get("user_id") or unified.get("email") or raw
+            jira_name = (unified.get("jira") or {}).get("displayName")
+            gh_login = (unified.get("github") or {}).get("login")
+            email = unified.get("email")
+            name = jira_name or gh_login or raw
+        else:
+            ident = f"{kind}:{raw}"
+            jira_name = raw if kind == "jira" else None
+            gh_login = raw if kind == "github" else None
+            email = None
+            name = raw
+        t = tallies.setdefault(
+            ident,
+            {
+                "name": name,
+                "email": email,
+                "jira_name": jira_name,
+                "github_login": gh_login,
+                "jira_items": 0,
+                "github_items": 0,
+                "sample_keys": [],
+            },
+        )
+        t[f"{kind}_items"] += 1
+        if len(t["sample_keys"]) < 6:
+            t["sample_keys"].append(key)
+
+    people = [{**t, "total": t["jira_items"] + t["github_items"]} for t in tallies.values()]
+    people.sort(key=lambda p: -p["total"])
+    return people[:limit]
+
+
 # ---------- Tool groupings for the deepagent ----------
 
 GENERIC_MONGO_TOOLS = [list_collections, describe_collection, mongo_count, mongo_query]
@@ -794,6 +941,7 @@ GITHUB_TOOLS = [
 ALL_TOOLS = [
     semantic_search,
     resolve_user,
+    who_knows,  # cross-source by design → orchestrator only, not single-source sub-agents
     get,
     filter_jira,
     filter_prs,
