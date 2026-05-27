@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import threading
 from collections.abc import Iterator
 
 from fastapi import APIRouter
@@ -21,13 +22,16 @@ log = get_logger("api.chat")
 
 # Build the agent lazily-and-once per process.
 _AGENT = None
+_AGENT_LOCK = threading.Lock()
 
 
 def _agent():
     global _AGENT
     if _AGENT is None:
-        log.info("building deep agent…")
-        _AGENT = build_agent()
+        with _AGENT_LOCK:
+            if _AGENT is None:
+                log.info("building deep agent…")
+                _AGENT = build_agent()
     return _AGENT
 
 
@@ -73,15 +77,16 @@ def _stream_agent_turn(session_id: str, query: str, prior: list, agent) -> Itera
         inputs = {"messages": prior + [HumanMessage(content=query)]}
         final_msgs = list(prior)
         seen: set[str] = set()
+        scanned = 0  # only inspect messages added since the last state snapshot
         for state in agent.stream(inputs, stream_mode="values"):
             final_msgs = state.get("messages", final_msgs)
-            for m in final_msgs:
-                if m.type != "ai":
-                    continue
-                for c in getattr(m, "tool_calls", None) or []:
-                    if c["id"] not in seen:
-                        seen.add(c["id"])
-                        yield _sse("tool", {"name": c.get("name")})
+            for m in final_msgs[scanned:]:
+                if m.type == "ai":
+                    for c in getattr(m, "tool_calls", None) or []:
+                        if c["id"] not in seen:
+                            seen.add(c["id"])
+                            yield _sse("tool", {"name": c.get("name")})
+            scanned = len(final_msgs)
 
         new_msgs = final_msgs[len(prior) :]
         turn_id = sess_mod.new_turn_id()
@@ -95,9 +100,9 @@ def _stream_agent_turn(session_id: str, query: str, prior: list, agent) -> Itera
                 "tool_calls": [tc.model_dump() for tc in _summarize_tool_calls(new_msgs)],
             },
         )
-    except Exception as e:  # surface failures to the client instead of hanging
+    except Exception:  # surface a generic failure; details stay in the server log
         log.exception("chat stream failed for session=%s", session_id)
-        yield _sse("error", {"detail": f"{type(e).__name__}: {e}"})
+        yield _sse("error", {"detail": "agent turn failed; please retry"})
 
 
 @router.post("", response_model=ChatResponse)

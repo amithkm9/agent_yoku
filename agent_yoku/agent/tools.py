@@ -53,10 +53,10 @@ def _index_key() -> str:
         return "_default"  # CLI / tests may run without a tenant context set
 
 
-def _to_epoch(value) -> float | None:
+def _to_epoch(value: str | datetime | None) -> float | None:
     """Parse an ISO-8601 timestamp (JIRA/GitHub `updated`) to epoch seconds, or
     None if absent/unparseable — callers treat None as 'age unknown'."""
-    if not value:
+    if value is None or value == "":
         return None
     try:
         return datetime.fromisoformat(str(value)).timestamp()
@@ -125,8 +125,8 @@ def _load_index() -> dict[str, Any]:
     return {"docs": docs, "matrix": matrix, "inverted": inverted, "idf": idf}
 
 
-def _fresh(idx: dict[str, Any] | None) -> bool:
-    return idx is not None and (time.monotonic() - idx["_built_at"]) < _INDEX_TTL_S
+def _fresh(idx: dict[str, Any]) -> bool:
+    return (time.monotonic() - idx["_built_at"]) < _INDEX_TTL_S
 
 
 def _index() -> dict[str, Any]:
@@ -134,11 +134,11 @@ def _index() -> dict[str, Any]:
     once it ages past the TTL."""
     key = _index_key()
     idx = _INDEXES.get(key)
-    if _fresh(idx):
+    if idx is not None and _fresh(idx):
         return idx
     with _INDEX_LOCK:
         idx = _INDEXES.get(key)  # re-check under lock
-        if not _fresh(idx):
+        if idx is None or not _fresh(idx):
             idx = _load_index()
             idx["_built_at"] = time.monotonic()
             _INDEXES[key] = idx
@@ -156,11 +156,14 @@ def invalidate_index(tenant: str | None = None) -> None:
 @lru_cache(maxsize=512)
 def _embed_query(text: str) -> np.ndarray:
     # Cached: a query string always maps to the same vector (tenant-independent),
-    # and the agent + sub-agents re-issue overlapping queries within a turn. The
-    # returned array is treated read-only by callers, so sharing it is safe.
+    # and the agent + sub-agents re-issue overlapping queries within a turn.
+    # lru_cache hands back the same array each hit, so freeze it — a future
+    # in-place caller would otherwise corrupt the entry for every later call.
     resp = openai_client().embeddings.create(model=EMBED_MODEL, input=[text])
     v = np.array(resp.data[0].embedding, dtype=np.float32)
-    return v / (np.linalg.norm(v) + 1e-12)
+    v /= np.linalg.norm(v) + 1e-12
+    v.flags.writeable = False
+    return v
 
 
 def _clean(doc: dict, drop: tuple[str, ...] = ()) -> dict:
@@ -265,7 +268,7 @@ def _lexical_overlap(query: str, query_tokens: set[str], summary: str) -> float:
 def _recency_factor(updated_ts: float | None, now: float) -> float:
     """1.0 for a just-updated item, halving every _RECENCY_HALFLIFE_DAYS; 0.0 when
     the timestamp is unknown (neutral — no boost, never a penalty below the base)."""
-    if not updated_ts:
+    if updated_ts is None:
         return 0.0
     age_days = max(0.0, (now - updated_ts) / 86400.0)
     return 0.5 ** (age_days / _RECENCY_HALFLIFE_DAYS)

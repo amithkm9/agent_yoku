@@ -76,6 +76,9 @@ class Settings(BaseSettings):
     rate_limit_enabled: bool = True
     rate_limit_requests: int = 120
     rate_limit_window_s: int = 60
+    # Only enable behind a trusted reverse proxy that sets X-Forwarded-For;
+    # otherwise clients can spoof the header to dodge the limit.
+    rate_limit_trust_forwarded_for: bool = False
 
     # How many recent turns of a session to replay into the agent (bounds token
     # cost on long chats; the full transcript is still kept for UI replay).

@@ -27,18 +27,23 @@ class RateLimit(BaseHTTPMiddleware):
         limit: int,
         window_s: int,
         exempt_paths: Iterable[str] = (),
+        trust_forwarded_for: bool = False,
     ) -> None:
         super().__init__(app)
         self.limit = max(1, limit)
         self.window_s = max(1, window_s)
         self.exempt = tuple(exempt_paths)
+        # Only honor X-Forwarded-For behind a trusted proxy; otherwise any client
+        # could spoof it and rotate IPs to bypass the limit. Default: socket IP.
+        self.trust_forwarded_for = trust_forwarded_for
         self._hits: dict[str, tuple[float, int]] = {}  # client -> (window_start, count)
         self._lock = threading.Lock()
 
     def _client(self, request: Request) -> str:
-        forwarded = request.headers.get("X-Forwarded-For")
-        if forwarded:
-            return forwarded.split(",")[0].strip()
+        if self.trust_forwarded_for:
+            forwarded = request.headers.get("X-Forwarded-For")
+            if forwarded:
+                return forwarded.split(",")[0].strip()
         return request.client.host if request.client else "unknown"
 
     def _check(self, key: str) -> tuple[bool, int]:

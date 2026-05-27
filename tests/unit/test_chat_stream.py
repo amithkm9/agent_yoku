@@ -66,7 +66,9 @@ def test_emits_error_event_on_failure(monkeypatch):
     blob = "".join(chat_mod._stream_agent_turn("s", "q", [], _BoomAgent()))
     events = _events(blob)
     assert events[-1][0] == "error"
-    assert "boom" in events[-1][1]["detail"]
+    # generic message — internal exception detail must NOT leak to the client
+    assert "boom" not in blob
+    assert events[-1][1]["detail"] == "agent turn failed; please retry"
 
 
 @pytest.mark.unit

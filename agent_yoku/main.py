@@ -43,6 +43,7 @@ def create_app() -> FastAPI:
             limit=settings.rate_limit_requests,
             window_s=settings.rate_limit_window_s,
             exempt_paths=("/healthz", "/docs", "/openapi.json", "/redoc"),
+            trust_forwarded_for=settings.rate_limit_trust_forwarded_for,
         )
 
     # Vite dev server runs on 5173; allow it + same-origin.
