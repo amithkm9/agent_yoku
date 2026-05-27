@@ -22,7 +22,7 @@ from langchain_core.messages import (
     ToolMessage,
 )
 
-from agent_yoku.config import chat_messages_collection, chat_sessions_collection
+from agent_yoku.config import chat_messages_collection, chat_sessions_collection, settings
 
 # =================== SESSIONS ===================
 
@@ -182,23 +182,35 @@ def load_all_messages(session_id: str) -> list[dict]:
     return list(cursor)
 
 
-def load_agent_history(session_id: str) -> list[BaseMessage]:
-    """Compact replay for the agent: only user + final-AI message per prior turn.
+def load_agent_history(session_id: str, max_turns: int | None = None) -> list[BaseMessage]:
+    """Compact replay for the agent: only user + final-AI message per prior turn,
+    capped to the most recent `max_turns` turns so token cost on long sessions
+    stays bounded. The full transcript is untouched (UI replay still shows all).
 
     Tool calls and intermediate AI messages are dropped — the agent re-plans
     fresh each turn, only needing the prior Q&A as conversational context.
     """
-    docs = load_all_messages(session_id)
+    if max_turns is None:
+        max_turns = settings.chat_history_max_turns
+    return _compact_turns(load_all_messages(session_id), max_turns)
+
+
+def _compact_turns(docs: list[dict], max_turns: int) -> list[BaseMessage]:
+    """Group docs by turn, keep human + final-AI per turn, and keep only the
+    most recent `max_turns` turns (<=0 keeps all)."""
     if not docs:
         return []
 
-    # Group by turn_seq, then keep human msgs and the LAST ai-without-tool-calls per turn.
     by_turn: dict[int, list[dict]] = {}
     for d in docs:
         by_turn.setdefault(d["turn_seq"], []).append(d)
 
+    seqs = sorted(by_turn)
+    if max_turns > 0:
+        seqs = seqs[-max_turns:]
+
     out: list[BaseMessage] = []
-    for seq in sorted(by_turn):
+    for seq in seqs:
         turn_docs = by_turn[seq]
         # human messages in order
         for d in turn_docs:
