@@ -84,6 +84,13 @@ class Settings(BaseSettings):
     # cost on long chats; the full transcript is still kept for UI replay).
     chat_history_max_turns: int = 12
 
+    # Background auto-sync — periodically refresh every tenant's connectors
+    # (ingest -> embed -> link) without anyone clicking "sync". Driven by the
+    # scheduler started in the API lifespan. Disable in prod by setting
+    # AUTO_SYNC_ENABLED=false; tune cadence with SYNC_INTERVAL_MINUTES.
+    auto_sync_enabled: bool = True
+    sync_interval_minutes: int = 60
+
     @property
     def is_default_jwt_secret(self) -> bool:
         """True when the built-in dev secret is still in use (unsafe in prod)."""

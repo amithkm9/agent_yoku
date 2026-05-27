@@ -106,6 +106,20 @@ make web-lint                      # TypeScript static checks for the React app
 
 Sign in at `http://localhost:5173` with the exact tenant name you created.
 
+### Auto-sync
+
+The API runs a background scheduler that re-runs the full refresh pipeline
+(ingest → embed → unify → link → backfill) for **every** tenant with a
+configured connector, using each tenant's own stored credentials. It starts
+with the API and is controlled by env:
+
+- `AUTO_SYNC_ENABLED` (default `true`) — set `false` to turn it off.
+- `SYNC_INTERVAL_MINUTES` (default `60`) — cadence between runs.
+
+The first run fires one interval after boot (not at startup), and runs are
+non-overlapping. Auto-sync is always off under `ENV=test`/`ci`. On-demand
+`POST /api/connectors/{name}/sync` still works regardless.
+
 ## CLI
 
 ```

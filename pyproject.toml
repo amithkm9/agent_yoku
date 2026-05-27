@@ -29,6 +29,7 @@ uvicorn = { extras = ["standard"], version = "^0.30" }
 python-jose = { extras = ["cryptography"], version = "^3.3" }
 bcrypt = "^4.2"
 python-multipart = "^0.0.20"
+apscheduler = "^3.11.2"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.6"

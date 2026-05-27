@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import os
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -26,11 +28,29 @@ def create_app() -> FastAPI:
             "JWT_SECRET before running outside local/dev."
         )
 
+    @asynccontextmanager
+    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        # Background auto-sync runs the per-tenant refresh pipeline on an
+        # interval. Kept off in test/ci so the suite never spawns a live
+        # scheduler thread or touches the network.
+        from agent_yoku import scheduler
+
+        run_auto_sync = settings.auto_sync_enabled and env.lower() not in {"test", "ci"}
+        if run_auto_sync:
+            scheduler.start()
+        else:
+            log.info("auto-sync disabled (enabled=%s, env=%s)", settings.auto_sync_enabled, env)
+        try:
+            yield
+        finally:
+            scheduler.shutdown()  # safe no-op if never started
+
     app = FastAPI(
         title="agent_yoku",
         version="0.1.0",
         description="JIRA + GitHub deepagent — REST surface.",
         # FastAPI mounts /docs and /redoc by default; that's fine here.
+        lifespan=lifespan,
     )
 
     # Request-correlation middleware must run before CORS so log records
