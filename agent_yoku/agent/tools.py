@@ -251,6 +251,7 @@ _W_LEX = 0.05  # up to +5% for summary overlap (incl. a phrase-match bonus).
 _W_CORR = 0.02  # up to +2% for cross-source corroboration (linked PR / JIRA).
 _W_RECENCY = 0.03  # up to +3% for a freshly-updated item (half-life decay).
 _RECENCY_HALFLIFE_DAYS = 180.0  # an item this old gets half the recency boost.
+_WHO_KNOWS_RECENCY_FLOOR = 0.2  # who_knows: an old contribution still counts this much.
 
 
 def _lexical_overlap(query: str, query_tokens: set[str], summary: str) -> float:
@@ -918,10 +919,12 @@ def who_knows(topic: str, limit: int = 5) -> list[dict]:
 
     Runs a hybrid search for `topic`, tallies JIRA assignees and PR authors over
     the matches, and joins the two identities via unified_users so one person
-    counts once. Use for "who's the expert on X?" / "who should I ask about Y?".
+    counts once. Ranking is recency-weighted: recent work counts toward current
+    ownership, while years-old items are discounted (so a long-departed owner
+    doesn't top the list). Use for "who's the expert on X?" / "who owns Y now?".
 
-    Returns people ranked by activity:
-    [{name, email, jira_name, github_login, jira_items, github_items, total, sample_keys}].
+    Returns people ranked by `score` (recency-weighted), with raw counts:
+    [{name, email, jira_name, github_login, jira_items, github_items, total, score, sample_keys}].
     """
     topic = (topic or "").strip()
     if not topic:
@@ -929,23 +932,35 @@ def who_knows(topic: str, limit: int = 5) -> list[dict]:
     limit = max(1, min(int(limit), 25))
 
     cards = semantic_search.invoke({"query": topic, "k": 40, "source": "both"})
-    # JIRA assignees ride on the card; PR authors need a lookup.
-    contributions: list[tuple[str, str, str]] = [  # (kind, raw_identifier, key)
-        ("jira", c["assignee"], c["key"])
+    jira_keys = [c["key"] for c in cards if c["source"] == "jira" and c.get("assignee")]
+    gh_keys = [c["key"] for c in cards if c["source"] == "github"]
+
+    # Update times drive recency weighting (recent work signals current ownership).
+    jira_ts: dict[str, float | None] = {}
+    if jira_keys:
+        jira_ts = {
+            d["key"]: _to_epoch(d.get("updated"))
+            for d in tickets_collection().find(
+                {"key": {"$in": jira_keys}}, {"_id": 0, "key": 1, "updated": 1}
+            )
+        }
+    # (kind, raw_identifier, key, updated_ts)
+    contributions: list[tuple[str, str, str, float | None]] = [
+        ("jira", c["assignee"], c["key"], jira_ts.get(c["key"]))
         for c in cards
         if c["source"] == "jira" and c.get("assignee")
     ]
-    gh_keys = [c["key"] for c in cards if c["source"] == "github"]
     if gh_keys:
         for d in github_prs_collection().find(
-            {"key": {"$in": gh_keys}}, {"_id": 0, "key": 1, "author": 1}
+            {"key": {"$in": gh_keys}}, {"_id": 0, "key": 1, "author": 1, "updated": 1}
         ):
             if d.get("author"):
-                contributions.append(("github", d["author"], d["key"]))
+                contributions.append(("github", d["author"], d["key"], _to_epoch(d.get("updated"))))
 
     by_jira, by_gh = _identity_maps()
+    now = time.time()
     tallies: dict[str, dict] = {}
-    for kind, raw, key in contributions:
+    for kind, raw, key, ts in contributions:
         unified = (by_jira if kind == "jira" else by_gh).get(raw)
         if unified and unified.get("is_bot"):
             continue  # don't surface bots as experts
@@ -972,15 +987,23 @@ def who_knows(topic: str, limit: int = 5) -> list[dict]:
                 "github_login": gh_login,
                 "jira_items": 0,
                 "github_items": 0,
+                "score": 0.0,
                 "sample_keys": [],
             },
         )
         t[f"{kind}_items"] += 1
+        # Recent work counts more; a floor keeps old contributions partially credited.
+        t["score"] += _WHO_KNOWS_RECENCY_FLOOR + (1 - _WHO_KNOWS_RECENCY_FLOOR) * _recency_factor(
+            ts, now
+        )
         if len(t["sample_keys"]) < 6:
             t["sample_keys"].append(key)
 
-    people = [{**t, "total": t["jira_items"] + t["github_items"]} for t in tallies.values()]
-    people.sort(key=lambda p: -p["total"])
+    people = [
+        {**t, "score": round(t["score"], 2), "total": t["jira_items"] + t["github_items"]}
+        for t in tallies.values()
+    ]
+    people.sort(key=lambda p: -p["score"])
     return people[:limit]
 
 

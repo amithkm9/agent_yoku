@@ -84,6 +84,37 @@ def test_empty_topic_raises(fake_collections, monkeypatch):
 
 
 @pytest.mark.unit
+def test_recency_weighting_demotes_stale_contributor(fake_collections, monkeypatch):
+    from datetime import UTC, datetime
+
+    recent = datetime.now(UTC).isoformat()
+    old = "2021-01-01T00:00:00+00:00"
+    _stub_search(
+        monkeypatch,
+        cards=[
+            {"key": "AS-1", "source": "jira", "assignee": "Stale Sam"},
+            {"key": "AS-2", "source": "jira", "assignee": "Stale Sam"},
+            {"key": "AS-3", "source": "jira", "assignee": "Stale Sam"},
+            {"key": "AS-9", "source": "jira", "assignee": "Fresh Fran"},
+        ],
+    )
+    fake_collections["jira_tickets"].docs = [
+        {"key": "AS-1", "updated": old},
+        {"key": "AS-2", "updated": old},
+        {"key": "AS-3", "updated": old},
+        {"key": "AS-9", "updated": recent},
+    ]
+    fake_collections["unified_users"].docs = []
+
+    people = tools.who_knows.invoke({"topic": "okta", "limit": 5})
+
+    # Fran's single fresh ticket outranks Sam's three ancient ones.
+    assert people[0]["name"] == "Fresh Fran"
+    sam = next(p for p in people if p["name"] == "Stale Sam")
+    assert sam["total"] == 3  # raw counts are still reported honestly
+
+
+@pytest.mark.unit
 def test_limit_is_respected(fake_collections, monkeypatch):
     _stub_search(
         monkeypatch,
