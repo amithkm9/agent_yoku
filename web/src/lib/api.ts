@@ -162,6 +162,53 @@ export const api = {
   postChat: (session_id: string, query: string) =>
     request<ChatResponse>("/api/chat", { method: "POST", json: { session_id, query } }),
 
+  // Streamed turn: invokes onEvent("tool"|"answer"|"error", data) as SSE arrives.
+  postChatStream: async (
+    session_id: string,
+    query: string,
+    onEvent: (event: string, data: Record<string, unknown>) => void
+  ): Promise<void> => {
+    const headers = new Headers({ "Content-Type": "application/json" });
+    const token = getToken();
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+
+    const r = await fetch("/api/chat/stream", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ session_id, query }),
+    });
+    if (r.status === 401) {
+      setToken(null);
+      if (location.pathname !== "/login") location.href = "/login";
+      return;
+    }
+    if (!r.ok || !r.body) {
+      throw new Error(`${r.status} ${r.statusText}: ${await r.text()}`);
+    }
+
+    const reader = r.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let sep = buf.indexOf("\n\n");
+      while (sep !== -1) {
+        const block = buf.slice(0, sep);
+        buf = buf.slice(sep + 2);
+        let event = "message";
+        let data = "";
+        for (const line of block.split("\n")) {
+          if (line.startsWith("event:")) event = line.slice(6).trim();
+          else if (line.startsWith("data:")) data += line.slice(5).trim();
+        }
+        if (data) onEvent(event, JSON.parse(data) as Record<string, unknown>);
+        sep = buf.indexOf("\n\n");
+      }
+    }
+  },
+
   counts: () => request<Counts>("/api/stats/counts"),
   freshness: () => request<SourceFreshness[]>("/api/stats/freshness"),
 

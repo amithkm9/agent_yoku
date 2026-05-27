@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
 
 from fastapi import APIRouter
+from fastapi.responses import StreamingResponse
 from langchain_core.messages import HumanMessage
 
 from agent_yoku.agent.agent import build_agent
@@ -47,6 +49,57 @@ def _summarize_tool_calls(messages: list) -> list[ToolCallSummary]:
     return out
 
 
+def _final_answer(messages: list) -> str:
+    """The last AI message with no pending tool calls — the user-facing answer."""
+    for m in reversed(messages):
+        if m.type == "ai" and not getattr(m, "tool_calls", None):
+            return _extract_text(m.content)
+    return ""
+
+
+def _sse(event: str, data: dict) -> str:
+    return f"event: {event}\ndata: {json.dumps(data, default=str)}\n\n"
+
+
+def _stream_agent_turn(session_id: str, query: str, prior: list, agent) -> Iterator[str]:
+    """Run one turn, emitting an SSE 'tool' event as each tool fires and a final
+    'answer' event (after persisting). Streams progress so the UI isn't frozen.
+
+    Uses stream_mode='values' (full state per step) rather than token streaming:
+    with deepagents sub-agents, isolating just the final-answer tokens is
+    unreliable, whereas tool-activity + final answer is robust and useful.
+    """
+    try:
+        inputs = {"messages": prior + [HumanMessage(content=query)]}
+        final_msgs = list(prior)
+        seen: set[str] = set()
+        for state in agent.stream(inputs, stream_mode="values"):
+            final_msgs = state.get("messages", final_msgs)
+            for m in final_msgs:
+                if m.type != "ai":
+                    continue
+                for c in getattr(m, "tool_calls", None) or []:
+                    if c["id"] not in seen:
+                        seen.add(c["id"])
+                        yield _sse("tool", {"name": c.get("name")})
+
+        new_msgs = final_msgs[len(prior) :]
+        turn_id = sess_mod.new_turn_id()
+        sess_mod.save_turn(session_id, turn_id, new_msgs, user_query=query)
+        yield _sse(
+            "answer",
+            {
+                "session_id": session_id,
+                "turn_id": turn_id,
+                "answer": _final_answer(new_msgs),
+                "tool_calls": [tc.model_dump() for tc in _summarize_tool_calls(new_msgs)],
+            },
+        )
+    except Exception as e:  # surface failures to the client instead of hanging
+        log.exception("chat stream failed for session=%s", session_id)
+        yield _sse("error", {"detail": f"{type(e).__name__}: {e}"})
+
+
 @router.post("", response_model=ChatResponse)
 async def post_chat(req: ChatRequest, user: CurrentUser) -> ChatResponse:
     set_session(req.session_id)
@@ -59,11 +112,7 @@ async def post_chat(req: ChatRequest, user: CurrentUser) -> ChatResponse:
     turn_id = sess_mod.new_turn_id()
     sess_mod.save_turn(req.session_id, turn_id, new_msgs, user_query=req.query)
 
-    answer = ""
-    for m in reversed(new_msgs):
-        if m.type == "ai" and not getattr(m, "tool_calls", None):
-            answer = _extract_text(m.content)
-            break
+    answer = _final_answer(new_msgs)
 
     log.info(
         "chat user=%s session=%s tools=%d",
@@ -77,4 +126,18 @@ async def post_chat(req: ChatRequest, user: CurrentUser) -> ChatResponse:
         turn_id=turn_id,
         answer=answer,
         tool_calls=_summarize_tool_calls(new_msgs),
+    )
+
+
+@router.post("/stream")
+async def post_chat_stream(req: ChatRequest, user: CurrentUser) -> StreamingResponse:
+    """Same turn as POST /chat, but streamed as Server-Sent Events: a 'tool'
+    event per tool call, then a final 'answer' event. The sync generator is run
+    in a threadpool by Starlette, so it doesn't block the event loop."""
+    set_session(req.session_id)
+    prior = sess_mod.load_agent_history(req.session_id)
+    log.info("chat stream user=%s session=%s", user.id, req.session_id)
+    return StreamingResponse(
+        _stream_agent_turn(req.session_id, req.query, prior, _agent()),
+        media_type="text/event-stream",
     )

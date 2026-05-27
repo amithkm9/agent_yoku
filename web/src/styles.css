@@ -424,6 +424,11 @@ button.link {
   border-radius: 4px;
   padding: 0.1em 0.35em;
 }
+.turn-status {
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 13px;
+}
 .msg.ai a.citation {
   color: #1d4ed8;
   text-decoration: none;

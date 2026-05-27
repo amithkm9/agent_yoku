@@ -43,6 +43,7 @@ interface ChatTurn {
   question: string;
   answer: string;
   toolCalls: ChatResponse["tool_calls"];
+  status?: string; // live progress while streaming (cleared once the answer lands)
 }
 
 type AnswerBlock =
@@ -320,17 +321,26 @@ export function Chat() {
     setDraft("");
     setBusy(true);
     setError(null);
-    const pending: ChatTurn = { question: q, answer: "…", toolCalls: [] };
+    const pending: ChatTurn = { question: q, answer: "…", toolCalls: [], status: "thinking…" };
     setHistory((h) => [...h, pending]);
+
+    const patchLast = (patch: Partial<ChatTurn>) =>
+      setHistory((h) => h.map((t, i) => (i === h.length - 1 ? { ...t, ...patch } : t)));
+
     try {
-      const r = await api.postChat(sid, q);
-      setHistory((h) =>
-        h.map((t, i) =>
-          i === h.length - 1
-            ? { question: q, answer: r.answer, toolCalls: r.tool_calls }
-            : t
-        )
-      );
+      await api.postChatStream(sid, q, (event, data) => {
+        if (event === "tool") {
+          patchLast({ status: `running ${String(data.name ?? "tool")}…` });
+        } else if (event === "answer") {
+          patchLast({
+            answer: String(data.answer ?? ""),
+            toolCalls: (data.tool_calls ?? []) as ChatTurn["toolCalls"],
+            status: undefined,
+          });
+        } else if (event === "error") {
+          throw new Error(String(data.detail ?? "stream error"));
+        }
+      });
       refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -463,7 +473,11 @@ export function Chat() {
                 </details>
               )}
               <div className="msg ai">
-                <AnswerContent text={turn.answer} />
+                {turn.status ? (
+                  <div className="turn-status">{turn.status}</div>
+                ) : (
+                  <AnswerContent text={turn.answer} />
+                )}
               </div>
             </div>
           ))}
