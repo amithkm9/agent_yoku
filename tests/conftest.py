@@ -52,11 +52,13 @@ def scratch_db(scratch_db_name):
 
 @pytest.fixture
 def isolated_index(monkeypatch):
-    """Reset the lazy cosine-index singleton between tests that touch it."""
+    """Reset the per-tenant index cache + tenant context between tests."""
     from agent_yoku.agent import tools
+    from agent_yoku.storage import tenancy
 
-    monkeypatch.setattr(tools, "_INDEX", {"loaded": False})
+    monkeypatch.setattr(tools, "_INDEXES", {})
     yield
+    tenancy.set_tenant(None)
 
 
 # ---------- in-memory mongo doubles ----------

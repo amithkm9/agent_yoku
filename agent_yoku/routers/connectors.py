@@ -160,6 +160,9 @@ def _run_jira_sync(tenant_id: str, cfg: JiraConfig) -> None:
             ingest_mod.main()
             users_mod.main()
         cc.mark_synced("jira", ok=True)
+        from agent_yoku.agent.tools import invalidate_index
+
+        invalidate_index(tenant_id)  # refresh the in-process search index
     except Exception as e:
         log.exception("jira sync failed for tenant=%s", tenant_id)
         cc.mark_synced(
@@ -177,6 +180,9 @@ def _run_github_sync(tenant_id: str, cfg: GithubConfig) -> None:
             ingest_mod.main()
             users_mod.main()
         cc.mark_synced("github", ok=True)
+        from agent_yoku.agent.tools import invalidate_index
+
+        invalidate_index(tenant_id)  # refresh the in-process search index
     except Exception as e:
         log.exception("github sync failed for tenant=%s", tenant_id)
         cc.mark_synced(

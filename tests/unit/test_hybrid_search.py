@@ -144,9 +144,8 @@ def test_ubiquitous_token_dropped_at_scale(isolated_index, monkeypatch):
     ]
     jira[0]["summary"] = "shared uniqueword"
     _seed_index(monkeypatch, jira=jira)
-    tools._ensure_index()
 
-    inverted = tools._INDEX["inverted"]
+    inverted = tools._index()["inverted"]
     assert "shared" not in inverted, "ubiquitous token should be stopworded"
     assert "as" not in inverted, "project prefix should be stopworded"
     assert "uniqueword" in inverted, "rare token should be kept"
@@ -168,53 +167,99 @@ def test_lexical_overlap_scores_phrase_and_tokens():
 
 
 @pytest.mark.unit
-def test_feature_rerank_promotes_corroborated_doc(monkeypatch):
-    monkeypatch.setattr(
-        tools,
-        "_INDEX",
-        {
-            "loaded": True,
-            "docs": [
-                {"key": "AS-1", "summary": "same", "source": "jira", "has_links": False},
-                {"key": "AS-2", "summary": "same", "source": "jira", "has_links": True},
-            ],
-        },
-    )
+def test_feature_rerank_promotes_corroborated_doc():
+    idx = {
+        "docs": [
+            {"key": "AS-1", "summary": "same", "source": "jira", "has_links": False},
+            {"key": "AS-2", "summary": "same", "source": "jira", "has_links": True},
+        ]
+    }
     # Equal first-stage score; the cross-linked doc should be reranked first.
-    order = tools._feature_rerank("same", [(0, 0.01), (1, 0.01)])
+    order = tools._feature_rerank("same", [(0, 0.01), (1, 0.01)], idx)
     assert order[0] == 1
 
 
 @pytest.mark.unit
-def test_rerank_does_not_overturn_clear_leader(monkeypatch):
+def test_rerank_does_not_overturn_clear_leader():
     # The 0.045 vs 0.032 gap mirrors the real bug: a keyword-#1 exact PR match
     # (high fused) vs a vec-ranked doc ~28% lower. The original additive boost
     # (+0.05 lexical) flipped these; the multiplicative boost must not. doc 1
     # here maxes out lexical + corroboration and still must stay below doc 0.
+    idx = {
+        "docs": [
+            {"key": "EXACT", "summary": "no overlap here", "source": "github", "has_links": True},
+            {"key": "LEXY", "summary": "payment gateway", "source": "github", "has_links": True},
+        ]
+    }
+    # doc 0 leads fusion clearly; doc 1 maxes out lexical + corroboration.
+    order = tools._feature_rerank("payment gateway", [(0, 0.045), (1, 0.032)], idx)
+    assert order[0] == 0
+
+
+# ---------- per-tenant index lifecycle ----------
+
+
+@pytest.mark.unit
+def test_index_is_isolated_per_tenant(isolated_index, monkeypatch):
+    # The agent is process-global; the index must NOT be shared across tenants,
+    # or one tenant's tickets leak into another's search.
+    from agent_yoku.storage import tenancy
+
     monkeypatch.setattr(
         tools,
-        "_INDEX",
-        {
-            "loaded": True,
-            "docs": [
-                {
-                    "key": "EXACT",
-                    "summary": "no overlap here",
-                    "source": "github",
-                    "has_links": True,
-                },
-                {
-                    "key": "LEXY",
-                    "summary": "payment gateway",
-                    "source": "github",
-                    "has_links": True,
-                },
-            ],
-        },
+        "_load_index",
+        lambda: {"docs": [{"key": tenancy.current_tenant()}], "inverted": {}, "idf": {}},
     )
-    # doc 0 leads fusion clearly; doc 1 maxes out lexical + corroboration.
-    order = tools._feature_rerank("payment gateway", [(0, 0.045), (1, 0.032)])
-    assert order[0] == 0
+
+    tenancy.set_tenant("tenant-a")
+    a = tools._index()
+    tenancy.set_tenant("tenant-b")
+    b = tools._index()
+
+    assert a["docs"][0]["key"] == "tenant-a"
+    assert b["docs"][0]["key"] == "tenant-b"
+    tenancy.set_tenant("tenant-a")
+    assert tools._index() is a, "tenant A's index should be cached, not rebuilt as B's"
+
+
+@pytest.mark.unit
+def test_invalidate_index_forces_rebuild(isolated_index, monkeypatch):
+    builds = {"n": 0}
+
+    def fake_load():
+        builds["n"] += 1
+        return {"docs": [], "inverted": {}, "idf": {}}
+
+    monkeypatch.setattr(tools, "_load_index", fake_load)
+
+    tools._index()
+    tools._index()
+    assert builds["n"] == 1, "second call should hit the cache"
+
+    tools.invalidate_index()
+    tools._index()
+    assert builds["n"] == 2, "invalidation should force a rebuild"
+
+
+@pytest.mark.unit
+def test_embed_query_is_cached(monkeypatch):
+    calls = {"n": 0}
+
+    class _FakeClient:
+        class embeddings:
+            @staticmethod
+            def create(model, input):
+                calls["n"] += 1
+                return type("R", (), {"data": [type("D", (), {"embedding": [1.0, 0.0, 0.0]})()]})
+
+    monkeypatch.setattr(tools, "openai_client", lambda: _FakeClient())
+    tools._embed_query.cache_clear()
+
+    a = tools._embed_query("same query")
+    b = tools._embed_query("same query")
+    assert calls["n"] == 1, "repeated query should hit the cache, not re-embed"
+    assert np.allclose(a, b)
+    tools._embed_query.cache_clear()
 
 
 @pytest.mark.unit

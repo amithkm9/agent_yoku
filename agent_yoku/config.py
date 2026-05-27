@@ -19,6 +19,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 
+# The shipped dev JWT secret. Booting prod with this still set is refused in
+# create_app(); kept as a named constant so the check can't drift from the default.
+DEFAULT_JWT_SECRET = "change-me-in-prod-please-32-chars-min"
+
 # Hydrate os.environ for SDKs that read directly.
 load_dotenv(_REPO_ROOT / ".env")
 load_dotenv(Path.home() / "Desktop" / ".env", override=False)
@@ -63,10 +67,15 @@ class Settings(BaseSettings):
 
     # Auth (FastAPI / JWT)
     jwt_secret: SecretStr = Field(
-        default=SecretStr("change-me-in-prod-please-32-chars-min"),
+        default=SecretStr(DEFAULT_JWT_SECRET),
         description="HS256 signing secret. MUST be overridden in production.",
     )
     jwt_ttl_hours: int = 24
+
+    @property
+    def is_default_jwt_secret(self) -> bool:
+        """True when the built-in dev secret is still in use (unsafe in prod)."""
+        return self.jwt_secret.get_secret_value() == DEFAULT_JWT_SECRET
 
     # Optional dedicated key for encrypting per-tenant connector secrets at rest.
     # Falls back to `jwt_secret` if unset — fine for dev. Override in prod so

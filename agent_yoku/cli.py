@@ -355,5 +355,22 @@ def status() -> None:
         click.echo(f"  {label:18s} {n:>8d}")
 
 
+@cli.command()
+@click.option("--sample", default=10, help="Max example keys to show per check.")
+def consistency(sample: int) -> None:
+    """Report JIRA/GitHub inconsistencies (done-no-PR, merged-no-ticket)."""
+    from agent_yoku.analysis.consistency import consistency_report
+
+    report = consistency_report(sample=sample)
+    for label, key in (
+        ("tickets marked done with no linked PR", "done_without_pr"),
+        ("merged PRs with no linked ticket", "merged_without_ticket"),
+    ):
+        block = report[key]
+        click.echo(f"{label}: {block['count']}")
+        for k in block["sample"]:
+            click.echo(f"  - {k}")
+
+
 if __name__ == "__main__":
     cli()

@@ -11,7 +11,9 @@ from __future__ import annotations
 
 import re
 import threading
+import time
 from datetime import UTC, datetime, timedelta
+from functools import lru_cache
 from typing import Any
 
 import numpy as np
@@ -28,82 +30,119 @@ from agent_yoku.config import (
 )
 from agent_yoku.log import get_logger
 from agent_yoku.storage.freshness import source_freshness
+from agent_yoku.storage.tenancy import current_tenant
 from agent_yoku.utils import bson_safe
 
 log = get_logger("tools")
 
-# ---------- Lazy-loaded singleton hybrid index (vector + keyword) ----------
+# ---------- Lazy per-tenant hybrid index (vector + keyword) ----------
+# Keyed by tenant id: the agent and tools are process-global but serve every
+# tenant, so a single shared index would leak one tenant's tickets/PRs into
+# another's search results. Built lazily per tenant; dropped by invalidate_index
+# after a sync re-embeds data.
 _INDEX_LOCK = threading.Lock()
-_INDEX: dict[str, Any] = {"loaded": False}
+_INDEXES: dict[str, dict[str, Any]] = {}
+_INDEX_TTL_S = 600  # rebuild a tenant's index if older than this, so a re-embed
+# in another process (CLI `embed`) can't leave search stale indefinitely.
 
 
-def _ensure_index() -> None:
-    """Load the unified JIRA + PR embedding matrix once per process."""
-    if _INDEX["loaded"]:
-        return
+def _index_key() -> str:
+    try:
+        return current_tenant()
+    except RuntimeError:
+        return "_default"  # CLI / tests may run without a tenant context set
+
+
+def _load_index() -> dict[str, Any]:
+    """Build the unified JIRA + PR index for the current tenant."""
+    log.info("loading unified embedding index…")
+    proj = {
+        "key": 1,
+        "summary": 1,
+        "status": 1,
+        "assignee": 1,
+        "url": 1,
+        "embedding": 1,
+        "jira_keys": 1,
+        "linked_prs": 1,
+        "repo": 1,
+    }
+
+    jira = list(tickets_collection().find({"embedding": {"$ne": None, "$exists": True}}, proj))
+    for d in jira:
+        d["source"] = "jira"
+
+    gh = list(github_prs_collection().find({"embedding": {"$ne": None, "$exists": True}}, proj))
+    for d in gh:
+        d["source"] = "github"
+
+    docs = jira + gh
+    if not docs:
+        raise RuntimeError("no embedded docs found; run ingest + embed first")
+
+    matrix = np.array([d["embedding"] for d in docs], dtype=np.float32)
+    matrix /= np.linalg.norm(matrix, axis=1, keepdims=True) + 1e-12
+    for d in docs:
+        d.pop("embedding", None)
+        d.pop("_id", None)
+        # Cross-source corroboration flag for reranking: a JIRA ticket with
+        # linked PRs, or a PR that references tickets, is better-evidenced.
+        d["has_links"] = bool(
+            d.get("jira_keys") if d["source"] == "github" else d.get("linked_prs")
+        )
+        d.pop("linked_prs", None)
+
+    # Keyword half of hybrid search: an inverted index over identifier +
+    # summary tokens, idf-weighted so rare tokens (a ticket key, a repo
+    # name) outweigh common words.
+    inverted: dict[str, list[int]] = {}
+    for i, d in enumerate(docs):
+        for tok in _tokenize(_doc_keyword_text(d)):
+            inverted.setdefault(tok, []).append(i)
+    # Drop ubiquitous tokens (the `as` project prefix, `asatocorp` org) — they
+    # match nearly everything and let vector-top docs piggyback a keyword hit,
+    # drowning out the true exact match. Absolute floor keeps tiny corpora intact.
+    stop_df = max(_STOP_DF_MIN, int(_STOP_DF_RATIO * len(docs)))
+    inverted = {tok: post for tok, post in inverted.items() if len(post) <= stop_df}
+    idf = {tok: float(np.log(1.0 + len(docs) / len(post))) for tok, post in inverted.items()}
+
+    log.info("index loaded jira=%d github=%d", len(jira), len(gh))
+    return {"docs": docs, "matrix": matrix, "inverted": inverted, "idf": idf}
+
+
+def _fresh(idx: dict[str, Any] | None) -> bool:
+    return idx is not None and (time.monotonic() - idx["_built_at"]) < _INDEX_TTL_S
+
+
+def _index() -> dict[str, Any]:
+    """Return the current tenant's index, building it on first use and rebuilding
+    once it ages past the TTL."""
+    key = _index_key()
+    idx = _INDEXES.get(key)
+    if _fresh(idx):
+        return idx
     with _INDEX_LOCK:
-        if _INDEX["loaded"]:
-            return
-        log.info("loading unified embedding index…")
-        proj = {
-            "key": 1,
-            "summary": 1,
-            "status": 1,
-            "assignee": 1,
-            "url": 1,
-            "embedding": 1,
-            "jira_keys": 1,
-            "linked_prs": 1,
-            "repo": 1,
-        }
-
-        jira = list(tickets_collection().find({"embedding": {"$ne": None, "$exists": True}}, proj))
-        for d in jira:
-            d["source"] = "jira"
-
-        gh = list(github_prs_collection().find({"embedding": {"$ne": None, "$exists": True}}, proj))
-        for d in gh:
-            d["source"] = "github"
-
-        docs = jira + gh
-        if not docs:
-            raise RuntimeError("no embedded docs found; run ingest + embed first")
-
-        matrix = np.array([d["embedding"] for d in docs], dtype=np.float32)
-        matrix /= np.linalg.norm(matrix, axis=1, keepdims=True) + 1e-12
-        for d in docs:
-            d.pop("embedding", None)
-            d.pop("_id", None)
-            # Cross-source corroboration flag for reranking: a JIRA ticket with
-            # linked PRs, or a PR that references tickets, is better-evidenced.
-            d["has_links"] = bool(
-                d.get("jira_keys") if d["source"] == "github" else d.get("linked_prs")
-            )
-            d.pop("linked_prs", None)
-
-        # Keyword half of hybrid search: an inverted index over identifier +
-        # summary tokens, idf-weighted so rare tokens (a ticket key, a repo
-        # name) outweigh common words.
-        inverted: dict[str, list[int]] = {}
-        for i, d in enumerate(docs):
-            for tok in _tokenize(_doc_keyword_text(d)):
-                inverted.setdefault(tok, []).append(i)
-        # Drop ubiquitous tokens (the `as` project prefix, `asatocorp` org) — they
-        # match nearly everything and let vector-top docs piggyback a keyword hit,
-        # drowning out the true exact match. Absolute floor keeps tiny corpora intact.
-        stop_df = max(_STOP_DF_MIN, int(_STOP_DF_RATIO * len(docs)))
-        inverted = {tok: post for tok, post in inverted.items() if len(post) <= stop_df}
-        idf = {tok: float(np.log(1.0 + len(docs) / len(post))) for tok, post in inverted.items()}
-
-        _INDEX["docs"] = docs
-        _INDEX["matrix"] = matrix
-        _INDEX["inverted"] = inverted
-        _INDEX["idf"] = idf
-        _INDEX["loaded"] = True
-        log.info("index loaded jira=%d github=%d", len(jira), len(gh))
+        idx = _INDEXES.get(key)  # re-check under lock
+        if not _fresh(idx):
+            idx = _load_index()
+            idx["_built_at"] = time.monotonic()
+            _INDEXES[key] = idx
+        return idx
 
 
+def invalidate_index(tenant: str | None = None) -> None:
+    """Drop a tenant's cached index so the next search rebuilds it — call after a
+    sync re-embeds data. Defaults to the current tenant."""
+    key = tenant or _index_key()
+    with _INDEX_LOCK:
+        _INDEXES.pop(key, None)
+
+
+@lru_cache(maxsize=512)
 def _embed_query(text: str) -> np.ndarray:
+    # Cached: a query string always maps to the same vector (tenant-independent),
+    # and the agent + sub-agents re-issue overlapping queries within a turn. The
+    # returned array is treated read-only by callers, so sharing it is safe.
     resp = openai_client().embeddings.create(model=EMBED_MODEL, input=[text])
     v = np.array(resp.data[0].embedding, dtype=np.float32)
     return v / (np.linalg.norm(v) + 1e-12)
@@ -153,10 +192,10 @@ def _doc_keyword_text(doc: dict) -> str:
     )
 
 
-def _keyword_scores(query: str) -> dict[int, float]:
+def _keyword_scores(query: str, idx: dict[str, Any]) -> dict[int, float]:
     """idf-weighted token-overlap score, keyed by doc index (matches only)."""
-    inverted = _INDEX["inverted"]
-    idf = _INDEX["idf"]
+    inverted = idx["inverted"]
+    idf = idx["idf"]
     scores: dict[int, float] = {}
     for tok in _tokenize(query):
         weight = idf.get(tok)
@@ -205,7 +244,9 @@ def _lexical_overlap(query: str, query_tokens: set[str], summary: str) -> float:
     return min(1.0, overlap + phrase)
 
 
-def _feature_rerank(query: str, candidates: list[tuple[int, float]]) -> list[int]:
+def _feature_rerank(
+    query: str, candidates: list[tuple[int, float]], idx: dict[str, Any]
+) -> list[int]:
     """Rescore first-stage (doc_index, fused_score) pairs with richer signals.
 
     Refines — not replaces — fusion: the fused score is the base, scaled by a
@@ -216,7 +257,7 @@ def _feature_rerank(query: str, candidates: list[tuple[int, float]]) -> list[int
     reranker could drop in later.
     """
     qtokens = _tokenize(query)
-    docs = _INDEX["docs"]
+    docs = idx["docs"]
     scored = []
     for i, base in candidates:
         d = docs[i]
@@ -260,13 +301,13 @@ def semantic_search(query: str, k: int = 50, source: str = "both") -> list[dict]
     """
     if not query or not query.strip():
         raise ValueError("query must not be empty")
-    _ensure_index()
     k = max(1, min(int(k), 200))
     if source not in ("jira", "github", "both"):
         raise ValueError(f"source must be jira/github/both, got {source!r}")
 
-    docs = _INDEX["docs"]
-    matrix = _INDEX["matrix"]
+    idx = _index()  # current tenant's index, built on first use
+    docs = idx["docs"]
+    matrix = idx["matrix"]
     cos = matrix @ _embed_query(query)  # cosine vs every doc (matrix is normalized)
 
     # Fuse more candidates than k from each ranking, so a strong keyword hit
@@ -284,7 +325,7 @@ def semantic_search(query: str, k: int = 50, source: str = "both") -> list[dict]
     # Keyword ranking, restricted to the same source.
     kw = {
         i: s
-        for i, s in _keyword_scores(query).items()
+        for i, s in _keyword_scores(query, idx).items()
         if source == "both" or docs[i]["source"] == source
     }
     kw_order = sorted(kw, key=lambda i: -kw[i])[:pool]
@@ -293,7 +334,7 @@ def semantic_search(query: str, k: int = 50, source: str = "both") -> list[dict]
 
     # Second stage: rerank the fused top window with richer signals, then cut to k.
     window = sorted(fused, key=lambda i: -fused[i])[: max(k, _RERANK_MIN_WINDOW)]
-    ranked = _RERANKER(query, [(i, fused[i]) for i in window])[:k]
+    ranked = _RERANKER(query, [(i, fused[i]) for i in window], idx)[:k]
 
     out = []
     for i in ranked:

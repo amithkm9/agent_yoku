@@ -2,17 +2,30 @@
 
 from __future__ import annotations
 
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from agent_yoku.config import settings
 from agent_yoku.log import get_logger
 from agent_yoku.middleware import RequestContext
 from agent_yoku.routers import auth, chat, connectors, sessions, stats
 
 log = get_logger("api.main")
 
+# Environments where the built-in dev JWT secret is tolerated.
+_SAFE_ENVS = {"local", "dev", "development", "test", "ci"}
+
 
 def create_app() -> FastAPI:
+    env = os.environ.get("ENV", "local")
+    if settings.is_default_jwt_secret and env.lower() not in _SAFE_ENVS:
+        raise RuntimeError(
+            f"JWT_SECRET is the built-in dev default but ENV={env!r}; set a strong "
+            "JWT_SECRET before running outside local/dev."
+        )
+
     app = FastAPI(
         title="agent_yoku",
         version="0.1.0",
