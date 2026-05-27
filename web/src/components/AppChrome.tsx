@@ -50,6 +50,19 @@ export function SettingsIcon() {
   );
 }
 
+export function SparkleIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="hero-spark" aria-hidden="true">
+      <path
+        d="M12 2.5v19M2.5 12h19M5.4 5.4l13.2 13.2M18.6 5.4 5.4 18.6"
+        stroke="currentColor"
+        strokeWidth="2.1"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 export function SendIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" className="nav-icon" aria-hidden="true">

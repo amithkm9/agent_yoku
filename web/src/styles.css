@@ -1,22 +1,53 @@
-/* Minimal, clean styling. Easy to swap for a theme/design system later. */
+/* agent_yoku — "Violet Infinity" theme.
+   All colour lives in tokens below; components reference them so the palette
+   stays cohesive. JIRA/GitHub connector logos intentionally keep their brand
+   colours and are the only hard-coded hues outside this block. */
 
 :root {
-  --bg: #fafafa;
+  /* Surfaces */
+  --bg: #f7f7fb;
   --bg-elevated: #ffffff;
-  --bg-sidebar: #f3f3f1;
-  --border: #e4e4e1;
-  --text: #1c1c1a;
-  --text-muted: #6b6b66;
-  --primary: #1d4ed8;
-  --primary-hover: #1e40af;
-  --danger: #b91c1c;
-  --bubble-user: #1d4ed8;
+  --bg-sidebar: #f1f0f8;
+  --bg-subtle: #f1eefb;
+  --border: #e7e5f0;
+  --border-strong: #d8d3ec;
+
+  /* Text */
+  --text: #1a1825;
+  --text-muted: #6b6880;
+
+  /* Brand / accent */
+  --primary: #6d5efc;
+  --primary-hover: #5b4ee0;
+  --primary-disabled: #c6bff8;
+  --primary-soft: #efecff;
+  --primary-border: #d9d2ff;
+  --on-primary: #ffffff;
+  --accent-grad: linear-gradient(135deg, #6d5efc 0%, #b06bff 100%);
+
+  /* Feedback */
+  --danger: #d83a52;
+  --danger-bg: #fdeef1;
+  --danger-border: #f6c9d1;
+  --success: #0a8f6c;
+  --success-bg: #e6f7f1;
+  --success-border: #b3e6d6;
+  --warning: #b4791f;
+
+  /* Chat bubbles */
+  --bubble-user: var(--primary);
   --bubble-user-text: #ffffff;
   --bubble-ai: #ffffff;
-  --bubble-ai-text: #1c1c1a;
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --bubble-ai-text: var(--text);
+
+  /* Effects */
+  --shadow: 0 1px 2px rgba(26, 24, 37, 0.06);
+  --shadow-md: 0 12px 30px rgba(60, 50, 120, 0.09);
+  --shadow-accent: 0 12px 24px rgba(109, 94, 252, 0.24);
+
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", sans-serif;
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --serif: Georgia, "Times New Roman", ui-serif, serif;
 }
 
 * {
@@ -40,19 +71,23 @@ button {
   font: inherit;
   cursor: pointer;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--bg-elevated);
   padding: 6px 12px;
   color: var(--text);
 }
-button:hover { background: #f1f1ee; }
+button:hover { background: var(--bg-subtle); }
 button.primary {
   background: var(--primary);
-  color: white;
+  color: var(--on-primary);
   border-color: var(--primary);
 }
-button.primary:hover { background: var(--primary-hover); }
-button.primary:disabled { background: #93a3c4; border-color: #93a3c4; cursor: not-allowed; }
+button.primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
+button.primary:disabled {
+  background: var(--primary-disabled);
+  border-color: var(--primary-disabled);
+  cursor: not-allowed;
+}
 button.block { width: 100%; }
 button.link {
   background: transparent;
@@ -68,15 +103,17 @@ button.link {
   align-items: center;
   justify-content: center;
   height: 100%;
-  background: var(--bg-sidebar);
+  background:
+    radial-gradient(1100px 520px at 50% -10%, rgba(109, 94, 252, 0.12), transparent 60%),
+    var(--bg-sidebar);
 }
 .auth-card {
   width: 360px;
   background: var(--bg-elevated);
   padding: 32px;
-  border-radius: 12px;
+  border-radius: 16px;
   border: 1px solid var(--border);
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-md);
 }
 .auth-title {
   margin: 0;
@@ -89,9 +126,9 @@ button.link {
 }
 .auth-error {
   color: var(--danger);
-  background: #fef2f2;
+  background: var(--danger-bg);
   padding: 8px 12px;
-  border-radius: 6px;
+  border-radius: 8px;
   margin: 12px 0;
   font-size: 13px;
 }
@@ -114,7 +151,7 @@ button.link {
   width: 100%;
   padding: 8px 10px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 8px;
   font: inherit;
   background: var(--bg-elevated);
 }
@@ -157,12 +194,12 @@ button.link {
   width: 40px;
   height: 40px;
   border-radius: 12px;
-  background: linear-gradient(135deg, #1d4ed8 0%, #0f172a 100%);
+  background: var(--accent-grad);
   color: #ffffff;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 10px 24px rgba(29, 78, 216, 0.18);
+  box-shadow: 0 10px 24px rgba(109, 94, 252, 0.28);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -191,7 +228,7 @@ button.link {
 .sidebar-bottom {
   margin-top: auto;
   padding-top: 12px;
-  border-top: 1px solid rgba(28, 28, 26, 0.08);
+  border-top: 1px solid var(--border);
 }
 .account-card {
   background: var(--bg-elevated);
@@ -220,14 +257,15 @@ button.link {
   min-height: 38px;
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: #f8fafc;
-  color: #334155;
+  background: var(--bg-subtle);
+  color: var(--text);
   text-decoration: none;
   padding: 0 10px;
 }
 .account-button:hover {
-  background: #eef2ff;
-  border-color: #c7d2fe;
+  background: var(--primary-soft);
+  border-color: var(--primary-border);
+  color: var(--primary-hover);
 }
 .account-button span {
   white-space: nowrap;
@@ -257,7 +295,7 @@ button.link {
 .counts > div {
   background: var(--bg-elevated);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 8px;
   padding: 8px;
   font-size: 12px;
   text-align: center;
@@ -276,7 +314,7 @@ button.link {
   color: var(--text-muted);
 }
 .fresh-badge.stale {
-  color: #b45309;
+  color: var(--warning);
   font-weight: 550;
 }
 .section-title {
@@ -301,14 +339,15 @@ button.link {
 .session-list li {
   position: relative;
   padding: 8px 10px;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
   border: 1px solid transparent;
 }
 .session-list li:hover { background: var(--bg-elevated); }
 .session-list li.active {
   background: var(--bg-elevated);
-  border-color: var(--primary);
+  border-color: var(--primary-border);
+  box-shadow: var(--shadow);
 }
 .session-list li.empty {
   color: var(--text-muted);
@@ -339,7 +378,7 @@ button.link {
   padding: 0 6px;
   border-radius: 4px;
 }
-.session-list .del:hover { color: var(--danger); background: #fef2f2; }
+.session-list .del:hover { color: var(--danger); background: var(--danger-bg); }
 
 /* ---------- Chat main pane ---------- */
 .chat-main {
@@ -349,10 +388,10 @@ button.link {
   overflow: hidden;
 }
 .banner.error {
-  background: #fef2f2;
+  background: var(--danger-bg);
   color: var(--danger);
   padding: 10px 16px;
-  border-bottom: 1px solid #fecaca;
+  border-bottom: 1px solid var(--danger-border);
   cursor: pointer;
 }
 .messages {
@@ -377,7 +416,7 @@ button.link {
 .msg {
   max-width: 80%;
   padding: 10px 14px;
-  border-radius: 12px;
+  border-radius: 14px;
   line-height: 1.5;
 }
 .msg.user {
@@ -415,12 +454,12 @@ button.link {
   font-weight: 650;
 }
 .rich-text em {
-  color: #374151;
+  color: var(--text-muted);
 }
 .rich-text code {
   font-family: var(--mono);
   font-size: 0.92em;
-  background: #f3f4f6;
+  background: var(--bg-subtle);
   border-radius: 4px;
   padding: 0.1em 0.35em;
 }
@@ -430,19 +469,19 @@ button.link {
   font-size: 13px;
 }
 .msg.ai a.citation {
-  color: #1d4ed8;
+  color: var(--primary);
   text-decoration: none;
   font-weight: 550;
-  border-bottom: 1px solid #c7d2fe;
+  border-bottom: 1px solid var(--primary-border);
 }
 .msg.ai a.citation:hover {
-  border-bottom-color: #1d4ed8;
+  border-bottom-color: var(--primary);
 }
 .tool-trace {
   align-self: flex-start;
   font-size: 12px;
   background: var(--bg-elevated);
-  border: 1px dashed var(--border);
+  border: 1px dashed var(--border-strong);
   border-radius: 8px;
   padding: 8px 12px;
   max-width: 80%;
@@ -474,8 +513,8 @@ button.link {
   gap: 8px;
   align-items: flex-end;
   padding: 18px 24px 20px;
-  border-top: 1px solid rgba(28, 28, 26, 0.08);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.78) 0%, rgba(250, 250, 250, 0.98) 100%);
+  border-top: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.78) 0%, rgba(247, 247, 251, 0.98) 100%);
   backdrop-filter: blur(10px);
 }
 .composer-inner {
@@ -484,14 +523,14 @@ button.link {
   gap: 0;
   align-items: stretch;
   padding: 10px;
-  border: 1px solid #dbe3f0;
+  border: 1px solid var(--border);
   border-radius: 22px;
   background: var(--bg-elevated);
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+  box-shadow: var(--shadow-md);
 }
 .composer-inner:focus-within {
-  border-color: #93c5fd;
-  box-shadow: 0 14px 34px rgba(29, 78, 216, 0.12);
+  border-color: var(--primary-border);
+  box-shadow: var(--shadow-accent);
 }
 .composer textarea {
   flex: 1;
@@ -516,24 +555,177 @@ button.link {
   align-items: stretch;
   padding-left: 10px;
   margin-left: 10px;
-  border-left: 1px solid #e2e8f0;
+  border-left: 1px solid var(--border);
   min-width: 132px;
 }
 .send-button {
   min-height: 100%;
   justify-content: center;
   gap: 8px;
+  border: none;
   border-radius: 16px;
   font-weight: 600;
-  box-shadow: 0 10px 18px rgba(29, 78, 216, 0.18);
+  color: var(--on-primary);
+  background: var(--accent-grad);
+  box-shadow: var(--shadow-accent);
   min-width: 112px;
+}
+.send-button:hover {
+  filter: brightness(1.04);
 }
 .send-button svg {
   width: 16px;
   height: 16px;
 }
 .send-button:disabled {
+  background: var(--primary-disabled);
   box-shadow: none;
+}
+
+/* ---------- Home hero (empty-state landing) ---------- */
+.home-hero {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px 112px;
+  background:
+    radial-gradient(900px 460px at 50% -8%, rgba(124, 108, 255, 0.10), transparent 62%),
+    var(--bg);
+}
+.hero-inner {
+  width: 100%;
+  max-width: 720px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.hero-greeting {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 0 0 30px;
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: clamp(30px, 4vw, 42px);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  text-align: center;
+}
+.hero-spark {
+  width: 34px;
+  height: 34px;
+  color: var(--primary);
+  flex: none;
+}
+.hero-composer {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-md);
+  padding: 14px 16px 12px;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.hero-composer:focus-within {
+  border-color: var(--primary-border);
+  box-shadow: var(--shadow-accent);
+}
+.hero-input {
+  width: 100%;
+  border: none;
+  outline: none;
+  resize: none;
+  background: transparent;
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text);
+  padding: 2px 2px 8px;
+  min-height: 28px;
+  max-height: 200px;
+}
+.hero-input::placeholder {
+  color: var(--text-muted);
+}
+.hero-composer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.hero-sources {
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  padding: 5px 11px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.hero-send {
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-grad);
+  border: none;
+  color: var(--on-primary);
+  box-shadow: var(--shadow-accent);
+}
+.hero-send:hover {
+  filter: brightness(1.04);
+}
+.hero-send:disabled {
+  background: var(--primary-disabled);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+.hero-send svg {
+  width: 16px;
+  height: 16px;
+}
+.hero-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 22px;
+}
+.hero-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  border-radius: 999px;
+  padding: 8px 15px;
+  font-size: 13px;
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+.hero-chip:hover {
+  background: var(--primary-soft);
+  border-color: var(--primary-border);
+  color: var(--primary-hover);
+}
+.hero-chip:hover svg {
+  color: var(--primary);
+}
+.hero-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.hero-chip svg {
+  width: 15px;
+  height: 15px;
+  color: var(--text-muted);
 }
 
 /* ---------- Settings page ---------- */
@@ -567,14 +759,14 @@ button.link {
   background: transparent;
 }
 .nav-pill:hover {
-  background: #eef2ff;
-  border-color: #dbe4ff;
-  color: #1e3a8a;
+  background: var(--primary-soft);
+  border-color: var(--primary-border);
+  color: var(--primary-hover);
 }
 .nav-pill.active {
-  color: #1e3a8a;
-  background: #eef2ff;
-  border-color: #c7d2fe;
+  color: var(--primary-hover);
+  background: var(--primary-soft);
+  border-color: var(--primary-border);
 }
 .settings-header .who {
   margin-left: auto;
@@ -621,7 +813,7 @@ button.link {
   padding: 16px 18px 16px 36px;
   border: 1px solid var(--border);
   border-radius: 12px;
-  background: linear-gradient(180deg, #ffffff 0%, #f7f8fb 100%);
+  background: linear-gradient(180deg, var(--bg-elevated) 0%, var(--bg) 100%);
   box-shadow: var(--shadow);
 }
 .hero-steps li + li {
@@ -635,14 +827,14 @@ button.link {
 .connector-card {
   border: 1px solid var(--border);
   background: var(--bg-elevated);
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 18px;
   margin: 16px 0;
   box-shadow: var(--shadow);
 }
 .connector-card.selected {
-  border-color: #93c5fd;
-  box-shadow: 0 14px 32px rgba(29, 78, 216, 0.1);
+  border-color: var(--primary-border);
+  box-shadow: var(--shadow-accent);
 }
 .connector-card header {
   display: flex;
@@ -680,6 +872,7 @@ button.link {
   height: 24px;
   display: block;
 }
+/* Brand-accurate connector logos — intentionally not themed. */
 .connector-logo.jira {
   background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 55%, #60a5fa 100%);
   color: white;
@@ -714,8 +907,8 @@ button.link {
   margin: 0 0 12px;
   color: var(--danger);
   font-size: 12px;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
   border-radius: 10px;
   padding: 10px 12px;
   word-break: break-word;
@@ -729,14 +922,14 @@ button.link {
   color: var(--text-muted);
 }
 .badge.ok {
-  background: #ecfdf5;
-  color: #047857;
-  border-color: #a7f3d0;
+  background: var(--success-bg);
+  color: var(--success);
+  border-color: var(--success-border);
 }
 .badge.danger {
-  background: #fef2f2;
+  background: var(--danger-bg);
   color: var(--danger);
-  border-color: #fecaca;
+  border-color: var(--danger-border);
 }
 .connector-checklist {
   margin: 0 0 16px;
@@ -752,17 +945,17 @@ button.link {
   margin-top: 8px;
 }
 button.danger {
-  border-color: #fecaca;
+  border-color: var(--danger-border);
   color: var(--danger);
-  background: #fef2f2;
+  background: var(--danger-bg);
 }
 button.danger:hover {
-  background: #fee2e2;
+  background: var(--danger-border);
 }
 .editor {
   border: 1px solid var(--border);
   background: var(--bg-elevated);
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 20px;
   box-shadow: var(--shadow);
 }

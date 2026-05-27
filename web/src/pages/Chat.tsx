@@ -17,7 +17,7 @@ import {
   setToken,
   User,
 } from "../lib/api";
-import { AppBrand, SendIcon, SettingsIcon } from "../components/AppChrome";
+import { AppBrand, SendIcon, SettingsIcon, SparkleIcon } from "../components/AppChrome";
 
 function extractText(content: unknown): string {
   if (content == null) return "";
@@ -241,6 +241,86 @@ function AnswerContent({ text }: { text: string }) {
   );
 }
 
+function timeGreeting(date = new Date()): string {
+  const h = date.getHours();
+  if (h < 12) return "Morning";
+  if (h < 18) return "Afternoon";
+  return "Evening";
+}
+
+function firstNameOf(user: User | null): string {
+  const raw = (user?.name || user?.email || "there").trim();
+  const first = raw.split(/[@\s.]+/)[0] || raw;
+  return first.charAt(0).toUpperCase() + first.slice(1);
+}
+
+// Quick-start prompts tailored to what agent_yoku actually knows about:
+// the tenant's JIRA tickets + GitHub PRs.
+interface Suggestion {
+  label: string;
+  prompt: string;
+  icon: ReactNode;
+}
+
+const SUGGESTIONS: Suggestion[] = [
+  {
+    label: "My open PRs",
+    prompt: "What are my open pull requests right now, and which are waiting on me?",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx="6" cy="6" r="2.4" stroke="currentColor" strokeWidth="1.6" />
+        <circle cx="6" cy="18" r="2.4" stroke="currentColor" strokeWidth="1.6" />
+        <circle cx="18" cy="18" r="2.4" stroke="currentColor" strokeWidth="1.6" />
+        <path
+          d="M6 8.4v7.2M18 15.6V12a4 4 0 0 0-4-4h-3.5"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+        />
+      </svg>
+    ),
+  },
+  {
+    label: "Stale tickets",
+    prompt: "Which of my JIRA tickets have been idle the longest?",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="1.6" />
+        <path d="M12 7.5V12l3 2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    label: "What shipped",
+    prompt: "What shipped this week across our repos?",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M3 7.5 12 3l9 4.5-9 4.5-9-4.5Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+        <path d="M3 12.5 12 17l9-4.5M3 17 12 21.5 21 17" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
+    label: "Find an expert",
+    prompt: "Who knows the most about our authentication code?",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx="12" cy="8" r="3.2" stroke="currentColor" strokeWidth="1.6" />
+        <path d="M5.5 19a6.5 6.5 0 0 1 13 0" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    label: "Sprint status",
+    prompt: "Give me a status summary of the current sprint.",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M4 20V11M10 20V5M16 20v-6M2 20h20" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+];
+
 export function Chat() {
   const nav = useNavigate();
   const [user, setUser] = useState<User | null>(null);
@@ -309,15 +389,15 @@ export function Chat() {
     refresh();
   }
 
-  async function send() {
-    if (!draft.trim()) return;
+  async function send(text?: string) {
+    const q = (text ?? draft).trim();
+    if (!q) return;
     let sid = activeSession;
     if (!sid) {
       const r = await api.createSession();
       sid = r.session_id;
       setActiveSession(sid);
     }
-    const q = draft.trim();
     setDraft("");
     setBusy(true);
     setError(null);
@@ -362,7 +442,7 @@ export function Chat() {
           <AppBrand subtitle="Home" />
         </div>
         <button className="primary block" onClick={newSession}>
-          + New session
+          + New chat
         </button>
         {counts && (
           <div className="counts">
@@ -390,7 +470,7 @@ export function Chat() {
             ))}
           </div>
         )}
-        <div className="section-title">Sessions</div>
+        <div className="section-title">Recents</div>
         <ul className="session-list">
           {sessions.map((s) => (
             <li
@@ -445,11 +525,73 @@ export function Chat() {
             {error}
           </div>
         )}
-        <div className="messages">
-          {history.length === 0 && (
-            <div className="empty">Ask anything about Asato JIRA tickets + GitHub PRs.</div>
-          )}
-          {history.map((turn, i) => (
+
+        {history.length === 0 ? (
+          <div className="home-hero">
+            <div className="hero-inner">
+              <h1 className="hero-greeting">
+                <SparkleIcon />
+                <span>
+                  {timeGreeting()}, {firstNameOf(user)}
+                </span>
+              </h1>
+
+              <form
+                className="hero-composer"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void send();
+                }}
+              >
+                <textarea
+                  className="hero-input"
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  placeholder="How can I help you today?"
+                  disabled={busy}
+                  rows={1}
+                  autoFocus
+                  onKeyDown={(e: KeyboardEvent<HTMLTextAreaElement>) => {
+                    if (e.key !== "Enter" || e.shiftKey) return;
+                    if (e.nativeEvent.isComposing) return;
+                    e.preventDefault();
+                    void send();
+                  }}
+                  aria-label="Message composer"
+                />
+                <div className="hero-composer-bar">
+                  <span className="hero-sources">JIRA + GitHub</span>
+                  <button
+                    type="submit"
+                    className="hero-send"
+                    disabled={busy || !draft.trim()}
+                    aria-label="Send message"
+                  >
+                    <SendIcon />
+                  </button>
+                </div>
+              </form>
+
+              <div className="hero-chips">
+                {SUGGESTIONS.map((s) => (
+                  <button
+                    key={s.label}
+                    type="button"
+                    className="hero-chip"
+                    onClick={() => void send(s.prompt)}
+                    disabled={busy}
+                  >
+                    {s.icon}
+                    <span>{s.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="messages">
+              {history.map((turn, i) => (
             <div key={i} className="turn">
               <div className="msg user">{turn.question}</div>
               {turn.toolCalls.length > 0 && (
@@ -514,6 +656,8 @@ export function Chat() {
             </div>
           </div>
         </form>
+          </>
+        )}
       </main>
     </div>
   );
