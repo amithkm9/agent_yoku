@@ -18,10 +18,13 @@ RUN curl -sSL https://install.python-poetry.org | python -
 ENV PATH="${POETRY_HOME}/bin:${PATH}"
 
 WORKDIR /app
-COPY pyproject.toml ./
-# Install runtime deps into a venv at /opt/venv.
+COPY pyproject.toml poetry.lock ./
+# Install runtime deps INTO /opt/venv. Setting VIRTUAL_ENV makes poetry target
+# that venv rather than its own interpreter — without it the runtime stage
+# (which copies /opt/venv) ends up empty and every import fails at startup.
 RUN python -m venv /opt/venv
-ENV PATH="/opt/venv/bin:${PATH}"
+ENV VIRTUAL_ENV="/opt/venv" \
+    PATH="/opt/venv/bin:${PATH}"
 RUN poetry config virtualenvs.create false \
     && poetry install --no-root --without dev
 
