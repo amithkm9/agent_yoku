@@ -19,11 +19,11 @@ class GitHubPR(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    key: str  # 'AsatoCorp/agent-svc#173'
-    repo: str  # 'AsatoCorp/agent-svc'
+    key: str
+    repo: str
     number: int
-    summary: str | None = None  # PR title
-    description: str | None = None  # PR body
+    summary: str | None = None
+    description: str | None = None
     status: PRStatus | str = PRStatus.OPEN
     assignee: str | None = None
     author: str | None = None

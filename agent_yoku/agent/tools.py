@@ -35,15 +35,9 @@ from agent_yoku.utils import bson_safe
 
 log = get_logger("tools")
 
-# ---------- Lazy per-tenant hybrid index (vector + keyword) ----------
-# Keyed by tenant id: the agent and tools are process-global but serve every
-# tenant, so a single shared index would leak one tenant's tickets/PRs into
-# another's search results. Built lazily per tenant; dropped by invalidate_index
-# after a sync re-embeds data.
 _INDEX_LOCK = threading.Lock()
 _INDEXES: dict[str, dict[str, Any]] = {}
-_INDEX_TTL_S = 600  # rebuild a tenant's index if older than this, so a re-embed
-# in another process (CLI `embed`) can't leave search stale indefinitely.
+_INDEX_TTL_S = 600
 
 
 def _index_key() -> str:
@@ -103,20 +97,13 @@ def _load_index() -> dict[str, Any]:
             d.get("jira_keys") if d["source"] == "github" else d.get("linked_prs")
         )
         d.pop("linked_prs", None)
-        # Parse the update time once so the reranker's recency factor is cheap.
         d["updated_ts"] = _to_epoch(d.get("updated"))
         d.pop("updated", None)
 
-    # Keyword half of hybrid search: an inverted index over identifier +
-    # summary tokens, idf-weighted so rare tokens (a ticket key, a repo
-    # name) outweigh common words.
     inverted: dict[str, list[int]] = {}
     for i, d in enumerate(docs):
         for tok in _tokenize(_doc_keyword_text(d)):
             inverted.setdefault(tok, []).append(i)
-    # Drop ubiquitous tokens (the `as` project prefix, `asatocorp` org) — they
-    # match nearly everything and let vector-top docs piggyback a keyword hit,
-    # drowning out the true exact match. Absolute floor keeps tiny corpora intact.
     stop_df = max(_STOP_DF_MIN, int(_STOP_DF_RATIO * len(docs)))
     inverted = {tok: post for tok, post in inverted.items() if len(post) <= stop_df}
     idf = {tok: float(np.log(1.0 + len(docs) / len(post))) for tok, post in inverted.items()}
@@ -155,10 +142,6 @@ def invalidate_index(tenant: str | None = None) -> None:
 
 @lru_cache(maxsize=512)
 def _embed_query(text: str) -> np.ndarray:
-    # Cached: a query string always maps to the same vector (tenant-independent),
-    # and the agent + sub-agents re-issue overlapping queries within a turn.
-    # lru_cache hands back the same array each hit, so freeze it — a future
-    # in-place caller would otherwise corrupt the entry for every later call.
     resp = openai_client().embeddings.create(model=EMBED_MODEL, input=[text])
     v = np.array(resp.data[0].embedding, dtype=np.float32)
     v /= np.linalg.norm(v) + 1e-12
@@ -177,16 +160,12 @@ def _clean(doc: dict, drop: tuple[str, ...] = ()) -> dict:
     return bson_safe(out)
 
 
-# ---------- Hybrid search internals (keyword + RRF) ----------
-
-# Tokens are kept whole (``as-1234``, ``dc-okta-user``, ``asatocorp/repo#12``)
-# and also split into pieces, so a query for "okta" still hits "dc-okta-user".
 _TOKEN_RE = re.compile(r"[a-z0-9]+(?:[-/#._][a-z0-9]+)*")
 _SPLIT_RE = re.compile(r"[-/#._]+")
-_RRF_K = 60  # rank-fusion damping constant (the RRF paper's default).
-_KEYWORD_WEIGHT = 2.0  # bias fusion toward exact-token hits (keys, repos, names).
-_STOP_DF_RATIO = 0.1  # tokens in >10% of docs are noise...
-_STOP_DF_MIN = 100  # ...but only once the corpus is large enough to judge.
+_RRF_K = 60
+_KEYWORD_WEIGHT = 2.0
+_STOP_DF_RATIO = 0.1
+_STOP_DF_MIN = 100
 
 
 def _tokenize(text: str) -> set[str]:
@@ -241,20 +220,12 @@ def _rrf_fuse(
     return fused
 
 
-# ---------- Second-stage reranker ----------
-
-# Rerank at least this many fused candidates even when k is small, so the second
-# stage has room to reorder; for larger k the whole top-k is reranked.
 _RERANK_MIN_WINDOW = 30
-# Boosts are *relative* (multiplicative, +10% combined max) so they reorder
-# near-ties but can't lift a candidate over one that's more than ~10% ahead in
-# fusion — e.g. an exact-key hit won't be demoted by a fresher/linked doc that
-# merely shares a summary word (that gap is ~28%).
-_W_LEX = 0.05  # up to +5% for summary overlap (incl. a phrase-match bonus).
-_W_CORR = 0.02  # up to +2% for cross-source corroboration (linked PR / JIRA).
-_W_RECENCY = 0.03  # up to +3% for a freshly-updated item (half-life decay).
-_RECENCY_HALFLIFE_DAYS = 180.0  # an item this old gets half the recency boost.
-_WHO_KNOWS_RECENCY_FLOOR = 0.2  # who_knows: an old contribution still counts this much.
+_W_LEX = 0.05
+_W_CORR = 0.02
+_W_RECENCY = 0.03
+_RECENCY_HALFLIFE_DAYS = 180.0
+_WHO_KNOWS_RECENCY_FLOOR = 0.2
 
 
 def _lexical_overlap(query: str, query_tokens: set[str], summary: str) -> float:
@@ -300,12 +271,7 @@ def _feature_rerank(
     return [i for i, _ in scored]
 
 
-# Pluggable so a neural / hosted reranker can replace the default without
-# touching the search path.
 _RERANKER = _feature_rerank
-
-
-# =================== SEMANTIC ===================
 
 
 @tool
@@ -337,16 +303,13 @@ def semantic_search(query: str, k: int = 50, source: str = "both") -> list[dict]
     if source not in ("jira", "github", "both"):
         raise ValueError(f"source must be jira/github/both, got {source!r}")
 
-    idx = _index()  # current tenant's index, built on first use
+    idx = _index()
     docs = idx["docs"]
     matrix = idx["matrix"]
-    cos = matrix @ _embed_query(query)  # cosine vs every doc (matrix is normalized)
+    cos = matrix @ _embed_query(query)
 
-    # Fuse more candidates than k from each ranking, so a strong keyword hit
-    # outside the vector top-k still reaches the fusion step.
     pool = max(k * 5, 100)
 
-    # Vector ranking (optionally restricted to one source).
     if source == "both":
         vec_order = np.argsort(-cos)[:pool].tolist()
     else:
@@ -354,7 +317,6 @@ def semantic_search(query: str, k: int = 50, source: str = "both") -> list[dict]
         elig.sort(key=lambda i: -cos[i])
         vec_order = elig[:pool]
 
-    # Keyword ranking, restricted to the same source.
     kw = {
         i: s
         for i, s in _keyword_scores(query, idx).items()
@@ -364,7 +326,6 @@ def semantic_search(query: str, k: int = 50, source: str = "both") -> list[dict]
 
     fused = _rrf_fuse([vec_order, kw_order], weights=[1.0, _KEYWORD_WEIGHT])
 
-    # Second stage: rerank the fused top window with richer signals, then cut to k.
     window = sorted(fused, key=lambda i: -fused[i])[: max(k, _RERANK_MIN_WINDOW)]
     ranked = _RERANKER(query, [(i, fused[i]) for i in window], idx)[:k]
 
@@ -387,9 +348,6 @@ def semantic_search(query: str, k: int = 50, source: str = "both") -> list[dict]
     return out
 
 
-# =================== USER RESOLUTION ===================
-
-
 def _resolve_user_doc(query: str) -> dict | None:
     """Resolve a free-form identifier (name, login, email, JIRA displayName)
     to a single unified_users record. Returns None if no match.
@@ -400,29 +358,24 @@ def _resolve_user_doc(query: str) -> dict | None:
     q_lower = q.lower()
     coll = unified_users_collection()
 
-    # 1. Exact email
     if "@" in q_lower:
         d = coll.find_one({"email": q_lower}, {"_id": 0})
         if d:
             return d
 
-    # 2. Exact GH login
     d = coll.find_one({"github.login": q}, {"_id": 0})
     if d:
         return d
 
-    # 3. Exact JIRA accountId
     if ":" in q and len(q) > 20:
         d = coll.find_one({"jira.accountId": q}, {"_id": 0})
         if d:
             return d
 
-    # 4. Exact JIRA displayName
     d = coll.find_one({"jira.displayName": q}, {"_id": 0})
     if d:
         return d
 
-    # 5. Case-insensitive partial match on displayName / name / login.
     rx = {"$regex": re.escape(q), "$options": "i"}
     d = coll.find_one(
         {
@@ -455,9 +408,6 @@ def resolve_user(query: str) -> dict:
     return doc
 
 
-# =================== POINT LOOKUPS ===================
-
-
 def _is_pr_key(key: str) -> bool:
     """PR keys look like 'org/repo#123'; JIRA keys look like 'AS-4163'.
 
@@ -486,9 +436,6 @@ def get(key: str) -> dict:
     if not doc:
         raise ValueError(f"JIRA ticket {key!r} not found")
     return _clean(doc)
-
-
-# =================== CROSS-SOURCE LINKS ===================
 
 
 def _prs_for_jira(jira_key: str, limit: int) -> list[dict]:
@@ -539,9 +486,6 @@ def linked(key: str, limit: int = 20) -> list[dict]:
     if _is_pr_key(key):
         return _jira_for_pr(key)
     return _prs_for_jira(key, limit)
-
-
-# =================== STRUCTURED FILTERS ===================
 
 
 def _since(days: int | None) -> datetime | None:
@@ -667,12 +611,6 @@ def filter_prs(
     return [_clean(d) for d in cursor]
 
 
-# =================== STATS ===================
-#
-# Counts are intentionally not narrow tools: `mongo_count` (generic escape
-# hatch) covers any count over either collection with arbitrary filters.
-
-
 @tool
 def list_repos(min_prs: int = 1, limit: int = 50) -> list[dict]:
     """List repos that have at least `min_prs` indexed PRs, sorted by count desc."""
@@ -687,14 +625,6 @@ def list_repos(min_prs: int = 1, limit: int = 50) -> list[dict]:
     ]
 
 
-# =================== GENERIC MONGO ESCAPE HATCH ===================
-#
-# Pattern lifted from asato-api MCP (~/Desktop/asato-api/asatoapi/mcp/tools):
-# give the agent a small set of generic, read-only mongo primitives so it can
-# compose arbitrary queries the narrow tools above don't cover. The narrow
-# tools stay as the fast/safe path for common cases; these are the power
-# escape hatch.
-
 _COLLECTION_DESCRIPTIONS = {
     "jira_tickets": "Asato JIRA tickets (project AS). Fields: key, summary, description, status, issuetype, assignee, reporter, priority, labels, fix_versions, created, updated, url, linked_prs.",
     "github_prs": "AsatoCorp GitHub PRs. Fields: key (org/repo#N), repo, number, summary, description, status (open|closed|merged|draft), author, author_email, assignee, labels, base, head, merged, merged_at, comments_count, created, updated, url, jira_keys.",
@@ -703,14 +633,11 @@ _COLLECTION_DESCRIPTIONS = {
     "unified_users": "Cross-walk between JIRA + GitHub users. Fields: user_id, email, jira.accountId, jira.displayName, github.login, github.name, is_bot, match_source.",
 }
 
-# Aggregation stages that perform writes or run arbitrary code — blocked.
 _BLOCKED_STAGES = {"$out", "$merge", "$function", "$accumulator", "$where"}
 
 _MAX_PIPELINE_STAGES = 20
 _MAX_INLINE_RESULTS = 100
-_HIDDEN_FIELDS = {"embedding", "text"}  # token-budget killers
-
-# Fields that should never appear in describe_collection samples (PII / huge).
+_HIDDEN_FIELDS = {"embedding", "text"}
 _DESCRIBE_DROP_FIELDS = {"_id", "embedding", "text", "description"}
 
 
@@ -865,7 +792,6 @@ def mongo_query(
 
     capped_limit = max(1, min(int(limit), _MAX_INLINE_RESULTS))
 
-    # Ensure a $limit stage exists and is within bounds.
     has_limit = False
     for stage in pipeline:
         if "$limit" in stage:
@@ -938,7 +864,6 @@ def who_knows(topic: str, limit: int = 5) -> list[dict]:
     jira_keys = [c["key"] for c in cards if c["source"] == "jira" and c.get("assignee")]
     gh_keys = [c["key"] for c in cards if c["source"] == "github"]
 
-    # Update times drive recency weighting (recent work signals current ownership).
     jira_ts: dict[str, float | None] = {}
     if jira_keys:
         jira_ts = {
@@ -947,7 +872,6 @@ def who_knows(topic: str, limit: int = 5) -> list[dict]:
                 {"key": {"$in": jira_keys}}, {"_id": 0, "key": 1, "updated": 1}
             )
         }
-    # (kind, raw_identifier, key, updated_ts)
     contributions: list[tuple[str, str, str, float | None]] = [
         ("jira", c["assignee"], c["key"], jira_ts.get(c["key"]))
         for c in cards
@@ -966,10 +890,8 @@ def who_knows(topic: str, limit: int = 5) -> list[dict]:
     for kind, raw, key, ts in contributions:
         unified = (by_jira if kind == "jira" else by_gh).get(raw)
         if unified and unified.get("is_bot"):
-            continue  # don't surface bots as experts
+            continue
         if unified:
-            # user_id is the stable primary key; fall back to email then raw so
-            # two distinct people can't collapse onto a shared display name.
             ident = unified.get("user_id") or unified.get("email") or raw
             jira_name = (unified.get("jira") or {}).get("displayName")
             gh_login = (unified.get("github") or {}).get("login")
@@ -995,7 +917,6 @@ def who_knows(topic: str, limit: int = 5) -> list[dict]:
             },
         )
         t[f"{kind}_items"] += 1
-        # Recent work counts more; a floor keeps old contributions partially credited.
         t["score"] += _WHO_KNOWS_RECENCY_FLOOR + (1 - _WHO_KNOWS_RECENCY_FLOOR) * _recency_factor(
             ts, now
         )
@@ -1009,8 +930,6 @@ def who_knows(topic: str, limit: int = 5) -> list[dict]:
     people.sort(key=lambda p: -p["score"])
     return people[:limit]
 
-
-# ---------- Tool groupings for the deepagent ----------
 
 GENERIC_MONGO_TOOLS = [list_collections, describe_collection, mongo_count, mongo_query]
 
@@ -1036,7 +955,7 @@ GITHUB_TOOLS = [
 ALL_TOOLS = [
     semantic_search,
     resolve_user,
-    who_knows,  # cross-source by design → orchestrator only, not single-source sub-agents
+    who_knows,
     get,
     filter_jira,
     filter_prs,

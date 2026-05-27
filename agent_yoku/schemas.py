@@ -38,9 +38,6 @@ def normalize_github_org(raw: str) -> str:
     return segments[0]
 
 
-# ---------- Auth ----------
-
-
 class LoginRequest(BaseModel):
     email: str
     password: str
@@ -60,9 +57,6 @@ class UserOut(BaseModel):
     is_admin: bool = False
 
 
-# ---------- Sessions ----------
-
-
 class SessionSummary(BaseModel):
     session_id: str
     title: str | None
@@ -77,9 +71,6 @@ class SessionDetail(SessionSummary):
 
 class CreateSessionResponse(BaseModel):
     session_id: str
-
-
-# ---------- Chat ----------
 
 
 class ChatRequest(BaseModel):
@@ -98,9 +89,6 @@ class ChatResponse(BaseModel):
     turn_id: str
     answer: str
     tool_calls: list[ToolCallSummary] = Field(default_factory=list)
-
-
-# ---------- Connectors ----------
 
 
 class JiraConfigIn(BaseModel):
@@ -161,9 +149,6 @@ class ConnectorStatus(BaseModel):
 class ConnectorSyncResponse(BaseModel):
     name: str
     status: Literal["started"]
-
-
-# ---------- Stats ----------
 
 
 class CountsResponse(BaseModel):

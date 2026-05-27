@@ -22,9 +22,6 @@ from agent_yoku.storage.mongo import auth_users_collection
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-# ---------- Internal helpers ----------
-
-
 def _to_user_out(doc: dict) -> UserOut:
     return UserOut(
         id=doc["user_id"],
@@ -51,9 +48,6 @@ def _bind_tenant(tenant: str | None) -> None:
             "invalid tenant id (allowed: 2-40 chars, a-z0-9_-, must start alphanumeric)",
         )
     tenancy.set_tenant(normalized)
-
-
-# ---------- OAuth2-compatible token endpoint (for FastAPI Swagger + clients) ----------
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -102,9 +96,6 @@ async def login_json(
     return TokenResponse(access_token=token, user=user)
 
 
-# ---------- Sign-up (open by default; gate at deploy time if you want closed) ----------
-
-
 @router.post("/signup", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 async def signup(
     req: LoginRequest,
@@ -142,9 +133,6 @@ async def signup(
         is_admin=user.is_admin,
     )
     return TokenResponse(access_token=token, user=user)
-
-
-# ---------- "Who am I" ----------
 
 
 @router.get("/me", response_model=UserOut)

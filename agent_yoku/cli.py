@@ -48,9 +48,6 @@ def cli(tenant: str | None, log_level: str | None) -> None:
         os.environ["LOG_LEVEL"] = log_level.upper()
 
 
-# =================== INGEST ===================
-
-
 @cli.group()
 def ingest() -> None:
     """Pull source data into mongo."""
@@ -90,9 +87,6 @@ def ingest_github_users_cmd() -> None:
     from agent_yoku.connectors.github import users_ingest
 
     users_ingest.main()
-
-
-# =================== ENRICH ===================
 
 
 @cli.command()
@@ -141,9 +135,6 @@ def backfill_pr_emails() -> None:
     backfill.main()
 
 
-# =================== END-TO-END ===================
-
-
 @cli.command("refresh-all")
 @click.option("--skip-jira", is_flag=True)
 @click.option("--skip-github", is_flag=True)
@@ -190,9 +181,6 @@ def refresh_all(skip_jira: bool, skip_github: bool) -> None:
     click.secho("✓ refresh-all done", fg="green")
 
 
-# =================== ASK ===================
-
-
 @cli.command()
 @click.argument("query", nargs=-1, required=True)
 def chat(query: tuple[str, ...]) -> None:
@@ -200,7 +188,6 @@ def chat(query: tuple[str, ...]) -> None:
     from agent_yoku.agent.chat import ask, final_answer
     from agent_yoku.log import set_session
 
-    # Bind a session_id so all logs from this run correlate.
     set_session(str(uuid.uuid4()))
 
     q = " ".join(query)
@@ -229,7 +216,6 @@ def api(port: int, host: str, reload: bool) -> None:
     os.execvp(cmd[0], cmd)
 
 
-# =================== AUTH ===================
 
 
 @cli.group()
@@ -291,9 +277,6 @@ def auth_list_users(tenant: str | None) -> None:
             f"  {u.get('email'):30s}  admin={u.get('is_admin'):<5}  "
             f"tenant={u.get('tenant_id')}  name={u.get('name')}"
         )
-
-
-# =================== STATS ===================
 
 
 @cli.command("list-connectors")

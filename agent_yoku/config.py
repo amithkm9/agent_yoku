@@ -23,7 +23,6 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 # create_app(); kept as a named constant so the check can't drift from the default.
 DEFAULT_JWT_SECRET = "change-me-in-prod-please-32-chars-min"
 
-# Hydrate os.environ for SDKs that read directly.
 load_dotenv(_REPO_ROOT / ".env")
 load_dotenv(Path.home() / "Desktop" / ".env", override=False)
 
@@ -38,41 +37,34 @@ class Settings(BaseSettings):
         case_sensitive=False,
     )
 
-    # JIRA — defaults point at the bundled-data source; override in .env.
     jira_email: str
     jira_token: SecretStr
     jira_base_url: str = "https://asato-ai.atlassian.net"
     jira_project: str = "AS"
 
-    # GitHub — `github_org` names the org whose PRs get ingested; override per deploy.
     github_token: SecretStr
     github_org: str = "AsatoCorp"
     github_api_base: str = "https://api.github.com"
     github_pr_lookback_days: int = 365
 
-    # OpenAI
     openai_api_key: SecretStr
     openai_embed_model: str = Field(default="text-embedding-3-small")
     openai_chat_model: str = Field(default="gpt-5.4-mini")
     chat_model_provider: str = "openai"
 
-    # Mongo
     mongo_uri: str = "mongodb://localhost:27017/"
     mongo_db: str = "agent_yoku"
 
-    # Observability
     sentry_dsn: SecretStr | None = None
     log_level: str = "INFO"
     log_json: bool = False
 
-    # Auth (FastAPI / JWT)
     jwt_secret: SecretStr = Field(
         default=SecretStr(DEFAULT_JWT_SECRET),
         description="HS256 signing secret. MUST be overridden in production.",
     )
     jwt_ttl_hours: int = 24
 
-    # Rate limiting (per client IP, in-process fixed window).
     rate_limit_enabled: bool = True
     rate_limit_requests: int = 120
     rate_limit_window_s: int = 60
@@ -101,7 +93,6 @@ class Settings(BaseSettings):
     # rotating JWT secrets doesn't invalidate stored connector tokens.
     connector_secret_key: SecretStr | None = None
 
-    # Derived
     @property
     def agent_model_id(self) -> str:
         return f"{self.chat_model_provider}:{self.openai_chat_model}"

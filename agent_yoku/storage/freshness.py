@@ -9,8 +9,6 @@ from datetime import UTC, datetime
 from agent_yoku.storage import connector_configs as cc
 from agent_yoku.storage.mongo import github_prs_collection, tickets_collection
 
-# Each connector's primary-entity collection accessor, resolved at call time so
-# it stays tenant-aware (and patchable in tests).
 _SOURCE_COLLECTIONS = {
     "jira": lambda: tickets_collection(),
     "github": lambda: github_prs_collection(),

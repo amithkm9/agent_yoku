@@ -24,9 +24,6 @@ from langchain_core.messages import (
 
 from agent_yoku.config import chat_messages_collection, chat_sessions_collection, settings
 
-# =================== SESSIONS ===================
-
-
 def start_session(title: str | None = None) -> str:
     """Create a new session and return its UUID."""
     sid = str(uuid.uuid4())
@@ -88,9 +85,6 @@ def delete_session(session_id: str) -> None:
     chat_sessions_collection().delete_one({"session_id": session_id})
 
 
-# =================== MESSAGES ===================
-
-
 def _next_turn_seq(session_id: str) -> int:
     last = chat_messages_collection().find_one(
         {"session_id": session_id},
@@ -103,8 +97,8 @@ def _next_turn_seq(session_id: str) -> int:
 def _serialize_msg(msg: BaseMessage) -> dict:
     """Flatten a LangChain message to a JSON-friendly mongo doc."""
     out: dict[str, Any] = {
-        "role": msg.type,  # human | ai | tool | system
-        "content": msg.content,  # str or list[block]
+        "role": msg.type,
+        "content": msg.content,
     }
     if msg.type == "ai":
         calls = getattr(msg, "tool_calls", None) or []
@@ -163,7 +157,6 @@ def save_turn(
         )
     chat_messages_collection().insert_many(docs)
 
-    # Maintain session counters + auto-title from the first user query.
     title = user_query[:120] if (user_query and turn_seq == 1) else None
     touch_session(session_id, title=title, increment_turn=True)
     return turn_seq
@@ -212,11 +205,9 @@ def _compact_turns(docs: list[dict], max_turns: int) -> list[BaseMessage]:
     out: list[BaseMessage] = []
     for seq in seqs:
         turn_docs = by_turn[seq]
-        # human messages in order
         for d in turn_docs:
             if d["role"] == "human":
                 out.append(_deserialize_msg(d))
-        # final answer (last ai without tool_calls)
         final_ai = None
         for d in turn_docs:
             if d["role"] == "ai" and not d.get("tool_calls"):

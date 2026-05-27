@@ -66,7 +66,6 @@ def create_app() -> FastAPI:
             trust_forwarded_for=settings.rate_limit_trust_forwarded_for,
         )
 
-    # Vite dev server runs on 5173; allow it + same-origin.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],

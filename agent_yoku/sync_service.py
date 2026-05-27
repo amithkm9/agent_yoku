@@ -57,9 +57,6 @@ def _fmt_error(e: Exception) -> str:
     return f"{type(e).__name__}: {e}\n{traceback.format_exc(limit=3)}"
 
 
-# ---------- Per-connector ingest ----------
-
-
 def _ingest_jira(decrypted: dict) -> None:
     with use_jira(jira_config_from_dict(decrypted)):
         from agent_yoku.connectors.jira import ingest as ingest_mod
@@ -121,9 +118,6 @@ def _run_post_ingest_pipeline() -> None:
     with _clean_argv("link"):
         pr_to_jira.main()
     backfill.main()
-
-
-# ---------- Tenant orchestration ----------
 
 
 def list_tenant_ids() -> list[str]:

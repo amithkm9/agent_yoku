@@ -23,7 +23,6 @@ log = get_logger("scheduler")
 
 _JOB_ID = "auto-sync-all-tenants"
 
-# Module-level singleton — one scheduler per process.
 _scheduler: BackgroundScheduler | None = None
 
 

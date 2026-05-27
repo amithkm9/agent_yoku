@@ -20,7 +20,6 @@ from agent_yoku.storage import sessions as sess_mod
 router = APIRouter(prefix="/chat", tags=["chat"])
 log = get_logger("api.chat")
 
-# Build the agent lazily-and-once per process.
 _AGENT = None
 _AGENT_LOCK = threading.Lock()
 

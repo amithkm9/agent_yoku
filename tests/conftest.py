@@ -12,8 +12,6 @@ from pathlib import Path
 
 import pytest
 
-# Ensure secret env exists before any agent_yoku import attempts to validate
-# Settings. Use harmless stubs; real values come from CI / dev .env.
 os.environ.setdefault("JIRA_EMAIL", "test@example.com")
 os.environ.setdefault("JIRA_TOKEN", "test-token")
 os.environ.setdefault("GITHUB_TOKEN", "test-token")
@@ -59,9 +57,6 @@ def isolated_index(monkeypatch):
     monkeypatch.setattr(tools, "_INDEXES", {})
     yield
     tenancy.set_tenant(None)
-
-
-# ---------- in-memory mongo doubles ----------
 
 
 class FakeCursor:

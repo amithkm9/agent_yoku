@@ -82,7 +82,6 @@ def auth_users_collection() -> Collection:
     return coll
 
 
-# Whitelist exposed to the agent via list_collections / mongo_query.
 ALLOWED_COLLECTIONS = {
     "jira_tickets": tickets_collection,
     "users": users_collection,

@@ -46,9 +46,6 @@ router = APIRouter(prefix="/connectors", tags=["connectors"])
 log = get_logger("connectors")
 
 
-# ---------- Listing ----------
-
-
 _CONNECTOR_META = {meta["name"]: meta for meta in discover_connectors() if meta.get("name")}
 
 
@@ -84,9 +81,6 @@ async def list_connectors(_: AdminUser) -> list[ConnectorStatus]:
     """List every supported connector with its current status."""
     configured = {d["name"]: d for d in cc.list_configs()}
     return [_status_doc(name, configured.get(name)) for name in cc.SUPPORTED_CONNECTORS]
-
-
-# ---------- Upsert ----------
 
 
 def _resolve_token(name: str, incoming: str | None) -> str:
@@ -147,9 +141,6 @@ async def delete_connector(name: str, _: AdminUser) -> None:
     cc.delete_config(name)
 
 
-# ---------- Sync ----------
-
-
 def _run_jira_sync(tenant_id: str, cfg: JiraConfig) -> None:
     """Synchronous ingest for one tenant. Runs in the background task pool."""
     tenancy.set_tenant(tenant_id)
@@ -161,7 +152,7 @@ def _run_jira_sync(tenant_id: str, cfg: JiraConfig) -> None:
             ingest_mod.main()
             users_mod.main()
         cc.mark_synced("jira", ok=True)
-        invalidate_index(tenant_id)  # refresh the in-process search index
+        invalidate_index(tenant_id)
     except Exception as e:
         log.exception("jira sync failed for tenant=%s", tenant_id)
         cc.mark_synced(
@@ -179,7 +170,7 @@ def _run_github_sync(tenant_id: str, cfg: GithubConfig) -> None:
             ingest_mod.main()
             users_mod.main()
         cc.mark_synced("github", ok=True)
-        invalidate_index(tenant_id)  # refresh the in-process search index
+        invalidate_index(tenant_id)
     except Exception as e:
         log.exception("github sync failed for tenant=%s", tenant_id)
         cc.mark_synced(

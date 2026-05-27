@@ -12,9 +12,6 @@ class QueryAsatoError(Exception):
     """Base class for all agent_yoku domain errors."""
 
 
-# ---------- Not found ----------
-
-
 class NotFoundError(QueryAsatoError):
     """A requested entity did not exist."""
 
@@ -31,18 +28,12 @@ class UserNotFound(NotFoundError):
     """User identifier did not resolve to a unified_users record."""
 
 
-# ---------- Upstream / transient ----------
-
-
 class UpstreamError(QueryAsatoError):
     """A 4xx/5xx from an external API after retries."""
 
 
 class RateLimited(UpstreamError):
     """Source API returned 429 or equivalent."""
-
-
-# ---------- Config / data ----------
 
 
 class ConfigError(QueryAsatoError):

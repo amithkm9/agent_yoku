@@ -33,9 +33,6 @@ _COLL_NAME = "connector_configs"
 SUPPORTED_CONNECTORS = ("jira", "github")
 
 
-# ---------- Encryption ----------
-
-
 @lru_cache(maxsize=1)
 def _fernet() -> Fernet:
     """Derive a Fernet key from the configured secret.
@@ -67,18 +64,12 @@ def decrypt_secrets(ciphertext: bytes) -> dict[str, Any]:
     return json.loads(plain.decode("utf-8"))
 
 
-# ---------- Mongo accessor ----------
-
-
 def _coll() -> Collection:
     from agent_yoku.storage.mongo import _client  # local import to avoid cycle
 
     coll = _client()[tenant_db_name()][_COLL_NAME]
     coll.create_index("name", unique=True)
     return coll
-
-
-# ---------- CRUD ----------
 
 
 def get_config(name: str) -> dict | None:

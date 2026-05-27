@@ -151,9 +151,6 @@ def test_ubiquitous_token_dropped_at_scale(isolated_index, monkeypatch):
     assert "uniqueword" in inverted, "rare token should be kept"
 
 
-# ---------- second-stage reranker ----------
-
-
 @pytest.mark.unit
 def test_lexical_overlap_scores_phrase_and_tokens():
     q = "payment gateway"
@@ -222,9 +219,6 @@ def test_rerank_does_not_overturn_clear_leader():
     # doc 0 leads fusion clearly; doc 1 maxes out lexical + corroboration.
     order = tools._feature_rerank("payment gateway", [(0, 0.045), (1, 0.032)], idx)
     assert order[0] == 0
-
-
-# ---------- per-tenant index lifecycle ----------
 
 
 @pytest.mark.unit
