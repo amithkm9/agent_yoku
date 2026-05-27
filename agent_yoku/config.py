@@ -52,6 +52,21 @@ class Settings(BaseSettings):
     openai_chat_model: str = Field(default="gpt-5.4-mini")
     chat_model_provider: str = "openai"
 
+    # ZeroEntropy second-stage reranker over hybrid-search candidates. Active only
+    # when both the flag is on and the key is set; otherwise search falls back to
+    # the built-in feature reranker. rerank_top_n caps how many top candidates are
+    # sent per call (bounds token cost + latency on the hot path).
+    rerank_enabled: bool = True
+    rerank_model: str = "zerank-2"
+    rerank_top_n: int = 50
+    rerank_timeout_s: float = 3.0
+    zeroentropy_api_key: SecretStr | None = None
+
+    @property
+    def rerank_active(self) -> bool:
+        """True when ZeroEntropy reranking is both enabled and configured."""
+        return self.rerank_enabled and self.zeroentropy_api_key is not None
+
     mongo_uri: str = "mongodb://localhost:27017/"
     mongo_db: str = "agent_yoku"
 

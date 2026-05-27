@@ -172,7 +172,7 @@ def test_feature_rerank_promotes_corroborated_doc():
         ]
     }
     # Equal first-stage score; the cross-linked doc should be reranked first.
-    order = tools._feature_rerank("same", [(0, 0.01), (1, 0.01)], idx)
+    order = tools._feature_rerank("same", [(0, 0.01), (1, 0.01)], idx, {})
     assert order[0] == 1
 
 
@@ -200,7 +200,7 @@ def test_rerank_prefers_recent_when_otherwise_tied():
         ]
     }
     # Equal base + equal lexical; recency must put the fresh ticket first.
-    order = tools._feature_rerank("okta", [(0, 0.01), (1, 0.01)], idx)
+    order = tools._feature_rerank("okta", [(0, 0.01), (1, 0.01)], idx, {})
     assert order[0] == 1
 
 
@@ -217,7 +217,7 @@ def test_rerank_does_not_overturn_clear_leader():
         ]
     }
     # doc 0 leads fusion clearly; doc 1 maxes out lexical + corroboration.
-    order = tools._feature_rerank("payment gateway", [(0, 0.045), (1, 0.032)], idx)
+    order = tools._feature_rerank("payment gateway", [(0, 0.045), (1, 0.032)], idx, {})
     assert order[0] == 0
 
 
@@ -302,3 +302,90 @@ def test_rerank_corroboration_changes_search_order(isolated_index, monkeypatch):
 
     out = tools.semantic_search.invoke({"query": "shared topic", "k": 5})
     assert out[0]["key"] == "AS-2"
+
+
+@pytest.mark.unit
+def test_adjacency_scores_reflect_linked_hit_strength():
+    idx = {
+        "docs": [
+            {"key": "AS-1", "link_keys": ["AsatoCorp/r#1"]},
+            {"key": "AsatoCorp/r#1", "link_keys": ["AS-1"]},
+            {"key": "AS-2", "link_keys": ["AsatoCorp/r#9"]},
+        ],
+        "key_to_idx": {"AS-1": 0, "AsatoCorp/r#1": 1, "AS-2": 2},
+    }
+    fused = {0: 0.01, 1: 0.02, 2: 0.005}
+    adj = tools._adjacency_scores(fused, idx)
+
+    assert adj[0] == pytest.approx(1.0)  # AS-1's link (idx 1) is the top fused hit
+    assert adj[1] == pytest.approx(0.5)  # the PR's link AS-1 scores 0.01/0.02
+    assert 2 not in adj  # AS-2's link is absent from fused -> no adjacency
+
+
+@pytest.mark.unit
+def test_adjacency_promotes_doc_whose_link_is_a_query_hit(isolated_index, monkeypatch):
+    # AS-1 and AS-2 are otherwise identical, AS-1 marginally ahead by insertion
+    # order. AS-2's linked PR is itself a strong hit for the query; AS-1's linked
+    # PR isn't in the index. Query-aware adjacency must lift AS-2 to the top.
+    jira = [
+        {
+            "key": "AS-1",
+            "summary": "shared topic",
+            "embedding": [1.0, 0.0, 0.0],
+            "linked_prs": [{"key": "AsatoCorp/r#9"}],
+        },
+        {
+            "key": "AS-2",
+            "summary": "shared topic",
+            "embedding": [1.0, 0.0, 0.0],
+            "linked_prs": [{"key": "AsatoCorp/r#1"}],
+        },
+    ]
+    github = [
+        {
+            "key": "AsatoCorp/r#1",
+            "summary": "shared topic",
+            "repo": "r",
+            "embedding": [1.0, 0.0, 0.0],
+        }
+    ]
+    _seed_index(monkeypatch, jira=jira, github=github, query_vec=(1.0, 0.0, 0.0))
+
+    out = tools.semantic_search.invoke({"query": "shared topic", "k": 5})
+    assert out[0]["key"] == "AS-2"
+
+
+@pytest.mark.unit
+def test_zeroentropy_rerank_reorders_results(isolated_index, monkeypatch):
+    # First-stage fusion ranks AS-1 first (perfect cosine + keyword). A ZeroEntropy
+    # rerank that prefers the other candidate must override that order.
+    jira = [
+        {"key": "AS-1", "summary": "alpha", "embedding": [1.0, 0.0, 0.0]},
+        {"key": "AS-2", "summary": "beta", "embedding": [0.0, 1.0, 0.0]},
+    ]
+    _seed_index(monkeypatch, jira=jira, query_vec=(1.0, 0.0, 0.0))
+
+    def fake_rerank(query, documents):
+        # Rank the input docs in reverse order, best first.
+        order = list(reversed(range(len(documents))))
+        return [(doc_i, 1.0 - rank * 0.1) for rank, doc_i in enumerate(order)]
+
+    monkeypatch.setattr(tools, "rerank", fake_rerank)
+
+    out = tools.semantic_search.invoke({"query": "alpha", "k": 5})
+    assert out[0]["key"] == "AS-2"
+
+
+@pytest.mark.unit
+def test_search_falls_back_when_zeroentropy_unavailable(isolated_index, monkeypatch):
+    # When ZeroEntropy returns None (disabled or errored), search keeps the
+    # built-in feature-reranked order — here the high-cosine keyword hit leads.
+    jira = [
+        {"key": "AS-1", "summary": "alpha", "embedding": [1.0, 0.0, 0.0]},
+        {"key": "AS-2", "summary": "beta", "embedding": [0.0, 1.0, 0.0]},
+    ]
+    _seed_index(monkeypatch, jira=jira, query_vec=(1.0, 0.0, 0.0))
+    monkeypatch.setattr(tools, "rerank", lambda *a, **k: None)
+
+    out = tools.semantic_search.invoke({"query": "alpha", "k": 5})
+    assert out[0]["key"] == "AS-1"

@@ -3356,6 +3356,29 @@ files = [
 ]
 
 [[package]]
+name = "zeroentropy"
+version = "0.1.0a11"
+description = "The official Python library for the ZeroEntropy API"
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "zeroentropy-0.1.0a11-py3-none-any.whl", hash = "sha256:07fc4d48fff78ba36680e53092c2a5e6dcbfd416866fce240ba0fe5a3ec800ef"},
+    {file = "zeroentropy-0.1.0a11.tar.gz", hash = "sha256:220b2e7faf7a31c400f9ca7b1d257b65e96a616b7fcb8620fe828fce705c6986"},
+]
+
+[package.dependencies]
+anyio = ">=3.5.0,<5"
+distro = ">=1.7.0,<2"
+httpx = ">=0.23.0,<1"
+pydantic = ">=1.9.0,<3"
+sniffio = "*"
+typing-extensions = ">=4.10,<5"
+
+[package.extras]
+aiohttp = ["aiohttp", "httpx-aiohttp (>=0.1.9)"]
+
+[[package]]
 name = "zstandard"
 version = "0.25.0"
 description = "Zstandard bindings for Python"
@@ -3470,4 +3493,4 @@ cffi = ["cffi (>=1.17,<2.0) ; platform_python_implementation != \"PyPy\" and pyt
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "f5c218d5ee70f97f115b7309380d6a9ba43eea69226d671b37305f79e8088f2c"
+content-hash = "c15b0f02d267e9f62d53c142dfbacecc0aab670dff2f402f721d0e1a813d8774"

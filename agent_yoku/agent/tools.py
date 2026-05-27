@@ -19,12 +19,14 @@ from typing import Any
 import numpy as np
 from langchain_core.tools import tool
 
+from agent_yoku.agent.rerank import rerank
 from agent_yoku.config import (
     ALLOWED_COLLECTIONS,
     EMBED_MODEL,
     get_collection,
     github_prs_collection,
     openai_client,
+    settings,
     tickets_collection,
     unified_users_collection,
 )
@@ -91,11 +93,18 @@ def _load_index() -> dict[str, Any]:
     for d in docs:
         d.pop("embedding", None)
         d.pop("_id", None)
-        # Cross-source corroboration flag for reranking: a JIRA ticket with
-        # linked PRs, or a PR that references tickets, is better-evidenced.
-        d["has_links"] = bool(
-            d.get("jira_keys") if d["source"] == "github" else d.get("linked_prs")
-        )
+        # Keys of the cross-source items this doc links to — a PR's referenced
+        # tickets, or the PRs linked onto a ticket. Doubles as the corroboration
+        # flag and as the lookup for query-aware adjacency reranking.
+        if d["source"] == "github":
+            d["link_keys"] = list(d.get("jira_keys") or [])
+        else:
+            d["link_keys"] = [
+                p["key"]
+                for p in (d.get("linked_prs") or [])
+                if isinstance(p, dict) and p.get("key")
+            ]
+        d["has_links"] = bool(d["link_keys"])
         d.pop("linked_prs", None)
         d["updated_ts"] = _to_epoch(d.get("updated"))
         d.pop("updated", None)
@@ -108,8 +117,16 @@ def _load_index() -> dict[str, Any]:
     inverted = {tok: post for tok, post in inverted.items() if len(post) <= stop_df}
     idf = {tok: float(np.log(1.0 + len(docs) / len(post))) for tok, post in inverted.items()}
 
+    key_to_idx = {d["key"]: i for i, d in enumerate(docs)}
+
     log.info("index loaded jira=%d github=%d", len(jira), len(gh))
-    return {"docs": docs, "matrix": matrix, "inverted": inverted, "idf": idf}
+    return {
+        "docs": docs,
+        "matrix": matrix,
+        "inverted": inverted,
+        "idf": idf,
+        "key_to_idx": key_to_idx,
+    }
 
 
 def _fresh(idx: dict[str, Any]) -> bool:
@@ -223,6 +240,7 @@ def _rrf_fuse(
 _RERANK_MIN_WINDOW = 30
 _W_LEX = 0.05
 _W_CORR = 0.02
+_W_ADJ = 0.15
 _W_RECENCY = 0.03
 _RECENCY_HALFLIFE_DAYS = 180.0
 _WHO_KNOWS_RECENCY_FLOOR = 0.2
@@ -245,17 +263,48 @@ def _recency_factor(updated_ts: float | None, now: float) -> float:
     return 0.5 ** (age_days / _RECENCY_HALFLIFE_DAYS)
 
 
+def _adjacency_scores(fused: dict[int, float], idx: dict[str, Any]) -> dict[int, float]:
+    """For each fused candidate, how relevant its strongest linked counterpart is.
+
+    A cross-source link (PR <-> ticket) is evidence: if a candidate's linked item
+    also surfaced for this query, the candidate is more likely the answer. Returns
+    {doc_index: 0..1} — the best linked counterpart's fused score scaled by the top
+    fused score, so a candidate whose counterpart is the #1 hit scores ~1.0. Only
+    counterparts that are themselves in `fused` count; absent links contribute 0.
+    """
+    if not fused:
+        return {}
+    docs = idx["docs"]
+    key_to_idx = idx["key_to_idx"]
+    top = max(fused.values())
+    out: dict[int, float] = {}
+    for i in fused:
+        best = 0.0
+        for k in docs[i].get("link_keys") or ():
+            j = key_to_idx.get(k)
+            if j is not None and j in fused:
+                best = max(best, fused[j])
+        if best > 0.0:
+            out[i] = best / top
+    return out
+
+
 def _feature_rerank(
-    query: str, candidates: list[tuple[int, float]], idx: dict[str, Any]
+    query: str,
+    candidates: list[tuple[int, float]],
+    idx: dict[str, Any],
+    adjacency: dict[int, float],
 ) -> list[int]:
     """Rescore first-stage (doc_index, fused_score) pairs with richer signals.
 
     Refines — not replaces — fusion: the fused score is the base, scaled by a
     small multiplicative boost from lexical overlap with the summary, cross-source
-    corroboration, and recency (freshly-updated items rank ahead of stale ones).
-    Multiplicative keeps the boost proportional, so it reorders near-ties but
-    can't lift a candidate over one materially (more than ~10%) ahead in fusion.
-    This is the seam where a cross-encoder or hosted reranker could drop in later.
+    corroboration, query-aware link adjacency (a linked counterpart that itself
+    surfaced for this query), and recency (freshly-updated items rank ahead of
+    stale ones). Multiplicative keeps the boost proportional, so it reorders
+    near-ties and modest gaps without letting a weakly-matched item leapfrog one
+    far ahead in fusion. This is the seam where a cross-encoder or hosted reranker
+    could drop in later.
     """
     qtokens = _tokenize(query)
     docs = idx["docs"]
@@ -265,10 +314,67 @@ def _feature_rerank(
         d = docs[i]
         lex = _lexical_overlap(query, qtokens, d.get("summary") or "")
         corr = 1.0 if d.get("has_links") else 0.0
+        adj = adjacency.get(i, 0.0)
         rec = _recency_factor(d.get("updated_ts"), now)
-        scored.append((i, base * (1.0 + _W_LEX * lex + _W_CORR * corr + _W_RECENCY * rec)))
+        boost = 1.0 + _W_LEX * lex + _W_CORR * corr + _W_ADJ * adj + _W_RECENCY * rec
+        scored.append((i, base * boost))
     scored.sort(key=lambda x: -x[1])
     return [i for i, _ in scored]
+
+
+def _fetch_texts(keys: list[str]) -> dict[str, str]:
+    """Pull the full embedded `text` for the given doc keys, split by key shape."""
+    jira = [k for k in keys if not _is_pr_key(k)]
+    prs = [k for k in keys if _is_pr_key(k)]
+    out: dict[str, str] = {}
+    if jira:
+        for d in tickets_collection().find({"key": {"$in": jira}}, {"_id": 0, "key": 1, "text": 1}):
+            out[d["key"]] = d.get("text") or ""
+    if prs:
+        for d in github_prs_collection().find(
+            {"key": {"$in": prs}}, {"_id": 0, "key": 1, "text": 1}
+        ):
+            out[d["key"]] = d.get("text") or ""
+    return out
+
+
+def _rerank_texts(indices: list[int], idx: dict[str, Any]) -> list[str]:
+    """Reranker input for each candidate: the full embedded body, summary on miss."""
+    docs = idx["docs"]
+    by_key = _fetch_texts([docs[i]["key"] for i in indices])
+    return [by_key.get(docs[i]["key"]) or (docs[i].get("summary") or "") for i in indices]
+
+
+def _rerank_order(
+    query: str,
+    window: list[int],
+    fused: dict[int, float],
+    idx: dict[str, Any],
+    adjacency: dict[int, float],
+) -> list[int]:
+    """Final ordering for the fused window.
+
+    Reranks the top `rerank_top_n` candidates with ZeroEntropy (reading their full
+    body text), then layers the graph signals the reranker can't see — cross-source
+    adjacency and recency — onto its relevance score. Any candidates past the cap
+    keep their fused order beneath. Falls back to the built-in feature reranker
+    whenever ZeroEntropy is disabled or unavailable, so search never depends on it.
+    """
+    head, tail = window[: settings.rerank_top_n], window[settings.rerank_top_n :]
+    scored_ze = rerank(query, _rerank_texts(head, idx))
+    if scored_ze is None:
+        return _feature_rerank(query, [(i, fused[i]) for i in window], idx, adjacency)
+
+    now = time.time()
+    docs = idx["docs"]
+    boosted = []
+    for local_i, relevance in scored_ze:
+        i = head[local_i]
+        adj = adjacency.get(i, 0.0)
+        rec = _recency_factor(docs[i].get("updated_ts"), now)
+        boosted.append((i, relevance * (1.0 + _W_ADJ * adj + _W_RECENCY * rec)))
+    boosted.sort(key=lambda x: -x[1])
+    return [i for i, _ in boosted] + tail
 
 
 @tool
@@ -279,8 +385,9 @@ def semantic_search(query: str, k: int = 50, source: str = "both") -> list[dict]
     (exact tokens — ticket keys, repo names, people, error strings) and fuses
     the two rankings with Reciprocal Rank Fusion. This surfaces exact-identifier
     hits that pure vector search ranks too low, without hurting semantic recall.
-    A lightweight second-stage reranker then refines the top window using
-    summary overlap and cross-source links before returning k results.
+    A second-stage reranker (ZeroEntropy when configured, otherwise a built-in
+    feature reranker) then refines the top window — using cross-source link
+    adjacency and recency as additional signals — before returning k results.
 
     Returns lightweight cards sorted by relevance. Use this to *discover*
     candidate items, then call get(key) to read full content.
@@ -322,9 +429,10 @@ def semantic_search(query: str, k: int = 50, source: str = "both") -> list[dict]
     kw_order = sorted(kw, key=lambda i: -kw[i])[:pool]
 
     fused = _rrf_fuse([vec_order, kw_order], weights=[1.0, _KEYWORD_WEIGHT])
+    adjacency = _adjacency_scores(fused, idx)
 
     window = sorted(fused, key=lambda i: -fused[i])[: max(k, _RERANK_MIN_WINDOW)]
-    ranked = _feature_rerank(query, [(i, fused[i]) for i in window], idx)[:k]
+    ranked = _rerank_order(query, window, fused, idx, adjacency)[:k]
 
     out = []
     for i in ranked:

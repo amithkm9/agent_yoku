@@ -50,11 +50,16 @@ def scratch_db(scratch_db_name):
 
 @pytest.fixture
 def isolated_index(monkeypatch):
-    """Reset the per-tenant index cache + tenant context between tests."""
+    """Reset the per-tenant index cache + tenant context between tests.
+
+    Also disables the ZeroEntropy reranker so search stays hermetic — tests that
+    exercise the rerank path stub `tools.rerank` themselves.
+    """
     from agent_yoku.agent import tools
     from agent_yoku.storage import tenancy
 
     monkeypatch.setattr(tools, "_INDEXES", {})
+    monkeypatch.setattr(tools, "rerank", lambda *a, **k: None)
     yield
     tenancy.set_tenant(None)
 
