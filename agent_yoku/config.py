@@ -122,28 +122,9 @@ def openai_client() -> OpenAI:
     return OpenAI(api_key=settings.openai_api_key.get_secret_value())
 
 
-# ---------- Back-compat re-exports ----------
-# Existing modules still import these constants by name. Wrap once here so the
-# rest of the codebase doesn't need to touch SecretStr semantics.
-
-JIRA_EMAIL = settings.jira_email
-JIRA_TOKEN = settings.jira_token.get_secret_value()
-JIRA_BASE_URL = settings.jira_base_url_clean
-JIRA_PROJECT = settings.jira_project
-
-GITHUB_TOKEN = settings.github_token.get_secret_value()
-GITHUB_ORG = settings.github_org
-GITHUB_API_BASE = settings.github_api_base_clean
-GITHUB_PR_LOOKBACK_DAYS = settings.github_pr_lookback_days
-
-OPENAI_API_KEY = settings.openai_api_key.get_secret_value()
+# Constants still imported by downstream modules.
 EMBED_MODEL = settings.openai_embed_model
-CHAT_MODEL = settings.openai_chat_model
-CHAT_MODEL_PROVIDER = settings.chat_model_provider
 AGENT_MODEL_ID = settings.agent_model_id
-
-MONGO_URI = settings.mongo_uri
-MONGO_DB = settings.mongo_db
 
 # Storage re-exports — lazy via PEP 562 to avoid `config <-> storage.mongo`
 # circular import. Legacy callers can still do
@@ -177,20 +158,7 @@ def __getattr__(name: str):
 # __getattr__ but excluded here so ruff doesn't flag them as undefined.
 __all__ = [
     "AGENT_MODEL_ID",
-    "CHAT_MODEL",
-    "CHAT_MODEL_PROVIDER",
     "EMBED_MODEL",
-    "GITHUB_API_BASE",
-    "GITHUB_ORG",
-    "GITHUB_PR_LOOKBACK_DAYS",
-    "GITHUB_TOKEN",
-    "JIRA_BASE_URL",
-    "JIRA_EMAIL",
-    "JIRA_PROJECT",
-    "JIRA_TOKEN",
-    "MONGO_DB",
-    "MONGO_URI",
-    "OPENAI_API_KEY",
     "Settings",
     "openai_client",
     "settings",

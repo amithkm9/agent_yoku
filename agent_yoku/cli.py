@@ -196,7 +196,7 @@ def refresh_all(skip_jira: bool, skip_github: bool) -> None:
 @cli.command()
 @click.argument("query", nargs=-1, required=True)
 def chat(query: tuple[str, ...]) -> None:
-    """One-shot agent query (CLI). Use `ui` for the interactive Streamlit app."""
+    """One-shot agent query (CLI). Use `web` for the React UI."""
     from agent_yoku.agent.chat import ask, final_answer
     from agent_yoku.log import set_session
 
@@ -226,26 +226,6 @@ def api(port: int, host: str, reload: bool) -> None:
     ]
     if reload:
         cmd.append("--reload")
-    os.execvp(cmd[0], cmd)
-
-
-@cli.command()
-@click.option("--port", default=8501, type=int)
-@click.option("--headless/--browser", default=True)
-def ui(port: int, headless: bool) -> None:
-    """Launch the legacy Streamlit deepagent UI (use `web` for the React UI)."""
-    app_path = _HERE / "app.py"
-    cmd = [
-        sys.executable,
-        "-m",
-        "streamlit",
-        "run",
-        str(app_path),
-        "--server.port",
-        str(port),
-    ]
-    if headless:
-        cmd += ["--server.headless", "true"]
     os.execvp(cmd[0], cmd)
 
 

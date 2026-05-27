@@ -45,3 +45,4 @@ web/*.tsbuildinfo
 
 # Generated schemas
 schemas/*.schema.json
+.gstack/

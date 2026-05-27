@@ -2,7 +2,7 @@
 
 Borrows the ContextVar pattern from asato-api: per-request request_id /
 correlation_id / tenant_id are pulled from the RequestContext middleware
-and stamped onto every record. Adds session_id (set in app.py / chat.py
+and stamped onto every record. Adds session_id (set in chat.py / cli.py
 around each conversation turn) for agent-yoku's chat correlation, plus
 service_name + env for ops filtering.
 
