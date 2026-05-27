@@ -180,6 +180,34 @@ def test_feature_rerank_promotes_corroborated_doc():
 
 
 @pytest.mark.unit
+def test_recency_factor_decays_by_half_life():
+    now = 1_000_000_000.0
+    day = 86400.0
+    assert tools._recency_factor(now, now) == pytest.approx(1.0)
+    half = tools._recency_factor(now - tools._RECENCY_HALFLIFE_DAYS * day, now)
+    assert half == pytest.approx(0.5, abs=1e-6)
+    ancient = tools._recency_factor(now - 1095 * day, now)  # ~3 years
+    assert ancient < 0.02
+    assert tools._recency_factor(None, now) == 0.0  # unknown age -> neutral
+
+
+@pytest.mark.unit
+def test_rerank_prefers_recent_when_otherwise_tied():
+    import time
+
+    now = time.time()
+    idx = {
+        "docs": [
+            {"key": "OLD", "summary": "okta", "source": "jira", "updated_ts": now - 1095 * 86400},
+            {"key": "NEW", "summary": "okta", "source": "jira", "updated_ts": now - 1 * 86400},
+        ]
+    }
+    # Equal base + equal lexical; recency must put the fresh ticket first.
+    order = tools._feature_rerank("okta", [(0, 0.01), (1, 0.01)], idx)
+    assert order[0] == 1
+
+
+@pytest.mark.unit
 def test_rerank_does_not_overturn_clear_leader():
     # The 0.045 vs 0.032 gap mirrors the real bug: a keyword-#1 exact PR match
     # (high fused) vs a vec-ranked doc ~28% lower. The original additive boost

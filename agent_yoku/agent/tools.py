@@ -53,6 +53,17 @@ def _index_key() -> str:
         return "_default"  # CLI / tests may run without a tenant context set
 
 
+def _to_epoch(value) -> float | None:
+    """Parse an ISO-8601 timestamp (JIRA/GitHub `updated`) to epoch seconds, or
+    None if absent/unparseable — callers treat None as 'age unknown'."""
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value)).timestamp()
+    except (ValueError, TypeError):
+        return None
+
+
 def _load_index() -> dict[str, Any]:
     """Build the unified JIRA + PR index for the current tenant."""
     log.info("loading unified embedding index…")
@@ -66,6 +77,7 @@ def _load_index() -> dict[str, Any]:
         "jira_keys": 1,
         "linked_prs": 1,
         "repo": 1,
+        "updated": 1,
     }
 
     jira = list(tickets_collection().find({"embedding": {"$ne": None, "$exists": True}}, proj))
@@ -91,6 +103,9 @@ def _load_index() -> dict[str, Any]:
             d.get("jira_keys") if d["source"] == "github" else d.get("linked_prs")
         )
         d.pop("linked_prs", None)
+        # Parse the update time once so the reranker's recency factor is cheap.
+        d["updated_ts"] = _to_epoch(d.get("updated"))
+        d.pop("updated", None)
 
     # Keyword half of hybrid search: an inverted index over identifier +
     # summary tokens, idf-weighted so rare tokens (a ticket key, a repo
@@ -228,12 +243,14 @@ def _rrf_fuse(
 # Rerank at least this many fused candidates even when k is small, so the second
 # stage has room to reorder; for larger k the whole top-k is reranked.
 _RERANK_MIN_WINDOW = 30
-# Boosts are *relative* (multiplicative, +7% combined max) so they reorder
-# near-ties but can't lift a candidate over one that's more than ~7% ahead in
-# fusion — e.g. an exact-key hit won't be demoted by a doc that merely shares a
-# common summary word (that gap is ~28%).
+# Boosts are *relative* (multiplicative, +10% combined max) so they reorder
+# near-ties but can't lift a candidate over one that's more than ~10% ahead in
+# fusion — e.g. an exact-key hit won't be demoted by a fresher/linked doc that
+# merely shares a summary word (that gap is ~28%).
 _W_LEX = 0.05  # up to +5% for summary overlap (incl. a phrase-match bonus).
 _W_CORR = 0.02  # up to +2% for cross-source corroboration (linked PR / JIRA).
+_W_RECENCY = 0.03  # up to +3% for a freshly-updated item (half-life decay).
+_RECENCY_HALFLIFE_DAYS = 180.0  # an item this old gets half the recency boost.
 
 
 def _lexical_overlap(query: str, query_tokens: set[str], summary: str) -> float:
@@ -244,26 +261,37 @@ def _lexical_overlap(query: str, query_tokens: set[str], summary: str) -> float:
     return min(1.0, overlap + phrase)
 
 
+def _recency_factor(updated_ts: float | None, now: float) -> float:
+    """1.0 for a just-updated item, halving every _RECENCY_HALFLIFE_DAYS; 0.0 when
+    the timestamp is unknown (neutral — no boost, never a penalty below the base)."""
+    if not updated_ts:
+        return 0.0
+    age_days = max(0.0, (now - updated_ts) / 86400.0)
+    return 0.5 ** (age_days / _RECENCY_HALFLIFE_DAYS)
+
+
 def _feature_rerank(
     query: str, candidates: list[tuple[int, float]], idx: dict[str, Any]
 ) -> list[int]:
     """Rescore first-stage (doc_index, fused_score) pairs with richer signals.
 
     Refines — not replaces — fusion: the fused score is the base, scaled by a
-    small multiplicative boost from lexical overlap with the summary and
-    cross-source corroboration. Multiplicative keeps the boost proportional, so
-    it reorders near-ties but can't lift a candidate over one materially (more
-    than ~7%) ahead in fusion. This is the seam where a cross-encoder or hosted
-    reranker could drop in later.
+    small multiplicative boost from lexical overlap with the summary, cross-source
+    corroboration, and recency (freshly-updated items rank ahead of stale ones).
+    Multiplicative keeps the boost proportional, so it reorders near-ties but
+    can't lift a candidate over one materially (more than ~10%) ahead in fusion.
+    This is the seam where a cross-encoder or hosted reranker could drop in later.
     """
     qtokens = _tokenize(query)
     docs = idx["docs"]
+    now = time.time()
     scored = []
     for i, base in candidates:
         d = docs[i]
         lex = _lexical_overlap(query, qtokens, d.get("summary") or "")
         corr = 1.0 if d.get("has_links") else 0.0
-        scored.append((i, base * (1.0 + _W_LEX * lex + _W_CORR * corr)))
+        rec = _recency_factor(d.get("updated_ts"), now)
+        scored.append((i, base * (1.0 + _W_LEX * lex + _W_CORR * corr + _W_RECENCY * rec)))
     scored.sort(key=lambda x: -x[1])
     return [i for i, _ in scored]
 
