@@ -1,4 +1,4 @@
-# agent_yoku
+# agent-yoku
 
 Cross-source agent over Asato's **JIRA tickets** + **GitHub PRs**. Ingests both
 into MongoDB, indexes them with OpenAI embeddings, and exposes a deepagent
@@ -6,13 +6,12 @@ into MongoDB, indexes them with OpenAI embeddings, and exposes a deepagent
 
 - **FastAPI** REST API with JWT auth + multi-tenant mongo isolation
 - **React** (Vite + TypeScript) frontend
-- **Streamlit** legacy UI (kept around; will be retired)
 - **Click** CLI for ingest, embed, link, smoke-test, user management
 
 ```
   ┌──────────────┐    JWT      ┌────────────────────┐    invoke    ┌──────────────────┐
   │  React UI    │ ──────────▶ │  FastAPI           │ ───────────▶ │ deepagent        │
-  │  (Vite :5173)│             │  (uvicorn :8000)   │              │ + 11 tools       │
+  │  (Vite :5173)│             │  (uvicorn :8000)   │              │ + 13 tools       │
   └──────────────┘             │  + tenant ContextVar│              │ + 2 sub-agents   │
                                └──────┬─────────────┘              └──────┬───────────┘
                                       │                                    │
@@ -29,7 +28,7 @@ into MongoDB, indexes them with OpenAI embeddings, and exposes a deepagent
 ## Project layout
 
 ```
-agent_yoku/
+agent-yoku/
 ├── pyproject.toml  Makefile  Dockerfile  .dockerignore
 ├── README.md  .env.example  .gitignore  .python-version
 ├── .pre-commit-config.yaml
@@ -38,12 +37,20 @@ agent_yoku/
 │   ├── exceptions.py
 │   ├── log.py                      # session_id ContextVar + optional Sentry
 │   ├── cli.py                      # Click entry: `agent-yoku …`
-│   ├── app.py                      # Streamlit UI (legacy)
-│   ├── api/                        # FastAPI surface
-│   │   ├── app.py                  #   create_app() + CORS + routers
-│   │   ├── deps.py                 #   JWT, current_user, password hashing
-│   │   ├── schemas.py              #   request/response Pydantic models
-│   │   └── routes/                 #   auth, sessions, chat, stats
+│   ├── main.py                     # FastAPI app factory + lifespan
+│   ├── deps.py                     # JWT, current_user, password hashing
+│   ├── schemas.py                  # request/response Pydantic models
+│   ├── scheduler.py                # APScheduler background sync loop
+│   ├── sync_service.py             # per-tenant full pipeline orchestration
+│   ├── routers/                    # FastAPI route handlers
+│   │   ├── auth.py                 #   login/signup + JWT
+│   │   ├── sessions.py             #   session CRUD
+│   │   ├── chat.py                 #   SSE streaming chat
+│   │   ├── connectors.py           #   on-demand sync + connector config
+│   │   └── stats.py                #   analytics
+│   ├── middleware/                 # FastAPI middlewares
+│   │   ├── rate_limit.py           #   per-client rate limiting
+│   │   └── request_context.py      #   request correlation IDs
 │   ├── models/                     # Pydantic DTOs for stored entities
 │   ├── connectors/                 # 🔌 drop a new source folder here
 │   │   ├── base.py                 #   Connector contract + auto-discovery
@@ -54,25 +61,30 @@ agent_yoku/
 │   │   ├── tenancy.py              #   ContextVar + db name routing
 │   │   ├── sessions.py             #   conversation persistence
 │   │   ├── unified_users.py        #   JIRA ↔ GitHub user join
+│   │   ├── connector_configs.py    #   per-tenant connector credentials
+│   │   ├── freshness.py            #   data freshness tracking
 │   │   └── backfill.py             #   author_email backfill
 │   ├── embeddings/embed.py
 │   ├── linking/pr_to_jira.py
+│   ├── analysis/consistency.py     # JIRA/GitHub data integrity checks
+│   ├── eval/retrieval.py           # retrieval quality evaluation
 │   ├── agent/
 │   │   ├── agent.py                # deepagent factory
 │   │   ├── chat.py                 # CLI ask/final_answer helpers
-│   │   └── tools.py                # 11 tools (narrow + generic mongo)
+│   │   └── tools.py                # 13 tools (9 narrow + 4 mongo escape hatches)
 │   └── utils/                      # cross-cutting helpers
 │       ├── bson.py · jira_keys.py · http.py
 ├── web/                            # React + Vite frontend
 │   ├── package.json  vite.config.ts  tsconfig.json
 │   └── src/
 │       ├── main.tsx · App.tsx · styles.css
-│       ├── pages/Login.tsx  pages/Chat.tsx
+│       ├── pages/Login.tsx  pages/Chat.tsx  pages/Settings.tsx
 │       └── lib/api.ts              # typed fetch client
 ├── scripts/
 │   ├── dump_schemas.py             # Pydantic → JSON Schema
-│   └── agent_smoke.py              # agent regression suite
-├── tests/                          # 71 tests: unit + integration
+│   ├── agent_smoke.py              # agent regression suite
+│   └── retrieval_eval.py           # score retrieval quality on golden set
+├── tests/                          # 37 test files: unit + integration
 └── schemas/                        # generated JSON Schemas (gitignored)
 ```
 
@@ -138,9 +150,9 @@ Commands:
   refresh-all        Full pipeline: ingest → embed → unify → link → backfill
   list-connectors    Enumerate registered data connectors
   status             Mongo collection counts (current tenant)
+  consistency        Report JIRA/GitHub inconsistencies (done-no-PR, merged-no-ticket)
   chat <Q…>          One-shot agent query
   api                Launch FastAPI on :8000
-  ui                 Launch legacy Streamlit on :8501
   auth               User management
     create-user      …  Create an account in a tenant
     list-users       …  List users in a tenant
@@ -181,8 +193,10 @@ JWT secret comes from `settings.jwt_secret` — **rotate before any non-local de
   `embedding` field on each doc; cosine runs in-memory via numpy.
 - **Two-layer agent.** Main orchestrator + `jira_researcher` + `github_researcher`
   sub-agents (isolated context).
-- **Narrow tools + generic escape hatch.** 7 narrow tools for common queries
-  (`get` / `linked` auto-route by key shape across both sources);
+- **Narrow tools + generic escape hatch.** 9 narrow tools for common queries
+  (`get` / `linked` auto-route by key shape across both sources;
+  `semantic_search`, `resolve_user`, `filter_jira`, `filter_prs`, `list_repos`,
+  `data_freshness`, `who_knows`);
   `mongo_query` / `mongo_count` / `describe_collection` / `list_collections`
   for analytics the narrow tools don't cover. Tool errors return
   `{"error": "..."}` so the agent can adapt rather than crash.
@@ -222,14 +236,14 @@ Pre-commit hooks: autoflake, ruff, black, standard hygiene.
 ## Docker
 
 ```bash
-docker build -t agent_yoku .
-docker run --rm -p 8000:8000 --env-file .env agent_yoku
+docker build -t agent-yoku .
+docker run --rm -p 8000:8000 --env-file .env agent-yoku
 # API on http://localhost:8000  /docs for Swagger
 ```
 
 For batch ingest:
 ```bash
-docker run --rm --env-file .env agent_yoku python -m agent_yoku.cli refresh-all
+docker run --rm --env-file .env agent-yoku python -m agent_yoku.cli refresh-all
 ```
 
 ## Data model

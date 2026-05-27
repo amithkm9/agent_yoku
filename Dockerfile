@@ -47,7 +47,6 @@ COPY scripts /app/scripts
 RUN mkdir -p /app/logs && chown -R app:app /app
 USER app
 
-EXPOSE 8501
+EXPOSE 8000
 
-# Default to the Streamlit UI; override CMD for batch jobs (e.g. ingest).
-CMD ["python", "-m", "agent_yoku.cli", "ui", "--port", "8501"]
+CMD ["python", "-m", "agent_yoku.cli", "api", "--host", "0.0.0.0", "--port", "8000"]
