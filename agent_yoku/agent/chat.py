@@ -42,7 +42,7 @@ def ask(query: str) -> dict:
     return result
 
 
-def _extract_text(content) -> str:
+def _extract_text(content: str | list | None) -> str:
     if content is None:
         return ""
     if isinstance(content, str):

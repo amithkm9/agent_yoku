@@ -16,7 +16,7 @@ import requests
 from pymongo import UpdateOne
 
 from agent_yoku.connectors._runtime import current_github_config
-from agent_yoku.connectors.github.client import _get, _paginate
+from agent_yoku.connectors.github.client import BOT_AUTHORS, _get, _paginate
 from agent_yoku.log import get_logger
 from agent_yoku.storage.mongo import github_users_collection
 
@@ -60,9 +60,7 @@ def main() -> None:
             "name": profile.get("name"),
             "email": email.lower() if email else None,
             "type": m.get("type") or profile.get("type") or "User",
-            "is_bot": (m.get("type") == "Bot")
-            or (m.get("type") == "User" and login.endswith("[bot]"))
-            or login in {"asato-bot"},
+            "is_bot": (m.get("type") == "Bot") or login.endswith("[bot]") or login in BOT_AUTHORS,
             "company": profile.get("company"),
             "blog": profile.get("blog"),
             "avatar_url": m.get("avatar_url"),

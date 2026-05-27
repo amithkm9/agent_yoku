@@ -113,7 +113,7 @@ def openai_client() -> OpenAI:
     return OpenAI(api_key=settings.openai_api_key.get_secret_value())
 
 
-# Constants still imported by downstream modules.
+# Legacy convenience aliases — prefer `settings.openai_embed_model` in new code.
 EMBED_MODEL = settings.openai_embed_model
 AGENT_MODEL_ID = settings.agent_model_id
 

@@ -160,7 +160,7 @@ GITHUB_RESEARCHER = SubAgent(
 
 
 def build_agent():
-    """Return a compiled deepagent. Cache the result for the process lifetime."""
+    """Build and return a compiled deepagent instance."""
     return create_deep_agent(
         model=AGENT_MODEL_ID,
         tools=ALL_TOOLS,

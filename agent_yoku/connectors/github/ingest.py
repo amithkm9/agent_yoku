@@ -20,12 +20,11 @@ from agent_yoku.connectors.github.client import (
     lookback_cutoff,
     pr_to_doc,
 )
+from agent_yoku.constants import INGEST_BATCH_SIZE
 from agent_yoku.log import get_logger
 from agent_yoku.storage.mongo import github_prs_collection
 
 log = get_logger("ingest_github")
-
-BATCH = 100
 
 
 def _repos_to_scan(filter_names: list[str]) -> list[str]:
@@ -76,7 +75,7 @@ def main(filter_names: list[str] | None = None) -> None:
             batch.append(UpdateOne({"key": key}, {"$set": doc}, upsert=True))
             per_repo += 1
 
-            if len(batch) >= BATCH:
+            if len(batch) >= INGEST_BATCH_SIZE:
                 coll.bulk_write(batch, ordered=False)
                 total += len(batch)
                 batch = []
@@ -96,14 +95,3 @@ def main(filter_names: list[str] | None = None) -> None:
         skipped_bots,
         elapsed,
     )
-
-
-def cli_main(argv: list[str] | None = None) -> None:
-    import sys
-
-    args = sys.argv[1:] if argv is None else argv
-    main(args)
-
-
-if __name__ == "__main__":
-    cli_main()

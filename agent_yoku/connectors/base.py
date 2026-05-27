@@ -39,7 +39,7 @@ class IngestModule(Protocol):
         ...
 
 
-def import_connector(name: str) -> dict[str, IngestModule]:
+def import_connector(name: str) -> dict[str, IngestModule | None]:
     """Lazily import a connector's submodules.
 
     Returns a dict {"ingest": <module>, "users_ingest": <module|None>}.

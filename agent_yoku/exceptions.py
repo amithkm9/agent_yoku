@@ -1,8 +1,7 @@
 """Typed exceptions for agent_yoku.
 
-Pattern borrowed from asato-svc/asato_svc/core/exceptions.py: a single
-QueryAsatoError base, with narrow subclasses the agent can catch and
-surface as clean failure signals to the LLM.
+A single QueryAsatoError base with narrow subclasses the agent can catch
+and surface as clean failure signals to the LLM.
 """
 
 from __future__ import annotations

@@ -26,11 +26,10 @@ from cryptography.fernet import Fernet, InvalidToken
 from pymongo.collection import Collection
 
 from agent_yoku.config import settings
+from agent_yoku.constants import SUPPORTED_CONNECTORS
 from agent_yoku.storage.tenancy import tenant_db_name
 
 _COLL_NAME = "connector_configs"
-
-SUPPORTED_CONNECTORS = ("jira", "github")
 
 
 @lru_cache(maxsize=1)
@@ -57,9 +56,14 @@ def encrypt_secrets(payload: dict[str, Any]) -> bytes:
 
 def decrypt_secrets(ciphertext: bytes) -> dict[str, Any]:
     """Inverse of `encrypt_secrets`. Returns {} on tamper / wrong-key."""
+    from agent_yoku.log import get_logger as _get_logger
+
     try:
         plain = _fernet().decrypt(ciphertext)
     except InvalidToken:
+        _get_logger("connector_configs").warning(
+            "failed to decrypt connector secrets — possible key rotation or data corruption"
+        )
         return {}
     return json.loads(plain.decode("utf-8"))
 
@@ -128,10 +132,7 @@ def delete_config(name: str) -> bool:
 
 def list_configs() -> list[dict]:
     """List all configured connectors for the current tenant (no ciphertext)."""
-    out: list[dict] = []
-    for doc in _coll().find({}, {"secrets_enc": 0, "_id": 0}):
-        out.append(doc)
-    return out
+    return list(_coll().find({}, {"secrets_enc": 0, "_id": 0}))
 
 
 def mark_synced(name: str, *, ok: bool, error: str | None = None) -> None:

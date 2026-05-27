@@ -14,27 +14,6 @@ export function AppBrand({ subtitle = "Home" }: { subtitle?: string }) {
   );
 }
 
-export function HomeIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className="nav-icon" aria-hidden="true">
-      <path
-        d="M4 10.5 12 4l8 6.5"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M6.5 9.5V20h11V9.5"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 export function SettingsIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" className="nav-icon" aria-hidden="true">

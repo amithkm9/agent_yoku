@@ -12,9 +12,9 @@ import threading
 import time
 from collections.abc import Iterable
 
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response
 
 _PRUNE_AT = 10_000  # prune expired client entries once the table grows past this
 
@@ -63,7 +63,7 @@ class RateLimit(BaseHTTPMiddleware):
                 return False, int(self.window_s - (now - start)) + 1
             return True, 0
 
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         path = request.url.path
         if request.method == "OPTIONS" or any(path.startswith(p) for p in self.exempt):
             return await call_next(request)

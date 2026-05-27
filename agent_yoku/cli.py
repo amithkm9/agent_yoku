@@ -59,8 +59,7 @@ def ingest_jira(extra_jql: str | None) -> None:
     """Pull all (or filtered) JIRA tickets from project AS."""
     from agent_yoku.connectors.jira import ingest as mod
 
-    sys.argv = ["ingest", extra_jql] if extra_jql else ["ingest"]
-    mod.main()
+    mod.main(extra=extra_jql)
 
 
 @ingest.command("jira-users")
@@ -77,8 +76,7 @@ def ingest_github(repos: tuple[str, ...]) -> None:
     """Pull GitHub PRs (no args = all non-archived AsatoCorp repos)."""
     from agent_yoku.connectors.github import ingest as mod
 
-    sys.argv = ["ingest_github", *repos]
-    mod.main()
+    mod.main(filter_names=list(repos) or None)
 
 
 @ingest.command("github-users")
@@ -142,7 +140,6 @@ def refresh_all(skip_jira: bool, skip_github: bool) -> None:
     """Full refresh: ingest -> embed -> unify -> link -> backfill."""
     if not skip_jira:
         click.secho("→ ingest jira", fg="cyan")
-        sys.argv = ["ingest"]
         from agent_yoku.connectors.jira import ingest as jira_ingest
 
         jira_ingest.main()
@@ -152,7 +149,6 @@ def refresh_all(skip_jira: bool, skip_github: bool) -> None:
         jira_users.main()
     if not skip_github:
         click.secho("→ ingest github", fg="cyan")
-        sys.argv = ["ingest_github"]
         from agent_yoku.connectors.github import ingest as gh_ingest
 
         gh_ingest.main()
@@ -216,8 +212,6 @@ def api(port: int, host: str, reload: bool) -> None:
     os.execvp(cmd[0], cmd)
 
 
-
-
 @cli.group()
 def auth() -> None:
     """User management — bootstrap admins, list/delete accounts."""
@@ -229,9 +223,7 @@ def auth() -> None:
 @click.option("--name", default=None)
 @click.option("--tenant", required=True, help="Tenant id")
 @click.option("--admin/--no-admin", default=False)
-def auth_create_user(
-    email: str, password: str, name: str | None, tenant: str | None, admin: bool
-) -> None:
+def auth_create_user(email: str, password: str, name: str | None, tenant: str, admin: bool) -> None:
     """Create a user in the named tenant's auth_users collection."""
     import uuid
     from datetime import UTC
@@ -266,7 +258,7 @@ def auth_create_user(
 
 @auth.command("list-users")
 @click.option("--tenant", required=True)
-def auth_list_users(tenant: str | None) -> None:
+def auth_list_users(tenant: str) -> None:
     """List users in the named tenant."""
     from agent_yoku.storage import tenancy
     from agent_yoku.storage.mongo import auth_users_collection

@@ -24,6 +24,7 @@ from langchain_core.messages import (
 
 from agent_yoku.config import chat_messages_collection, chat_sessions_collection, settings
 
+
 def start_session(title: str | None = None) -> str:
     """Create a new session and return its UUID."""
     sid = str(uuid.uuid4())
@@ -44,10 +45,10 @@ def touch_session(
     session_id: str, *, title: str | None = None, increment_turn: bool = False
 ) -> None:
     now = datetime.now(UTC)
-    set_fields: dict = {"last_active_at": now}
+    set_fields: dict[str, Any] = {"last_active_at": now}
     if title:
         set_fields["title"] = title
-    update: dict = {
+    update: dict[str, Any] = {
         "$set": set_fields,
         "$setOnInsert": {"session_id": session_id, "created_at": now},
     }
@@ -78,6 +79,21 @@ def list_sessions(limit: int = 20) -> list[dict]:
         .limit(int(limit))
     )
     return list(cursor)
+
+
+def get_session(session_id: str) -> dict | None:
+    """Return a session's metadata doc by id, or None if not found."""
+    return chat_sessions_collection().find_one(
+        {"session_id": session_id},
+        {
+            "_id": 0,
+            "session_id": 1,
+            "title": 1,
+            "created_at": 1,
+            "last_active_at": 1,
+            "turn_count": 1,
+        },
+    )
 
 
 def delete_session(session_id: str) -> None:

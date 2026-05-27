@@ -132,7 +132,7 @@ def list_tenant_ids() -> list[str]:
 
     prefix = f"{settings.mongo_db}_"
     names = _client().list_database_names()
-    return sorted(n[len(prefix) :] for n in names if n.startswith(prefix))
+    return sorted(n.removeprefix(prefix) for n in names if n.startswith(prefix))
 
 
 def run_full_pipeline_for_tenant(tenant_id: str) -> dict:

@@ -12,18 +12,20 @@ from __future__ import annotations
 import sys
 import time
 
+from openai import OpenAI
 from pymongo import UpdateOne
 from pymongo.collection import Collection
 
 from agent_yoku.config import ALLOWED_COLLECTIONS, EMBED_MODEL, openai_client
+from agent_yoku.constants import (
+    EMBED_BATCH_SIZE,
+    EMBED_COST_PER_M_TOKENS,
+    EMBED_MAX_CHARS,
+    EMBEDDABLE_COLLECTIONS,
+)
 from agent_yoku.log import get_logger
 
 log = get_logger("embed")
-
-BATCH = 64
-MAX_CHARS = 8000  # text-embedding-3-small input cap is generous; truncate to be safe
-
-EMBEDDABLE_COLLECTIONS = ("jira_tickets", "github_prs")
 
 
 def _parse_args() -> tuple[list[str], bool]:
@@ -42,7 +44,7 @@ def _parse_args() -> tuple[list[str], bool]:
     return coll_names, re_embed_all
 
 
-def _embed_collection(coll: Collection, client, re_embed_all: bool) -> tuple[int, int]:
+def _embed_collection(coll: Collection, client: OpenAI, re_embed_all: bool) -> tuple[int, int]:
     query = (
         {} if re_embed_all else {"$or": [{"embedding": None}, {"embedding": {"$exists": False}}]}
     )
@@ -56,11 +58,11 @@ def _embed_collection(coll: Collection, client, re_embed_all: bool) -> tuple[int
     total = 0
     total_tokens = 0
     for doc in cursor:
-        text = (doc.get("text") or "")[:MAX_CHARS].strip()
+        text = (doc.get("text") or "")[:EMBED_MAX_CHARS].strip()
         if not text:
             continue
         pending.append({"key": doc["key"], "text": text})
-        if len(pending) >= BATCH:
+        if len(pending) >= EMBED_BATCH_SIZE:
             n, tokens = _flush(client, coll, pending)
             total += n
             total_tokens += tokens
@@ -77,7 +79,7 @@ def _embed_collection(coll: Collection, client, re_embed_all: bool) -> tuple[int
     return total, total_tokens
 
 
-def _flush(client, coll: Collection, batch: list[dict]) -> tuple[int, int]:
+def _flush(client: OpenAI, coll: Collection, batch: list[dict]) -> tuple[int, int]:
     resp = client.embeddings.create(
         model=EMBED_MODEL,
         input=[d["text"] for d in batch],
@@ -106,7 +108,7 @@ def main() -> None:
         grand_tokens += tokens
 
     elapsed = time.monotonic() - t0
-    cost = grand_tokens / 1_000_000 * 0.02
+    cost = grand_tokens / 1_000_000 * EMBED_COST_PER_M_TOKENS
     log.info(
         "embed done total=%d tokens=%d est_cost=$%.4f elapsed=%.1fs",
         grand_total,

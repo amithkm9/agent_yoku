@@ -32,7 +32,6 @@ help:
 	@echo "  make api             FastAPI backend on :8000 (--reload)"
 	@echo "  make web             React dev server on :5173 (run web-install first)"
 	@echo "  make web-install     npm install (one-time)"
-	@echo "  make ui              Legacy Streamlit UI on :8501"
 	@echo "  make chat Q='...'    one-shot CLI query"
 	@echo "  make agent-smoke     Run the agent regression suite"
 	@echo "  make retrieval-eval TENANT=asato  Score retrieval on golden queries"
@@ -95,9 +94,6 @@ refresh-all:
 
 status:
 	$(CLI) status
-
-ui:
-	$(CLI) ui
 
 api:
 	$(CLI) api --reload

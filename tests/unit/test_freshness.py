@@ -14,7 +14,7 @@ class _FakeColl:
     def __init__(self, n):
         self._n = n
 
-    def count_documents(self, _filter):
+    def estimated_document_count(self):
         return self._n
 
 

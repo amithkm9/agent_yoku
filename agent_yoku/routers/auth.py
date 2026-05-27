@@ -50,6 +50,22 @@ def _bind_tenant(tenant: str | None) -> None:
     tenancy.set_tenant(normalized)
 
 
+def _authenticate(tenant: str, email: str, password: str) -> TokenResponse:
+    """Validate credentials for a tenant and return a signed JWT."""
+    _bind_tenant(tenant)
+    doc = auth_users_collection().find_one({"email": email.lower()})
+    if not doc or not verify_password(password, doc["password_hash"]):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid credentials")
+    user = _to_user_out(doc)
+    token = make_token(
+        user_id=user.id,
+        email=user.email,
+        tenant_id=user.tenant_id,
+        is_admin=user.is_admin,
+    )
+    return TokenResponse(access_token=token, user=user)
+
+
 @router.post("/login", response_model=TokenResponse)
 async def login(
     form: Annotated[OAuth2PasswordRequestForm, Depends()],
@@ -60,19 +76,7 @@ async def login(
     Uses the OAuth2PasswordRequestForm so it's compatible with the FastAPI
     Swagger 'Authorize' button. JSON variant lives at /auth/login-json.
     """
-    _bind_tenant(tenant)
-    doc = auth_users_collection().find_one({"email": form.username.lower()})
-    if not doc or not verify_password(form.password, doc["password_hash"]):
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid credentials")
-
-    user = _to_user_out(doc)
-    token = make_token(
-        user_id=user.id,
-        email=user.email,
-        tenant_id=user.tenant_id,
-        is_admin=user.is_admin,
-    )
-    return TokenResponse(access_token=token, user=user)
+    return _authenticate(tenant, form.username, form.password)
 
 
 @router.post("/login-json", response_model=TokenResponse)
@@ -81,19 +85,7 @@ async def login_json(
     tenant: str = Query(..., description="Tenant id to authenticate against"),
 ) -> TokenResponse:
     """JSON-bodied variant — the React UI uses this."""
-    _bind_tenant(tenant)
-    doc = auth_users_collection().find_one({"email": req.email.lower()})
-    if not doc or not verify_password(req.password, doc["password_hash"]):
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid credentials")
-
-    user = _to_user_out(doc)
-    token = make_token(
-        user_id=user.id,
-        email=user.email,
-        tenant_id=user.tenant_id,
-        is_admin=user.is_admin,
-    )
-    return TokenResponse(access_token=token, user=user)
+    return _authenticate(tenant, req.email, req.password)
 
 
 @router.post("/signup", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)

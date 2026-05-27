@@ -72,15 +72,3 @@ def main(extra: str | None = None) -> None:
 
     elapsed = time.monotonic() - t0
     log.info("ingest done total=%d new_or_changed=%d elapsed=%.1fs", count, new_or_changed, elapsed)
-
-
-def cli_main(argv: list[str] | None = None) -> None:
-    import sys
-
-    args = sys.argv[1:] if argv is None else argv
-    extra = args[0] if args else None
-    main(extra)
-
-
-if __name__ == "__main__":
-    cli_main()

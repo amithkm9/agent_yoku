@@ -26,8 +26,7 @@ async def create_session(_user: CurrentUser) -> CreateSessionResponse:
 
 @router.get("/{session_id}", response_model=SessionDetail)
 async def get_session(session_id: str, _user: CurrentUser) -> SessionDetail:
-    rows = sess_mod.list_sessions(limit=200)
-    meta = next((r for r in rows if r["session_id"] == session_id), None)
+    meta = sess_mod.get_session(session_id)
     if not meta:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "session not found")
     msgs = sess_mod.load_all_messages(session_id)

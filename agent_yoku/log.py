@@ -97,10 +97,13 @@ class _AgentYokuFormatter(logging.Formatter):
         "session_id": "-",
     }
 
-    def format(self, record: logging.LogRecord) -> str:
+    def _backfill(self, record: logging.LogRecord) -> None:
         for attr, default in self._DEFAULTS.items():
             if not hasattr(record, attr):
                 setattr(record, attr, default)
+
+    def format(self, record: logging.LogRecord) -> str:
+        self._backfill(record)
         return super().format(record)
 
 
@@ -108,9 +111,7 @@ class _JsonFormatter(_AgentYokuFormatter):
     """JSON line formatter — one record per line."""
 
     def format(self, record: logging.LogRecord) -> str:
-        for attr, default in self._DEFAULTS.items():
-            if not hasattr(record, attr):
-                setattr(record, attr, default)
+        self._backfill(record)
         payload = {
             "ts": self.formatTime(record, "%Y-%m-%dT%H:%M:%S%z"),
             "level": record.levelname,

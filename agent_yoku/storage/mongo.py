@@ -9,18 +9,22 @@ Indexes are created lazily on first use; cheap because mongo is idempotent.
 
 from __future__ import annotations
 
+from functools import lru_cache
+
 from pymongo import MongoClient
 from pymongo.collection import Collection
+from pymongo.database import Database
 
 from agent_yoku.config import settings
 from agent_yoku.storage.tenancy import tenant_db_name
 
 
+@lru_cache(maxsize=1)
 def _client() -> MongoClient:
     return MongoClient(settings.mongo_uri, serverSelectionTimeoutMS=3000)
 
 
-def _db():
+def _db() -> Database:
     return _client()[tenant_db_name()]
 
 

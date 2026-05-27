@@ -81,7 +81,7 @@ def create_app() -> FastAPI:
     app.include_router(connectors.router, prefix="/api")
 
     @app.get("/healthz", tags=["health"])
-    async def healthz() -> dict:
+    async def healthz() -> dict[str, str]:
         return {"status": "ok"}
 
     log.info("FastAPI app initialised — routers + middleware wired")

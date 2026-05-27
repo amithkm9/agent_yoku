@@ -167,7 +167,3 @@ class SourceFreshness(BaseModel):
     last_synced_at: datetime | None = None
     synced_ago: str | None = None
     last_sync_status: str | None = None
-
-
-# Forward refs
-TokenResponse.model_rebuild()

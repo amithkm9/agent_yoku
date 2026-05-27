@@ -48,4 +48,4 @@ def test_filter_prs_has_jira_link_true(fake_collections):
 def test_filter_prs_has_jira_link_false(fake_collections):
     tools.filter_prs.invoke({"has_jira_link": False, "limit": 5})
     last_find = fake_collections["github_prs"].find_calls[-1][0]
-    assert last_find["jira_keys"] == []
+    assert last_find["jira_keys"] == {"$in": [[], None]}

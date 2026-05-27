@@ -161,6 +161,7 @@ def _run_jira_sync(tenant_id: str, cfg: JiraConfig) -> None:
 
 
 def _run_github_sync(tenant_id: str, cfg: GithubConfig) -> None:
+    """Synchronous ingest for one tenant. Runs in the background task pool."""
     tenancy.set_tenant(tenant_id)
     try:
         with use_github(cfg):

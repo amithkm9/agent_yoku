@@ -18,5 +18,5 @@ def extract_jira_keys(*sources: str | None) -> list[str]:
         if not s:
             continue
         for m in JIRA_KEY_RE.findall(s):
-            seen.setdefault(m, None)
-    return list(seen.keys())
+            seen[m] = None
+    return list(seen)

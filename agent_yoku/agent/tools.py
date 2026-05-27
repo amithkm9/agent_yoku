@@ -271,9 +271,6 @@ def _feature_rerank(
     return [i for i, _ in scored]
 
 
-_RERANKER = _feature_rerank
-
-
 @tool
 def semantic_search(query: str, k: int = 50, source: str = "both") -> list[dict]:
     """Hybrid (vector + keyword) search over the unified JIRA + GitHub PR index.
@@ -327,7 +324,7 @@ def semantic_search(query: str, k: int = 50, source: str = "both") -> list[dict]
     fused = _rrf_fuse([vec_order, kw_order], weights=[1.0, _KEYWORD_WEIGHT])
 
     window = sorted(fused, key=lambda i: -fused[i])[: max(k, _RERANK_MIN_WINDOW)]
-    ranked = _RERANKER(query, [(i, fused[i]) for i in window], idx)[:k]
+    ranked = _feature_rerank(query, [(i, fused[i]) for i in window], idx)[:k]
 
     out = []
     for i in ranked:
@@ -585,7 +582,7 @@ def filter_prs(
     if has_jira_link is True:
         q["jira_keys"] = {"$ne": []}
     elif has_jira_link is False:
-        q["jira_keys"] = []
+        q["jira_keys"] = {"$in": [[], None]}
     since = _since(since_days)
     if since:
         q["updated"] = {"$gte": since.isoformat()}
@@ -792,14 +789,17 @@ def mongo_query(
 
     capped_limit = max(1, min(int(limit), _MAX_INLINE_RESULTS))
 
+    capped_stages: list[dict] = []
     has_limit = False
     for stage in pipeline:
         if "$limit" in stage:
-            stage["$limit"] = min(int(stage["$limit"]), capped_limit)
+            capped_stages.append({"$limit": min(int(stage["$limit"]), capped_limit)})
             has_limit = True
-            break
+        else:
+            capped_stages.append(stage)
     if not has_limit:
-        pipeline = [*pipeline, {"$limit": capped_limit}]
+        capped_stages = [*capped_stages, {"$limit": capped_limit}]
+    pipeline = capped_stages
 
     try:
         raw = list(coll.aggregate(pipeline))
@@ -861,15 +861,15 @@ def who_knows(topic: str, limit: int = 5) -> list[dict]:
     limit = max(1, min(int(limit), 25))
 
     cards = semantic_search.invoke({"query": topic, "k": 40, "source": "both"})
-    jira_keys = [c["key"] for c in cards if c["source"] == "jira" and c.get("assignee")]
+    jira_card_keys = [c["key"] for c in cards if c["source"] == "jira" and c.get("assignee")]
     gh_keys = [c["key"] for c in cards if c["source"] == "github"]
 
     jira_ts: dict[str, float | None] = {}
-    if jira_keys:
+    if jira_card_keys:
         jira_ts = {
             d["key"]: _to_epoch(d.get("updated"))
             for d in tickets_collection().find(
-                {"key": {"$in": jira_keys}}, {"_id": 0, "key": 1, "updated": 1}
+                {"key": {"$in": jira_card_keys}}, {"_id": 0, "key": 1, "updated": 1}
             )
         }
     contributions: list[tuple[str, str, str, float | None]] = [

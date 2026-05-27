@@ -339,7 +339,7 @@ export function Chat() {
       .me()
       .then(setUser)
       .catch(() => nav("/login"));
-    refresh();
+    void refresh();
   }, []);
 
   useEffect(() => {
@@ -386,7 +386,7 @@ export function Chat() {
       setActiveSession(null);
       setHistory([]);
     }
-    refresh();
+    await refresh();
   }
 
   async function send(text?: string) {
@@ -421,7 +421,7 @@ export function Chat() {
           throw new Error(String(data.detail ?? "stream error"));
         }
       });
-      refresh();
+      await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setHistory((h) => h.slice(0, -1));
@@ -441,7 +441,7 @@ export function Chat() {
         <div className="sidebar-top">
           <AppBrand subtitle="Home" />
         </div>
-        <button className="primary block" onClick={newSession}>
+        <button className="primary block" onClick={() => void newSession()}>
           + New chat
         </button>
         {counts && (
@@ -476,7 +476,7 @@ export function Chat() {
             <li
               key={s.session_id}
               className={s.session_id === activeSession ? "active" : ""}
-              onClick={() => selectSession(s.session_id)}
+              onClick={() => void selectSession(s.session_id)}
             >
               <div className="title">{s.title || "Untitled chat"}</div>
               <div className="meta">
@@ -487,7 +487,7 @@ export function Chat() {
                 className="del"
                 onClick={(e) => {
                   e.stopPropagation();
-                  deleteSession(s.session_id);
+                  void deleteSession(s.session_id);
                 }}
               >
                 ×

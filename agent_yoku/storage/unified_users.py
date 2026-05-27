@@ -11,7 +11,7 @@ Records:
   match_source   "email" | "name" | "jira_only" | "github_only"
 
 Usage:
-    python build_unified_users.py
+    agent-yoku unify-users
 """
 
 from __future__ import annotations
@@ -19,6 +19,7 @@ from __future__ import annotations
 import hashlib
 import re
 import time
+from collections import Counter
 from datetime import UTC, datetime
 
 from agent_yoku.config import (
@@ -192,9 +193,7 @@ def main() -> None:
     if unified:
         coll.insert_many(unified, ordered=False)
 
-    by_source: dict[str, int] = {}
-    for u in unified:
-        by_source[u["match_source"]] = by_source.get(u["match_source"], 0) + 1
+    by_source = Counter(u["match_source"] for u in unified)
 
     elapsed = time.monotonic() - t0
     log.info(

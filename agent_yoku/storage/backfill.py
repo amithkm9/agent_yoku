@@ -35,7 +35,6 @@ def main() -> None:
         ops.append(UpdateMany({"author": login}, {"$set": {"author_email": email}}))
         ops.append(UpdateMany({"assignee": login}, {"$set": {"assignee_email": email}}))
 
-    # Run as a batch — pymongo bulk_write handles UpdateMany.
     result = coll.bulk_write(ops, ordered=False)
     elapsed = time.monotonic() - t0
     log.info(

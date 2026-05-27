@@ -16,6 +16,7 @@ import time
 from pymongo import UpdateOne
 
 from agent_yoku.config import github_prs_collection, tickets_collection
+from agent_yoku.constants import LINK_BATCH_SIZE
 from agent_yoku.log import get_logger
 
 log = get_logger("link_prs")
@@ -63,7 +64,7 @@ def main() -> None:
                     {"$addToSet": {"linked_prs": ref}},
                 )
             )
-        if len(ops) >= 200:
+        if len(ops) >= LINK_BATCH_SIZE:
             jira_coll.bulk_write(ops, ordered=True)
             ops = []
 

@@ -13,7 +13,8 @@ import uuid
 from contextvars import ContextVar
 
 from fastapi import Request
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+from starlette.responses import Response
 
 request_id_context: ContextVar[str] = ContextVar("request_id", default="")
 correlation_id_context: ContextVar[str] = ContextVar("correlation_id", default="")
@@ -21,7 +22,7 @@ tenant_id_context: ContextVar[str] = ContextVar("tenant_id", default="")
 
 
 class RequestContext(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
         correlation_id = request.headers.get("X-Correlation-ID") or str(uuid.uuid4())
         tenant_id = request.headers.get("X-Tenant-ID", "unknown-tenant")

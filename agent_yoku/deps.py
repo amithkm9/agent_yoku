@@ -43,13 +43,14 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 
 def make_token(*, user_id: str, email: str, tenant_id: str, is_admin: bool = False) -> str:
+    now = datetime.now(UTC)
     payload = {
         "sub": user_id,
         "email": email,
         "tenant_id": tenant_id,
         "is_admin": is_admin,
-        "exp": datetime.now(UTC) + timedelta(hours=settings.jwt_ttl_hours),
-        "iat": datetime.now(UTC),
+        "exp": now + timedelta(hours=settings.jwt_ttl_hours),
+        "iat": now,
     }
     return jwt.encode(payload, settings.jwt_secret.get_secret_value(), algorithm="HS256")
 

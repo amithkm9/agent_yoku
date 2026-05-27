@@ -48,7 +48,7 @@ def source_freshness() -> list[dict]:
         rows.append(
             {
                 "source": name,
-                "count": coll().count_documents({}),
+                "count": coll().estimated_document_count(),
                 "last_synced_at": ts.isoformat() if ts else None,
                 "synced_ago": _ago((now - ts).total_seconds()) if ts else "never",
                 "last_sync_status": cfg.get("last_sync_status"),

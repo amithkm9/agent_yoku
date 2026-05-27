@@ -104,7 +104,7 @@ function errorMessage(status: number, statusText: string, text: string): string 
 
 async function request<T>(
   path: string,
-  init: RequestInit & { json?: unknown; tenantQuery?: boolean } = {}
+  init: RequestInit & { json?: unknown } = {}
 ): Promise<T> {
   const headers = new Headers(init.headers);
   if (init.json !== undefined) {
@@ -113,15 +113,7 @@ async function request<T>(
   const token = getToken();
   if (token) headers.set("Authorization", `Bearer ${token}`);
 
-  let url = path;
-  if (init.tenantQuery) {
-    const tenant = getTenant();
-    if (tenant) {
-      url += (url.includes("?") ? "&" : "?") + "tenant=" + encodeURIComponent(tenant);
-    }
-  }
-
-  const r = await fetch(url, {
+  const r = await fetch(path, {
     ...init,
     headers,
     body: init.json !== undefined ? JSON.stringify(init.json) : init.body,
@@ -158,9 +150,6 @@ export const api = {
     request<SessionSummary & { messages: PersistedMessage[] }>(`/api/sessions/${id}`),
   deleteSession: (id: string) =>
     request<void>(`/api/sessions/${id}`, { method: "DELETE" }),
-
-  postChat: (session_id: string, query: string) =>
-    request<ChatResponse>("/api/chat", { method: "POST", json: { session_id, query } }),
 
   // Streamed turn: invokes onEvent("tool"|"answer"|"error", data) as SSE arrives.
   postChatStream: async (
