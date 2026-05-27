@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from agent_yoku.config import settings
 from agent_yoku.log import get_logger
-from agent_yoku.middleware import RequestContext
+from agent_yoku.middleware import RateLimit, RequestContext
 from agent_yoku.routers import auth, chat, connectors, sessions, stats
 
 log = get_logger("api.main")
@@ -36,6 +36,14 @@ def create_app() -> FastAPI:
     # Request-correlation middleware must run before CORS so log records
     # emitted during preflight responses still carry the IDs.
     app.add_middleware(RequestContext)
+
+    if settings.rate_limit_enabled:
+        app.add_middleware(
+            RateLimit,
+            limit=settings.rate_limit_requests,
+            window_s=settings.rate_limit_window_s,
+            exempt_paths=("/healthz", "/docs", "/openapi.json", "/redoc"),
+        )
 
     # Vite dev server runs on 5173; allow it + same-origin.
     app.add_middleware(

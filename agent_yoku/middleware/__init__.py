@@ -1,5 +1,6 @@
 """HTTP middleware for the FastAPI app."""
 
+from agent_yoku.middleware.rate_limit import RateLimit
 from agent_yoku.middleware.request_context import (
     RequestContext,
     correlation_id_context,
@@ -8,6 +9,7 @@ from agent_yoku.middleware.request_context import (
 )
 
 __all__ = [
+    "RateLimit",
     "RequestContext",
     "correlation_id_context",
     "request_id_context",

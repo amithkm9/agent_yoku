@@ -72,6 +72,11 @@ class Settings(BaseSettings):
     )
     jwt_ttl_hours: int = 24
 
+    # Rate limiting (per client IP, in-process fixed window).
+    rate_limit_enabled: bool = True
+    rate_limit_requests: int = 120
+    rate_limit_window_s: int = 60
+
     @property
     def is_default_jwt_secret(self) -> bool:
         """True when the built-in dev secret is still in use (unsafe in prod)."""
