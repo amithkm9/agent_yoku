@@ -158,7 +158,8 @@ def _configure() -> None:
     root.addHandler(fh)
     root.addHandler(sh)
 
-    logging.getLogger("httpx").setLevel(logging.WARNING)
+    for noisy in ("httpx", "pymongo", "apscheduler", "langchain", "openai", "uvicorn.access"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
 
     _maybe_attach_sentry(root)
     _configured = True

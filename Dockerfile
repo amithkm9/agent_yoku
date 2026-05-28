@@ -8,7 +8,10 @@ ENV POETRY_VERSION=1.8.4 \
     POETRY_HOME=/opt/poetry \
     POETRY_NO_INTERACTION=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    PIP_PREFER_BINARY=1 \
+    PIP_DEFAULT_TIMEOUT=300 \
+    POETRY_REQUESTS_TIMEOUT=300
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         curl build-essential \
@@ -26,7 +29,10 @@ RUN python -m venv /opt/venv
 ENV VIRTUAL_ENV="/opt/venv" \
     PATH="/opt/venv/bin:${PATH}"
 RUN poetry config virtualenvs.create false \
-    && poetry install --no-root --without dev
+    && poetry install --no-root --without dev \
+    && /opt/venv/bin/pip uninstall -y pip setuptools wheel 2>/dev/null || true \
+    && find /opt/venv -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true \
+    && find /opt/venv -name "*.pyc" -o -name "*.pyo" -delete 2>/dev/null || true
 
 
 # ---------- Runtime ----------

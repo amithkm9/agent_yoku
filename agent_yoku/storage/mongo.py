@@ -99,3 +99,7 @@ def get_collection(name: str) -> Collection:
     if name not in ALLOWED_COLLECTIONS:
         raise ValueError(f"Unknown collection {name!r}. Allowed: {sorted(ALLOWED_COLLECTIONS)}")
     return ALLOWED_COLLECTIONS[name]()
+
+
+def ping() -> None:
+    _client().admin.command("ping")

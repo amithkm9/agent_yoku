@@ -13,14 +13,17 @@ from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponen
 
 TRANSIENT = (requests.ConnectionError, requests.Timeout)
 
+RETRY_CODES: frozenset[int] = frozenset({429, 500, 502, 503, 504})
+FATAL_CODES: frozenset[int] = frozenset({401, 403, 404})
+
 
 def is_retryable(exc: BaseException, source: str, log: logging.Logger) -> bool:
-    """True iff a transient connection error or a retry-worthy HTTP code (5xx, 429)."""
+    """True iff a transient connection error or a retry-worthy HTTP code."""
     if isinstance(exc, TRANSIENT):
         return True
     if isinstance(exc, requests.HTTPError) and exc.response is not None:
         code = exc.response.status_code
-        if code >= 500 or code == 429:
+        if code in RETRY_CODES:
             log.warning("transient %s error status=%s", source, code)
             return True
     return False

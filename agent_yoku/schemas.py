@@ -6,7 +6,7 @@ import re
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 # GitHub org/login slugs: alphanumerics joined by single hyphens, max 39 chars.
 # Mirrors GitHub's own account-name rules so we reject values that can only 404.
@@ -39,7 +39,9 @@ def normalize_github_org(raw: str) -> str:
 
 
 class LoginRequest(BaseModel):
-    email: str
+    model_config = ConfigDict(extra="forbid")
+
+    email: EmailStr
     password: str
 
 
@@ -74,8 +76,10 @@ class CreateSessionResponse(BaseModel):
 
 
 class ChatRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     session_id: str
-    query: str
+    query: str = Field(min_length=1, max_length=4000)
 
 
 class ToolCallSummary(BaseModel):
@@ -95,6 +99,8 @@ class JiraConfigIn(BaseModel):
     """Inbound JIRA config. `token` is optional on edit — blank means
     'keep the previously stored token'. Required on first-time setup."""
 
+    model_config = ConfigDict(extra="forbid")
+
     base_url: str
     email: str
     token: str | None = None
@@ -103,6 +109,8 @@ class JiraConfigIn(BaseModel):
 
 class GithubConfigIn(BaseModel):
     """Inbound GitHub config. See `JiraConfigIn.token` for blank-token semantics."""
+
+    model_config = ConfigDict(extra="forbid")
 
     api_base: str = "https://api.github.com"
     token: str | None = None

@@ -15,6 +15,7 @@ on the config doc, never allowed to abort the rest of the run.
 
 from __future__ import annotations
 
+import gc
 import sys
 import traceback
 from collections.abc import Callable, Iterator
@@ -168,4 +169,6 @@ def run_all_tenants() -> None:
             run_full_pipeline_for_tenant(tenant_id)
         except Exception:
             log.exception("auto-sync pipeline crashed for tenant=%s", tenant_id)
+        finally:
+            gc.collect()
     log.info("auto-sync run complete")

@@ -8,10 +8,13 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from agent_yoku.config import settings
 from agent_yoku.log import get_logger
 from agent_yoku.middleware import RateLimit, RequestContext
+from agent_yoku.middleware.exception_handler import register_exception_handlers
+from agent_yoku.middleware.request_logger import RequestLogger
 from agent_yoku.routers import auth, chat, connectors, sessions, stats
 
 log = get_logger("api.main")
@@ -53,9 +56,10 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # Request-correlation middleware must run before CORS so log records
-    # emitted during preflight responses still carry the IDs.
+    register_exception_handlers(app)
+
     app.add_middleware(RequestContext)
+    app.add_middleware(RequestLogger)
 
     if settings.rate_limit_enabled:
         app.add_middleware(
@@ -82,6 +86,15 @@ def create_app() -> FastAPI:
 
     @app.get("/healthz", tags=["health"])
     async def healthz() -> dict[str, str]:
+        from agent_yoku.storage.mongo import ping
+
+        try:
+            ping()
+        except Exception:
+            log.warning("healthz: mongo unreachable")
+            return JSONResponse(  # type: ignore[return-value]
+                {"status": "degraded", "mongo": "unreachable"}, status_code=503
+            )
         return {"status": "ok"}
 
     log.info("FastAPI app initialised — routers + middleware wired")
