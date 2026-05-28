@@ -51,7 +51,7 @@ def _index_key() -> str:
 
 def _to_epoch(value: str | datetime | None) -> float | None:
     """Parse an ISO-8601 timestamp (JIRA/GitHub `updated`) to epoch seconds, or
-    None if absent/unparseable — callers treat None as 'age unknown'."""
+    None if absent/unparsable — callers treat None as 'age unknown'."""
     if value is None or value == "":
         return None
     try:
@@ -362,17 +362,26 @@ def _rerank_order(
     """
     head, tail = window[: settings.rerank_top_n], window[settings.rerank_top_n :]
     scored_ze = rerank(query, _rerank_texts(head, idx))
-    if scored_ze is None:
+    if not scored_ze:  # None (disabled/error) or [] (empty ZE response)
         return _feature_rerank(query, [(i, fused[i]) for i in window], idx, adjacency)
 
     now = time.time()
     docs = idx["docs"]
+    seen_local: set[int] = set()
     boosted = []
     for local_i, relevance in scored_ze:
+        # Skip negative, out-of-range, or duplicate indices from a malformed ZE response.
+        if local_i < 0 or local_i >= len(head) or local_i in seen_local:
+            continue
+        seen_local.add(local_i)
         i = head[local_i]
         adj = adjacency.get(i, 0.0)
         rec = _recency_factor(docs[i].get("updated_ts"), now)
         boosted.append((i, relevance * (1.0 + _W_ADJ * adj + _W_RECENCY * rec)))
+    # Guard: if ZeroEntropy omits any head items (unexpected), append them at the bottom.
+    for local_i in range(len(head)):
+        if local_i not in seen_local:
+            boosted.append((head[local_i], 0.0))
     boosted.sort(key=lambda x: -x[1])
     return [i for i, _ in boosted] + tail
 

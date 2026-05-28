@@ -62,3 +62,17 @@ def test_returns_none_on_api_error(monkeypatch):
 
     _stub_client(monkeypatch, rerank_impl=_boom)
     assert rr.rerank("q", ["a", "b"]) is None
+
+
+@pytest.mark.unit
+def test_passes_latency_fast_to_client(monkeypatch):
+    _enable(monkeypatch)
+    captured: dict = {}
+
+    def _capture(**kw):
+        captured.update(kw)
+        return _Response([_Result(0, 0.9)])
+
+    _stub_client(monkeypatch, rerank_impl=_capture)
+    rr.rerank("q", ["a"])
+    assert captured.get("latency") == "fast"

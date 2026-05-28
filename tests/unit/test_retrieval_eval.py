@@ -72,3 +72,23 @@ def test_empty_report_is_zero_not_crash():
     assert report.n == 0
     assert report.hit_rate == 0.0
     assert report.mrr == 0.0
+
+
+@pytest.mark.unit
+def test_aggregate_metrics_across_multiple_cases():
+    # Case 1: hit at rank 1 (MRR contribution = 1.0)
+    # Case 2: hit at rank 2 (MRR contribution = 0.5)
+    # Case 3: miss        (MRR contribution = 0.0)
+    # hit_rate = 2/3, mean_recall = 2/3, MRR = (1 + 0.5 + 0) / 3
+    cases = [
+        EvalCase(query="q1", expected_keys=("A",)),
+        EvalCase(query="q2", expected_keys=("B",)),
+        EvalCase(query="q3", expected_keys=("C",)),
+    ]
+    search = _fake_search({"q1": ["A", "X"], "q2": ["X", "B"], "q3": ["X", "Y"]})
+    report = evaluate(cases, search)
+
+    assert report.n == 3
+    assert report.hit_rate == pytest.approx(2 / 3)
+    assert report.mean_recall == pytest.approx(2 / 3)
+    assert report.mrr == pytest.approx((1.0 + 0.5 + 0.0) / 3)
