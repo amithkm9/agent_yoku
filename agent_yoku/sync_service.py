@@ -26,8 +26,10 @@ from agent_yoku.config import settings
 from agent_yoku.connectors._runtime import (
     github_config_from_dict,
     jira_config_from_dict,
+    slack_config_from_dict,
     use_github,
     use_jira,
+    use_slack,
 )
 from agent_yoku.log import get_logger
 from agent_yoku.storage import connector_configs as cc
@@ -76,9 +78,19 @@ def _ingest_github(decrypted: dict) -> None:
         users_mod.main()
 
 
+def _ingest_slack(decrypted: dict) -> None:
+    with use_slack(slack_config_from_dict(decrypted)):
+        from agent_yoku.connectors.slack import ingest as ingest_mod
+        from agent_yoku.connectors.slack import users_ingest as users_mod
+
+        ingest_mod.main()
+        users_mod.main()
+
+
 _INGEST_FNS: dict[str, Callable[[dict], None]] = {
     "jira": _ingest_jira,
     "github": _ingest_github,
+    "slack": _ingest_slack,
 }
 
 

@@ -15,13 +15,15 @@ from agent_yoku.config import AGENT_MODEL_ID
 
 MAIN_PROMPT = """You are the agent_yoku research orchestrator.
 
-You answer questions about Asato's work by reasoning over two data sources:
+You answer questions about Asato's work by reasoning over three data sources:
 - **JIRA tickets** (project AS, e.g. AS-4163) — what we plan to do.
 - **GitHub PRs** (e.g. AsatoCorp/agent-svc#173) — code that does it.
+- **Slack messages** — what the team is discussing across channels.
 
-The two sources cross-link via `jira_keys` (PRs that mention AS-XXXX) and
-`linked_prs` (the reverse on JIRA tickets). Use this to compose multi-source
-answers.
+Sources cross-link: PRs reference JIRA tickets via `jira_keys`; Slack messages
+that mention ticket keys are linked via `jira_keys` too. Use `semantic_search`
+with `source="slack"` for channel discussions, or `source="both"` to search
+everything at once.
 
 ## How to work
 
@@ -42,7 +44,7 @@ answers.
 - `semantic_search(query, k=50, source=...)` — by meaning, across both sources.
 - `get(key)` — point lookup; auto-routes JIRA ticket vs PR by key shape.
 - `linked(key)` — cross-source link hop; JIRA key → PRs, PR key → JIRA tickets.
-- `filter_jira / filter_prs` — exact filters on common fields.
+- `filter_jira / filter_prs / filter_slack` — exact filters on common fields.
 - `list_repos()` — repo inventory.
 - `resolve_user(query)` — name/login/email → unified user record.
 - `who_knows(topic)` — people behind a topic (experts), ranked and merged

@@ -47,6 +47,11 @@ class Settings(BaseSettings):
     github_api_base: str = "https://api.github.com"
     github_pr_lookback_days: int = 365
 
+    slack_bot_token: SecretStr | None = None
+    slack_workspace: str | None = None
+    slack_lookback_days: int = 90
+    slack_channel_types: str = "public_channel"
+
     openai_api_key: SecretStr
     openai_embed_model: str = Field(default="text-embedding-3-small")
     openai_chat_model: str = Field(default="gpt-5.4-mini")

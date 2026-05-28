@@ -134,6 +134,59 @@ class GithubConfigIn(BaseModel):
         return org
 
 
+_VALID_CHANNEL_TYPES = frozenset({"public_channel", "private_channel", "mpim", "im"})
+
+
+def normalize_slack_workspace(raw: str) -> str:
+    """Extract bare workspace slug from whatever the user pastes.
+
+    Accepts: 'acme', 'acme.slack.com', 'https://acme.slack.com', 'https://acme.slack.com/'.
+    Returns '' when nothing slug-like remains.
+    """
+    value = raw.strip().rstrip("/")
+    # strip scheme
+    for prefix in ("https://", "http://"):
+        if value.lower().startswith(prefix):
+            value = value[len(prefix):]
+    # strip .slack.com suffix
+    if value.lower().endswith(".slack.com"):
+        value = value[: -len(".slack.com")]
+    # take only the first path segment (ignore any trailing path)
+    value = value.split("/")[0].split(".")[0]
+    return value
+
+
+class SlackConfigIn(BaseModel):
+    """Inbound Slack config. `bot_token` is optional on edit — blank means keep existing."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    workspace: str
+    bot_token: str | None = None
+    lookback_days: int = 90
+    channel_types: str = "public_channel"
+
+    @field_validator("workspace")
+    @classmethod
+    def _normalize_workspace(cls, value: str) -> str:
+        slug = normalize_slack_workspace(value)
+        if not slug:
+            raise ValueError("workspace must be a Slack workspace slug, e.g. 'acme'")
+        return slug
+
+    @field_validator("channel_types")
+    @classmethod
+    def _validate_channel_types(cls, value: str) -> str:
+        parts = [p.strip() for p in value.split(",") if p.strip()]
+        invalid = [p for p in parts if p not in _VALID_CHANNEL_TYPES]
+        if invalid:
+            raise ValueError(
+                f"Invalid channel type(s): {invalid}. "
+                f"Valid values: {sorted(_VALID_CHANNEL_TYPES)}"
+            )
+        return ",".join(parts)
+
+
 class ConnectorGuide(BaseModel):
     source: str
     display_name: str
@@ -164,6 +217,8 @@ class CountsResponse(BaseModel):
     jira_users: int
     github_prs: int
     github_users: int
+    slack_messages: int
+    slack_users: int
     unified_users: int
     chat_sessions: int
     chat_messages: int

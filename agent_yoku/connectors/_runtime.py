@@ -29,6 +29,8 @@ from dataclasses import dataclass
 
 from agent_yoku.config import settings
 
+_SLACK_LOOKBACK_DAYS_DEFAULT = 90
+
 
 @dataclass(frozen=True)
 class JiraConfig:
@@ -54,8 +56,17 @@ class GithubConfig:
         return self.api_base.rstrip("/")
 
 
+@dataclass(frozen=True)
+class SlackConfig:
+    bot_token: str
+    workspace: str
+    lookback_days: int = _SLACK_LOOKBACK_DAYS_DEFAULT
+    channel_types: str = "public_channel"
+
+
 _jira: ContextVar[JiraConfig | None] = ContextVar("jira_config", default=None)
 _github: ContextVar[GithubConfig | None] = ContextVar("github_config", default=None)
+_slack: ContextVar[SlackConfig | None] = ContextVar("slack_config", default=None)
 
 
 def _env_jira_config() -> JiraConfig:
@@ -86,6 +97,31 @@ def current_github_config() -> GithubConfig:
     return _github.get() or _env_github_config()
 
 
+def _env_slack_config() -> SlackConfig | None:
+    token = settings.slack_bot_token
+    workspace = settings.slack_workspace
+    if not token or not workspace:
+        return None
+    return SlackConfig(
+        bot_token=token.get_secret_value(),
+        workspace=workspace,
+        lookback_days=settings.slack_lookback_days,
+        channel_types=settings.slack_channel_types,
+    )
+
+
+def current_slack_config() -> SlackConfig:
+    cfg = _slack.get()
+    if cfg is not None:
+        return cfg
+    env_cfg = _env_slack_config()
+    if env_cfg is not None:
+        return env_cfg
+    raise RuntimeError(
+        "no Slack config bound — call use_slack(cfg) first or set SLACK_BOT_TOKEN + SLACK_WORKSPACE"
+    )
+
+
 @contextmanager
 def use_jira(cfg: JiraConfig) -> Iterator[None]:
     token = _jira.set(cfg)
@@ -104,6 +140,15 @@ def use_github(cfg: GithubConfig) -> Iterator[None]:
         _github.reset(token)
 
 
+@contextmanager
+def use_slack(cfg: SlackConfig) -> Iterator[None]:
+    token = _slack.set(cfg)
+    try:
+        yield
+    finally:
+        _slack.reset(token)
+
+
 def jira_config_from_dict(d: dict) -> JiraConfig:
     return JiraConfig(
         base_url=(d.get("base_url") or "").rstrip("/"),
@@ -119,4 +164,13 @@ def github_config_from_dict(d: dict) -> GithubConfig:
         token=d["token"],
         org=d["org"],
         pr_lookback_days=int(d.get("pr_lookback_days") or settings.github_pr_lookback_days),
+    )
+
+
+def slack_config_from_dict(d: dict) -> SlackConfig:
+    return SlackConfig(
+        bot_token=d["bot_token"],
+        workspace=d["workspace"],
+        lookback_days=int(d.get("lookback_days") or _SLACK_LOOKBACK_DAYS_DEFAULT),
+        channel_types=d.get("channel_types") or "public_channel",
     )

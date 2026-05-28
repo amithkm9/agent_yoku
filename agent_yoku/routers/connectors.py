@@ -23,10 +23,13 @@ from agent_yoku.agent.tools import invalidate_index
 from agent_yoku.connectors._runtime import (
     GithubConfig,
     JiraConfig,
+    SlackConfig,
     github_config_from_dict,
     jira_config_from_dict,
+    slack_config_from_dict,
     use_github,
     use_jira,
+    use_slack,
 )
 from agent_yoku.connectors.base import list_connectors as discover_connectors
 from agent_yoku.deps import AdminUser
@@ -37,6 +40,7 @@ from agent_yoku.schemas import (
     ConnectorSyncResponse,
     GithubConfigIn,
     JiraConfigIn,
+    SlackConfigIn,
 )
 from agent_yoku.storage import connector_configs as cc
 from agent_yoku.storage import tenancy
@@ -134,6 +138,23 @@ async def upsert_github(payload: GithubConfigIn, admin: AdminUser) -> ConnectorS
     return _status_doc("github", cc.get_config("github"))
 
 
+@router.put("/slack", response_model=ConnectorStatus)
+async def upsert_slack(payload: SlackConfigIn, admin: AdminUser) -> ConnectorStatus:
+    """Store Slack creds for the current tenant. Bot token is encrypted at rest."""
+    bot_token = _resolve_token("slack", payload.bot_token)
+    cc.upsert_config(
+        name="slack",
+        config={
+            "workspace": payload.workspace,
+            "lookback_days": payload.lookback_days,
+            "channel_types": payload.channel_types,
+        },
+        secrets={"bot_token": bot_token},
+        user_id=admin.id,
+    )
+    return _status_doc("slack", cc.get_config("slack"))
+
+
 @router.delete("/{name}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def delete_connector(name: str, _: AdminUser) -> None:
     if name not in cc.SUPPORTED_CONNECTORS:
@@ -179,9 +200,28 @@ def _run_github_sync(tenant_id: str, cfg: GithubConfig) -> None:
         )
 
 
+def _run_slack_sync(tenant_id: str, cfg: SlackConfig) -> None:
+    tenancy.set_tenant(tenant_id)
+    try:
+        with use_slack(cfg):
+            from agent_yoku.connectors.slack import ingest as ingest_mod
+            from agent_yoku.connectors.slack import users_ingest as users_mod
+
+            ingest_mod.main()
+            users_mod.main()
+        cc.mark_synced("slack", ok=True)
+        invalidate_index(tenant_id)
+    except Exception as e:
+        log.exception("slack sync failed for tenant=%s", tenant_id)
+        cc.mark_synced(
+            "slack", ok=False, error=f"{type(e).__name__}: {e}\n{traceback.format_exc(limit=3)}"
+        )
+
+
 _SYNC_FNS = {
     "jira": (_run_jira_sync, jira_config_from_dict),
     "github": (_run_github_sync, github_config_from_dict),
+    "slack": (_run_slack_sync, slack_config_from_dict),
 }
 
 

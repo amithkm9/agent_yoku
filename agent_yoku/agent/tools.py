@@ -13,6 +13,8 @@ import re
 import threading
 import time
 from datetime import UTC, datetime, timedelta
+
+from langchain_core.tools import ToolException
 from functools import lru_cache
 from typing import Any
 
@@ -30,6 +32,7 @@ from agent_yoku.config import (
     tickets_collection,
     unified_users_collection,
 )
+from agent_yoku.storage.mongo import slack_messages_collection
 from agent_yoku.log import get_logger
 from agent_yoku.storage.freshness import source_freshness
 from agent_yoku.storage.tenancy import current_tenant
@@ -84,7 +87,11 @@ def _load_index() -> dict[str, Any]:
     for d in gh:
         d["source"] = "github"
 
-    docs = jira + gh
+    slack = list(slack_messages_collection().find({"embedding": {"$ne": None, "$exists": True}}, proj))
+    for d in slack:
+        d["source"] = "slack"
+
+    docs = jira + gh + slack
     if not docs:
         raise RuntimeError("no embedded docs found; run ingest + embed first")
 
@@ -96,7 +103,7 @@ def _load_index() -> dict[str, Any]:
         # Keys of the cross-source items this doc links to — a PR's referenced
         # tickets, or the PRs linked onto a ticket. Doubles as the corroboration
         # flag and as the lookup for query-aware adjacency reranking.
-        if d["source"] == "github":
+        if d["source"] in ("github", "slack"):
             d["link_keys"] = list(d.get("jira_keys") or [])
         else:
             d["link_keys"] = [
@@ -119,7 +126,7 @@ def _load_index() -> dict[str, Any]:
 
     key_to_idx = {d["key"]: i for i, d in enumerate(docs)}
 
-    log.info("index loaded jira=%d github=%d", len(jira), len(gh))
+    log.info("index loaded jira=%d github=%d slack=%d", len(jira), len(gh), len(slack))
     return {
         "docs": docs,
         "matrix": matrix,
@@ -199,8 +206,8 @@ def _doc_keyword_text(doc: dict) -> str:
         [
             str(doc.get("key") or ""),
             str(doc.get("summary") or ""),
-            str(doc.get("repo") or ""),
-            str(doc.get("assignee") or ""),
+            str(doc.get("repo") or doc.get("channel_name") or ""),
+            str(doc.get("assignee") or doc.get("author_name") or ""),
             " ".join(str(x) for x in (doc.get("jira_keys") or [])),
         ]
     )
@@ -413,8 +420,8 @@ def semantic_search(query: str, k: int = 50, source: str = "both") -> list[dict]
     if not query or not query.strip():
         raise ValueError("query must not be empty")
     k = max(1, min(int(k), 200))
-    if source not in ("jira", "github", "both"):
-        raise ValueError(f"source must be jira/github/both, got {source!r}")
+    if source not in ("jira", "github", "slack", "both"):
+        raise ValueError(f"source must be jira/github/slack/both, got {source!r}")
 
     idx = _index()
     docs = idx["docs"]
@@ -544,11 +551,11 @@ def get(key: str) -> dict:
     if _is_pr_key(key):
         doc = github_prs_collection().find_one({"key": key}, {"embedding": 0})
         if not doc:
-            raise ValueError(f"PR {key!r} not found")
+            raise ToolException(f"PR {key!r} not found")
         return _clean(doc)
     doc = tickets_collection().find_one({"key": key}, {"embedding": 0})
     if not doc:
-        raise ValueError(f"JIRA ticket {key!r} not found")
+        raise ToolException(f"JIRA ticket {key!r} not found")
     return _clean(doc)
 
 
@@ -717,6 +724,62 @@ def filter_prs(
                 "updated": 1,
                 "url": 1,
                 "merged": 1,
+            },
+        )
+        .sort("updated", -1)
+        .limit(int(limit))
+    )
+    return [_clean(d) for d in cursor]
+
+
+@tool
+def filter_slack(
+    channel: str | None = None,
+    author: str | None = None,
+    has_jira_link: bool | None = None,
+    since_days: int | None = None,
+    limit: int = 20,
+) -> list[dict]:
+    """Filter Slack messages by channel, author, JIRA link presence, or recency.
+
+    Args:
+        channel: channel name without the # prefix, e.g. 'engineering'.
+        author: display name, GitHub login, or email — auto-resolved via unified_users.
+        has_jira_link: True to return only messages that mention a JIRA ticket key.
+        since_days: only messages from the last N days.
+        limit: max results, default 20.
+    """
+    q: dict = {}
+    if channel:
+        q["channel_name"] = channel
+    if author:
+        u = _resolve_user_doc(author)
+        slack_name = None
+        if u:
+            identities = u.get("slack") or {}
+            slack_name = identities.get("display_name")
+        q["author_name"] = slack_name or author
+    if has_jira_link is True:
+        q["jira_keys"] = {"$ne": []}
+    elif has_jira_link is False:
+        q["jira_keys"] = {"$in": [[], None]}
+    since = _since(since_days)
+    if since:
+        q["updated"] = {"$gte": since.isoformat()}
+    cursor = (
+        slack_messages_collection()
+        .find(
+            q,
+            {
+                "key": 1,
+                "channel_name": 1,
+                "author_name": 1,
+                "summary": 1,
+                "jira_keys": 1,
+                "thread_ts": 1,
+                "is_thread_reply": 1,
+                "updated": 1,
+                "url": 1,
             },
         )
         .sort("updated", -1)
@@ -1076,6 +1139,7 @@ ALL_TOOLS = [
     get,
     filter_jira,
     filter_prs,
+    filter_slack,
     linked,
     list_repos,
     data_freshness,

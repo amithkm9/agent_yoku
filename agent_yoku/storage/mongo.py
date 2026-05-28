@@ -86,12 +86,29 @@ def auth_users_collection() -> Collection:
     return coll
 
 
+def slack_messages_collection() -> Collection:
+    coll = _db()["slack_messages"]
+    coll.create_index("key", unique=True)
+    coll.create_index("channel_id")
+    coll.create_index([("updated", -1)])
+    return coll
+
+
+def slack_users_collection() -> Collection:
+    coll = _db()["slack_users"]
+    coll.create_index("user_id", unique=True)
+    coll.create_index("email", sparse=True)
+    return coll
+
+
 ALLOWED_COLLECTIONS = {
     "jira_tickets": tickets_collection,
     "users": users_collection,
     "github_prs": github_prs_collection,
     "github_users": github_users_collection,
     "unified_users": unified_users_collection,
+    "slack_messages": slack_messages_collection,
+    "slack_users": slack_users_collection,
 }
 
 

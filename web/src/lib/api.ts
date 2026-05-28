@@ -56,6 +56,8 @@ export interface Counts {
   jira_users: number;
   github_prs: number;
   github_users: number;
+  slack_messages: number;
+  slack_users: number;
   unified_users: number;
   chat_sessions: number;
   chat_messages: number;
@@ -206,6 +208,8 @@ export const api = {
     request<ConnectorStatus>("/api/connectors/jira", { method: "PUT", json: cfg }),
   saveGithubConfig: (cfg: GithubConfigIn) =>
     request<ConnectorStatus>("/api/connectors/github", { method: "PUT", json: cfg }),
+  saveSlackConfig: (cfg: SlackConfigIn) =>
+    request<ConnectorStatus>("/api/connectors/slack", { method: "PUT", json: cfg }),
   deleteConnector: (name: string) =>
     request<void>(`/api/connectors/${name}`, { method: "DELETE" }),
   syncConnector: (name: string) =>
@@ -220,6 +224,14 @@ export interface JiraConfigIn {
   /** Blank/omitted on edit = keep existing stored token. Required on first connect. */
   token?: string;
   project: string;
+}
+
+export interface SlackConfigIn {
+  workspace: string;
+  /** Blank/omitted on edit = keep existing stored token. Required on first connect. */
+  bot_token?: string;
+  lookback_days: number;
+  channel_types: string;
 }
 
 export interface GithubConfigIn {

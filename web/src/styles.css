@@ -728,6 +728,59 @@ button.link {
   color: var(--text-muted);
 }
 
+.hero-counts {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+.hero-count-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.9rem 1.4rem;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  min-width: 110px;
+  transition: border-color 0.15s;
+}
+.hero-count-item:hover {
+  border-color: var(--text-muted);
+}
+.hero-count-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  margin-bottom: 0.1rem;
+}
+.hero-count-icon svg {
+  width: 18px;
+  height: 18px;
+}
+.hero-count-icon--jira  { background: #e8f0fe; color: #1a73e8; }
+.hero-count-icon--github { background: #f0f0f0; color: #24292e; }
+.hero-count-icon--slack  { background: #fef0f6; color: #e01e5a; }
+.hero-count-item strong {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1;
+}
+.hero-count-item > span {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
 /* ---------- Settings page ---------- */
 .settings-shell {
   display: flex;

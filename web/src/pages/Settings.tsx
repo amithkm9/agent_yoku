@@ -5,11 +5,12 @@ import {
   ConnectorStatus,
   GithubConfigIn,
   JiraConfigIn,
+  SlackConfigIn,
   User,
 } from "../lib/api";
 import { AppBrand, SettingsIcon } from "../components/AppChrome";
 
-type EditingName = "jira" | "github" | null;
+type EditingName = "jira" | "github" | "slack" | null;
 
 export function Settings() {
   const nav = useNavigate();
@@ -129,21 +130,21 @@ export function Settings() {
               <JiraEditor
                 initial={activeConnector}
                 onCancel={() => setEditing(null)}
-                onSaved={async () => {
-                  setEditing(null);
-                  await refresh();
-                }}
+                onSaved={async () => { setEditing(null); await refresh(); }}
               />
-            ) : (
+            ) : activeConnector.name === "github" ? (
               <GithubEditor
                 initial={activeConnector}
                 onCancel={() => setEditing(null)}
-                onSaved={async () => {
-                  setEditing(null);
-                  await refresh();
-                }}
+                onSaved={async () => { setEditing(null); await refresh(); }}
               />
-            )}
+            ) : activeConnector.name === "slack" ? (
+              <SlackEditor
+                initial={activeConnector}
+                onCancel={() => setEditing(null)}
+                onSaved={async () => { setEditing(null); await refresh(); }}
+              />
+            ) : null}
           </aside>
         </section>
       </main>
@@ -278,6 +279,23 @@ function ConnectorLogo({ name }: { name: string }) {
           <path d="M4 9.2 11.2 2H22l-7.2 7.2H4Z" fill="currentColor" />
           <path d="M8.2 13.4 15.4 6.2h4.2L12.4 13.4H8.2Z" fill="currentColor" opacity="0.75" />
           <path d="M2 11.6h10.8L20 18.8H9.2L2 11.6Z" fill="currentColor" opacity="0.55" />
+        </svg>
+      </span>
+    );
+  }
+
+  if (name === "slack") {
+    return (
+      <span className="connector-logo slack" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none">
+          <path d="M9 3a2 2 0 1 0 0 4h2V3H9Z" fill="currentColor" opacity="0.9"/>
+          <path d="M3 9a2 2 0 1 0 4 0V7H3v2Z" fill="currentColor" opacity="0.7"/>
+          <path d="M15 21a2 2 0 1 0 0-4h-2v4h2Z" fill="currentColor" opacity="0.9"/>
+          <path d="M21 15a2 2 0 1 0-4 0v2h4v-2Z" fill="currentColor" opacity="0.7"/>
+          <path d="M3 15a2 2 0 1 0 4 0v-2H3v2Z" fill="currentColor" opacity="0.6"/>
+          <path d="M9 21a2 2 0 1 0 0-4H7v4h2Z" fill="currentColor" opacity="0.8"/>
+          <path d="M21 9a2 2 0 1 0-4 0v2h4V9Z" fill="currentColor" opacity="0.6"/>
+          <path d="M15 3a2 2 0 1 0 0 4h2V3h-2Z" fill="currentColor" opacity="0.8"/>
         </svg>
       </span>
     );
@@ -491,6 +509,108 @@ function GithubEditor({
           {initial?.guide.field_help.pr_lookback_days ||
             defaultFieldHelp.pr_lookback_days}
         </small>
+      </label>
+      {err && <div className="auth-error">{err}</div>}
+      <div className="connector-actions">
+        <button type="button" onClick={onCancel} disabled={busy}>
+          Cancel
+        </button>
+        <button className="primary" type="submit" disabled={busy}>
+          {busy ? "Saving…" : "Save"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function SlackEditor({
+  initial,
+  onCancel,
+  onSaved,
+}: {
+  initial: ConnectorStatus | undefined;
+  onCancel: () => void;
+  onSaved: () => void;
+}) {
+  const cfg = (initial?.config || {}) as Partial<SlackConfigIn>;
+  const [form, setForm] = useState<SlackConfigIn>({
+    workspace: (cfg.workspace as string) || "",
+    bot_token: "",
+    lookback_days: (cfg.lookback_days as number) || 90,
+    channel_types: (cfg.channel_types as string) || "public_channel",
+  });
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setErr(null);
+    try {
+      const payload: SlackConfigIn = { ...form };
+      if (!payload.bot_token) delete payload.bot_token;
+      await api.saveSlackConfig(payload);
+      onSaved();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form className="editor" onSubmit={save}>
+      <div className="editor-title-row">
+        <ConnectorLogo name="slack" />
+        <div>
+          <h3>{initial?.configured ? "Edit Slack" : "Connect Slack"}</h3>
+          <p className="editor-kicker">Slack</p>
+        </div>
+      </div>
+      <p className="editor-copy">
+        Slack powers message search, conversation context, and cross-source linking
+        between discussions and tickets for this tenant.
+      </p>
+      <label className="field">
+        <span>Workspace slug</span>
+        <input
+          value={form.workspace}
+          onChange={(e) => setForm({ ...form, workspace: e.target.value })}
+          placeholder="e.g. acme"
+          required
+        />
+        <small>{initial?.guide.field_help.workspace || "Your Slack workspace slug (the part before .slack.com)."}</small>
+      </label>
+      <label className="field">
+        <span>Bot token</span>
+        <input
+          type="password"
+          value={form.bot_token}
+          onChange={(e) => setForm({ ...form, bot_token: e.target.value })}
+          placeholder={initial?.configured ? "leave blank to keep existing" : "xoxb-…"}
+          required={!initial?.configured}
+        />
+        <small>{initial?.guide.field_help.bot_token || "Bot User OAuth Token starting with xoxb-. Stored encrypted."}</small>
+      </label>
+      <label className="field">
+        <span>Lookback days</span>
+        <input
+          type="number"
+          min={1}
+          max={3650}
+          value={form.lookback_days}
+          onChange={(e) => setForm({ ...form, lookback_days: Number(e.target.value) || 90 })}
+          required
+        />
+        <small>{initial?.guide.field_help.lookback_days || "How many days of message history to ingest."}</small>
+      </label>
+      <label className="field">
+        <span>Channel types</span>
+        <input
+          value={form.channel_types}
+          onChange={(e) => setForm({ ...form, channel_types: e.target.value })}
+        />
+        <small>{initial?.guide.field_help.channel_types || "Comma-separated: public_channel, private_channel."}</small>
       </label>
       {err && <div className="auth-error">{err}</div>}
       <div className="connector-actions">

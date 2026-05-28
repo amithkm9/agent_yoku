@@ -87,12 +87,23 @@ def ingest_github_users_cmd() -> None:
     users_ingest.main()
 
 
+@ingest.command("slack-export")
+@click.argument("export_path", type=click.Path(exists=True))
+@click.option("--workspace", required=True, help="Slack workspace slug for URL construction (e.g. 'acme' for acme.slack.com).")
+def ingest_slack_export(export_path: str, workspace: str) -> None:
+    """Ingest a Slack workspace export (directory or .zip)."""
+    from agent_yoku.connectors.slack import export_ingest
+
+    total = export_ingest.main(export_path, workspace=workspace)
+    click.echo(f"Ingested {total} Slack messages.")
+
+
 @cli.command()
 @click.option(
     "--coll",
-    type=click.Choice(["jira_tickets", "github_prs"]),
+    type=click.Choice(["jira_tickets", "github_prs", "slack_messages"]),
     default=None,
-    help="Single collection to embed; omit to embed both.",
+    help="Single collection to embed; omit to embed all.",
 )
 @click.option("--all", "re_embed_all", is_flag=True, help="Re-embed everything, not just missing.")
 def embed(coll: str | None, re_embed_all: bool) -> None:

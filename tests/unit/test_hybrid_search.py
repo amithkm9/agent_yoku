@@ -12,10 +12,11 @@ import pytest
 from agent_yoku.agent import tools
 
 
-def _seed_index(monkeypatch, jira=None, github=None, query_vec=(1.0, 0.0, 0.0)):
+def _seed_index(monkeypatch, jira=None, github=None, slack=None, query_vec=(1.0, 0.0, 0.0)):
     """Populate the lazy index from fake docs and pin the query embedding."""
     monkeypatch.setattr(tools, "tickets_collection", lambda: _FakeColl(jira or []))
     monkeypatch.setattr(tools, "github_prs_collection", lambda: _FakeColl(github or []))
+    monkeypatch.setattr(tools, "slack_messages_collection", lambda: _FakeColl(slack or []))
     monkeypatch.setattr(tools, "_embed_query", lambda _q: np.array(query_vec, dtype=np.float32))
 
 

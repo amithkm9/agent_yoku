@@ -20,7 +20,7 @@ EMBED_MAX_CHARS = 8_000
 EMBED_COST_PER_M_TOKENS = 0.02
 
 #: Collections that carry an `embedding` vector and need periodic embedding runs.
-EMBEDDABLE_COLLECTIONS = ("jira_tickets", "github_prs")
+EMBEDDABLE_COLLECTIONS = ("jira_tickets", "github_prs", "slack_messages")
 
 # ---------------------------------------------------------------------------
 # Ingest / linking
@@ -37,7 +37,7 @@ LINK_BATCH_SIZE = 200
 # ---------------------------------------------------------------------------
 
 #: All connector names the platform supports.
-SUPPORTED_CONNECTORS: tuple[str, ...] = ("jira", "github")
+SUPPORTED_CONNECTORS: tuple[str, ...] = ("jira", "github", "slack")
 
 # ---------------------------------------------------------------------------
 # Domain
