@@ -66,7 +66,7 @@ def test_list_requires_admin(client):
         r = client.get("/api/connectors", headers=_auth(admin_token))
         assert r.status_code == 200
         names = {c["name"] for c in r.json()}
-        assert names == {"jira", "github"}
+        assert names == {"jira", "github", "slack"}
         # Nothing configured yet.
         for c in r.json():
             assert c["configured"] is False

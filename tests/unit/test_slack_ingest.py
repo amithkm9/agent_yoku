@@ -10,7 +10,6 @@ import pytest
 from agent_yoku.connectors._runtime import slack_config_from_dict, use_slack
 from agent_yoku.connectors.slack.client import message_to_doc
 
-
 _USER_MAP = {
     "U001": {"display_name": "Alice Chen", "email": "alice@co.ai"},
     "U002": {"display_name": "Bob Smith", "email": "bob@co.ai"},
@@ -41,7 +40,9 @@ def test_basic_fields():
 
 @pytest.mark.unit
 def test_embed_text_includes_channel_and_author():
-    doc = message_to_doc(_make_msg(text="the auth service is broken"), "C123", "engineering", _USER_MAP, "acme")
+    doc = message_to_doc(
+        _make_msg(text="the auth service is broken"), "C123", "engineering", _USER_MAP, "acme"
+    )
     assert doc["text"] == "[#engineering] Alice Chen: the auth service is broken"
 
 
@@ -57,7 +58,10 @@ def test_summary_truncated_at_200_chars():
 def test_jira_keys_extracted():
     doc = message_to_doc(
         _make_msg(text="fixing AS-1234 and AS-5678 before the release"),
-        "C123", "engineering", _USER_MAP, "acme",
+        "C123",
+        "engineering",
+        _USER_MAP,
+        "acme",
     )
     assert set(doc["jira_keys"]) == {"AS-1234", "AS-5678"}
 
@@ -72,7 +76,10 @@ def test_no_jira_keys_when_none_present():
 def test_thread_reply_flag_set_when_reply():
     doc = message_to_doc(
         _make_msg(ts="1710000001.000000", thread_ts="1710000000.000000"),
-        "C123", "eng", _USER_MAP, "acme",
+        "C123",
+        "eng",
+        _USER_MAP,
+        "acme",
     )
     assert doc["is_thread_reply"] is True
     assert doc["thread_ts"] == "1710000000.000000"
@@ -82,7 +89,10 @@ def test_thread_reply_flag_set_when_reply():
 def test_top_level_message_not_marked_as_reply():
     doc = message_to_doc(
         _make_msg(ts="1710000000.000000", thread_ts="1710000000.000000"),
-        "C123", "eng", _USER_MAP, "acme",
+        "C123",
+        "eng",
+        _USER_MAP,
+        "acme",
     )
     assert doc["is_thread_reply"] is False
 
@@ -118,12 +128,14 @@ def test_slack_config_from_dict_defaults():
 
 @pytest.mark.unit
 def test_slack_config_from_dict_overrides():
-    cfg = slack_config_from_dict({
-        "bot_token": "xoxb-x",
-        "workspace": "myco",
-        "lookback_days": "30",
-        "channel_types": "public_channel,private_channel",
-    })
+    cfg = slack_config_from_dict(
+        {
+            "bot_token": "xoxb-x",
+            "workspace": "myco",
+            "lookback_days": "30",
+            "channel_types": "public_channel,private_channel",
+        }
+    )
     assert cfg.lookback_days == 30
     assert cfg.channel_types == "public_channel,private_channel"
 
@@ -131,6 +143,7 @@ def test_slack_config_from_dict_overrides():
 @pytest.mark.unit
 def test_current_slack_config_raises_when_unbound():
     from agent_yoku.connectors._runtime import current_slack_config
+
     with pytest.raises(RuntimeError, match="no Slack config bound"):
         current_slack_config()
 
@@ -138,6 +151,7 @@ def test_current_slack_config_raises_when_unbound():
 @pytest.mark.unit
 def test_use_slack_binds_and_unbinds():
     from agent_yoku.connectors._runtime import current_slack_config
+
     cfg = slack_config_from_dict({"bot_token": "xoxb-test", "workspace": "acme"})
     with use_slack(cfg):
         bound = current_slack_config()

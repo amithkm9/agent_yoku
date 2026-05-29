@@ -26,6 +26,8 @@ class JiraTicket(BaseModel):
     description: str | None = None
     status: str | None = None
     issuetype: str | None = None
+    epic_key: str | None = None
+    parent_key: str | None = None
     assignee: str | None = None
     reporter: str | None = None
     priority: str | None = None

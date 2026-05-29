@@ -44,7 +44,8 @@ def main(filter_channels: list[str] | None = None) -> None:
     log.info("resolved %d workspace users", len(user_map))
 
     channels = [
-        ch for ch in list_channels(cfg.channel_types)
+        ch
+        for ch in list_channels(cfg.channel_types)
         if not filter_channels or ch["name"] in filter_channels
     ]
     log.info("scanning %d channel(s)", len(channels))
@@ -62,7 +63,10 @@ def main(filter_channels: list[str] | None = None) -> None:
 
         joined = join_channel(channel_id)
         if not joined and not ch.get("is_member"):
-            log.warning("channel=#%s skipped — bot not a member and channels:join scope missing", channel_name)
+            log.warning(
+                "channel=#%s skipped — bot not a member and channels:join scope missing",
+                channel_name,
+            )
             continue
         for msg in list_messages(channel_id, oldest):
             doc = message_to_doc(msg, channel_id, channel_name, user_map, cfg.workspace)

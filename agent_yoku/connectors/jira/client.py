@@ -38,6 +38,7 @@ _FIELDS = [
     "created",
     "updated",
     "fixVersions",
+    "parent",
 ]
 
 
@@ -82,6 +83,22 @@ def search_issues(jql: str, page_size: int = 100) -> Iterator[dict]:
             return
 
 
+def _parent_links(parent: dict | None) -> tuple[str | None, str | None]:
+    """Derive (epic_key, parent_key) from a team-managed issue's `parent` field.
+
+    `parent` points one level up: an Epic for a Story/Task, or a Story/Task for
+    a Sub-task. We always record `parent_key`; `epic_key` is set only when the
+    immediate parent is itself an Epic. A Sub-task's epic is resolved at query
+    time by joining through its parent Story's `epic_key`.
+    """
+    if not parent:
+        return None, None
+    parent_key = parent.get("key")
+    parent_type = ((parent.get("fields") or {}).get("issuetype") or {}).get("name")
+    epic_key = parent_key if parent_type == "Epic" else None
+    return epic_key, parent_key
+
+
 def issue_to_doc(issue: dict) -> dict:
     """Flatten a JIRA issue into a mongo doc with a clean text blob."""
     f = issue.get("fields", {})
@@ -89,6 +106,7 @@ def issue_to_doc(issue: dict) -> dict:
     summary = f.get("summary") or ""
     status = (f.get("status") or {}).get("name")
     issuetype = (f.get("issuetype") or {}).get("name")
+    epic_key, parent_key = _parent_links(f.get("parent"))
     assignee = (f.get("assignee") or {}).get("displayName")
     reporter = (f.get("reporter") or {}).get("displayName")
     priority = (f.get("priority") or {}).get("name")
@@ -101,6 +119,8 @@ def issue_to_doc(issue: dict) -> dict:
         "description": description,
         "status": status,
         "issuetype": issuetype,
+        "epic_key": epic_key,
+        "parent_key": parent_key,
         "assignee": assignee,
         "reporter": reporter,
         "priority": priority,

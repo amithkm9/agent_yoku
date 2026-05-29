@@ -112,7 +112,10 @@ def fetch_user_map() -> dict[str, dict]:
             continue
         profile = u.get("profile") or {}
         out[uid] = {
-            "display_name": profile.get("display_name") or profile.get("real_name") or u.get("name") or uid,
+            "display_name": profile.get("display_name")
+            or profile.get("real_name")
+            or u.get("name")
+            or uid,
             "email": (profile.get("email") or "").lower() or None,
         }
     return out

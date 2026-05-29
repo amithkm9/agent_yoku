@@ -89,7 +89,11 @@ def ingest_github_users_cmd() -> None:
 
 @ingest.command("slack-export")
 @click.argument("export_path", type=click.Path(exists=True))
-@click.option("--workspace", required=True, help="Slack workspace slug for URL construction (e.g. 'acme' for acme.slack.com).")
+@click.option(
+    "--workspace",
+    required=True,
+    help="Slack workspace slug for URL construction (e.g. 'acme' for acme.slack.com).",
+)
 def ingest_slack_export(export_path: str, workspace: str) -> None:
     """Ingest a Slack workspace export (directory or .zip)."""
     from agent_yoku.connectors.slack import export_ingest

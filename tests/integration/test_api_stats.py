@@ -65,6 +65,8 @@ def test_counts_returns_expected_keys(client):
             "jira_users",
             "github_prs",
             "github_users",
+            "slack_messages",
+            "slack_users",
             "unified_users",
             "chat_sessions",
             "chat_messages",

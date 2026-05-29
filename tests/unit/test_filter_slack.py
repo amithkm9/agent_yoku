@@ -122,7 +122,9 @@ def test_slack_source_included_in_both(isolated_index, monkeypatch):
     monkeypatch.setattr(tools, "tickets_collection", lambda: _FakeColl(jira))
     monkeypatch.setattr(tools, "github_prs_collection", lambda: _FakeColl([]))
     monkeypatch.setattr(tools, "slack_messages_collection", lambda: _FakeColl(slack))
-    monkeypatch.setattr(tools, "_embed_query", lambda _q: np.array([1.0, 0.0, 0.0], dtype=np.float32))
+    monkeypatch.setattr(
+        tools, "_embed_query", lambda _q: np.array([1.0, 0.0, 0.0], dtype=np.float32)
+    )
 
     results = tools.semantic_search.invoke({"query": "auth bug", "k": 10, "source": "both"})
     sources = {r["source"] for r in results}
@@ -145,7 +147,9 @@ def test_slack_source_filter_isolates_slack(isolated_index, monkeypatch):
     monkeypatch.setattr(tools, "tickets_collection", lambda: _FakeColl(jira))
     monkeypatch.setattr(tools, "github_prs_collection", lambda: _FakeColl([]))
     monkeypatch.setattr(tools, "slack_messages_collection", lambda: _FakeColl(slack))
-    monkeypatch.setattr(tools, "_embed_query", lambda _q: np.array([1.0, 0.0, 0.0], dtype=np.float32))
+    monkeypatch.setattr(
+        tools, "_embed_query", lambda _q: np.array([1.0, 0.0, 0.0], dtype=np.float32)
+    )
 
     results = tools.semantic_search.invoke({"query": "auth", "k": 10, "source": "slack"})
     assert all(r["source"] == "slack" for r in results)

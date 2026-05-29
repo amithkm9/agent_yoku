@@ -147,7 +147,7 @@ def normalize_slack_workspace(raw: str) -> str:
     # strip scheme
     for prefix in ("https://", "http://"):
         if value.lower().startswith(prefix):
-            value = value[len(prefix):]
+            value = value[len(prefix) :]
     # strip .slack.com suffix
     if value.lower().endswith(".slack.com"):
         value = value[: -len(".slack.com")]

@@ -33,10 +33,20 @@ log = get_logger("slack_export_ingest")
 
 # Subtypes that are system events, not real messages.
 _SKIP_SUBTYPES = {
-    "channel_join", "channel_leave", "channel_purpose", "channel_topic",
-    "channel_name", "channel_archive", "channel_unarchive",
-    "bot_add", "bot_remove", "app_install", "app_uninstall",
-    "pinned_item", "unpinned_item", "file_share",
+    "channel_join",
+    "channel_leave",
+    "channel_purpose",
+    "channel_topic",
+    "channel_name",
+    "channel_archive",
+    "channel_unarchive",
+    "bot_add",
+    "bot_remove",
+    "app_install",
+    "app_uninstall",
+    "pinned_item",
+    "unpinned_item",
+    "file_share",
 }
 
 _SLACK_URL_RE = re.compile(r"<(https?://[^|>]+)(?:\|[^>]*)?>")
@@ -60,10 +70,7 @@ def _build_user_map(users_data: list[dict]) -> dict[str, dict]:
         profile = u.get("profile") or {}
         out[uid] = {
             "display_name": (
-                profile.get("display_name")
-                or profile.get("real_name")
-                or u.get("name")
-                or uid
+                profile.get("display_name") or profile.get("real_name") or u.get("name") or uid
             ),
             "email": (profile.get("email") or "").lower() or None,
         }
@@ -160,7 +167,9 @@ def _ingest_users(users_data: list[dict]) -> int:
         doc = {
             "user_id": uid,
             "name": u.get("name"),
-            "display_name": profile.get("display_name") or profile.get("real_name") or u.get("name"),
+            "display_name": profile.get("display_name")
+            or profile.get("real_name")
+            or u.get("name"),
             "real_name": profile.get("real_name"),
             "email": email,
             "is_bot": bool(u.get("is_bot")),
@@ -186,14 +195,13 @@ def _read_json(path_or_zip: Path | zipfile.ZipFile, rel: str) -> Any:
     return json.loads(p.read_text(encoding="utf-8"))
 
 
-def _iter_channel_files(
-    root: Path | zipfile.ZipFile, channel_name: str
-) -> list[str]:
+def _iter_channel_files(root: Path | zipfile.ZipFile, channel_name: str) -> list[str]:
     """Return relative paths of all daily JSON files for a channel."""
     if isinstance(root, zipfile.ZipFile):
         prefix = f"{channel_name}/"
         return sorted(
-            n for n in root.namelist()
+            n
+            for n in root.namelist()
             if n.startswith(prefix) and n.endswith(".json") and n != prefix
         )
     channel_dir = root / channel_name
@@ -213,11 +221,7 @@ def main(export_path: str, workspace: str, tenant: str | None = None) -> None:
     t0 = time.monotonic()
 
     # Open as zip or directory
-    source: Path | zipfile.ZipFile
-    if path.suffix == ".zip":
-        source = zipfile.ZipFile(path, "r")
-    else:
-        source = path
+    source: Path | zipfile.ZipFile = zipfile.ZipFile(path, "r") if path.suffix == ".zip" else path
 
     try:
         users_data: list[dict] = _read_json(source, "users.json") or []
@@ -281,6 +285,9 @@ def main(export_path: str, workspace: str, tenant: str | None = None) -> None:
     elapsed = time.monotonic() - t0
     log.info(
         "slack export ingest done total=%d new_or_changed=%d users=%d elapsed=%.1fs",
-        total, new_or_changed, n_users, elapsed,
+        total,
+        new_or_changed,
+        n_users,
+        elapsed,
     )
     return total

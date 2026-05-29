@@ -13,13 +13,11 @@ import re
 import threading
 import time
 from datetime import UTC, datetime, timedelta
-
-from langchain_core.tools import ToolException
 from functools import lru_cache
 from typing import Any
 
 import numpy as np
-from langchain_core.tools import tool
+from langchain_core.tools import ToolException, tool
 
 from agent_yoku.agent.rerank import rerank
 from agent_yoku.config import (
@@ -32,9 +30,9 @@ from agent_yoku.config import (
     tickets_collection,
     unified_users_collection,
 )
-from agent_yoku.storage.mongo import slack_messages_collection
 from agent_yoku.log import get_logger
 from agent_yoku.storage.freshness import source_freshness
+from agent_yoku.storage.mongo import slack_messages_collection
 from agent_yoku.storage.tenancy import current_tenant
 from agent_yoku.utils import bson_safe
 
@@ -87,7 +85,9 @@ def _load_index() -> dict[str, Any]:
     for d in gh:
         d["source"] = "github"
 
-    slack = list(slack_messages_collection().find({"embedding": {"$ne": None, "$exists": True}}, proj))
+    slack = list(
+        slack_messages_collection().find({"embedding": {"$ne": None, "$exists": True}}, proj)
+    )
     for d in slack:
         d["source"] = "slack"
 
@@ -621,6 +621,7 @@ def filter_jira(
     assignee: str | None = None,
     label: str | None = None,
     issuetype: str | None = None,
+    epic_key: str | None = None,
     fix_version: str | None = None,
     since_days: int | None = None,
     limit: int = 20,
@@ -633,6 +634,8 @@ def filter_jira(
                   via unified_users.
         label: any label, e.g. 'apr-bug-bash'.
         issuetype: 'Task', 'Story', 'Bug', 'Epic'.
+        epic_key: parent epic key, e.g. 'AS-1000' — returns issues directly
+                  under that epic (Sub-tasks roll up via their Story, not here).
         fix_version: target release name, e.g. 'Sprint 24' or 'v2.5'.
         since_days: only tickets updated within last N days.
         limit: max results, default 20.
@@ -648,6 +651,8 @@ def filter_jira(
         q["labels"] = label
     if issuetype:
         q["issuetype"] = issuetype
+    if epic_key:
+        q["epic_key"] = epic_key
     if fix_version:
         q["fix_versions"] = fix_version
     since = _since(since_days)
@@ -663,6 +668,8 @@ def filter_jira(
                 "status": 1,
                 "assignee": 1,
                 "issuetype": 1,
+                "epic_key": 1,
+                "parent_key": 1,
                 "labels": 1,
                 "updated": 1,
                 "url": 1,
@@ -803,7 +810,7 @@ def list_repos(min_prs: int = 1, limit: int = 50) -> list[dict]:
 
 
 _COLLECTION_DESCRIPTIONS = {
-    "jira_tickets": "Asato JIRA tickets (project AS). Fields: key, summary, description, status, issuetype, assignee, reporter, priority, labels, fix_versions, created, updated, url, linked_prs.",
+    "jira_tickets": "Asato JIRA tickets (project AS). Fields: key, summary, description, status, issuetype, epic_key, parent_key, assignee, reporter, priority, labels, fix_versions, created, updated, url, linked_prs.",
     "github_prs": "AsatoCorp GitHub PRs. Fields: key (org/repo#N), repo, number, summary, description, status (open|closed|merged|draft), author, author_email, assignee, labels, base, head, merged, merged_at, comments_count, created, updated, url, jira_keys.",
     "users": "JIRA users directory. Fields: accountId, displayName, emailAddress, active, accountType.",
     "github_users": "AsatoCorp GitHub org members. Fields: login, id, name, email, is_bot, type, company.",

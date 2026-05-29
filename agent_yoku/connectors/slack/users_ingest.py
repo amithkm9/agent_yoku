@@ -39,7 +39,9 @@ def main() -> None:
         doc = {
             "user_id": uid,
             "name": u.get("name"),
-            "display_name": profile.get("display_name") or profile.get("real_name") or u.get("name"),
+            "display_name": profile.get("display_name")
+            or profile.get("real_name")
+            or u.get("name"),
             "real_name": profile.get("real_name"),
             "email": email,
             "is_bot": bool(u.get("is_bot")),
