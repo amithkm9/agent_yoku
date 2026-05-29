@@ -38,9 +38,13 @@ from agent_yoku.utils import bson_safe
 
 log = get_logger("tools")
 
+# Per-tenant index cache. `_INDEX_LOCK` guards only the dict + lock table (never
+# held across a rebuild's Mongo I/O); each tenant rebuilds under its own lock.
 _INDEX_LOCK = threading.Lock()
+_TENANT_LOCKS: dict[str, threading.Lock] = {}
 _INDEXES: dict[str, dict[str, Any]] = {}
 _INDEX_TTL_S = 600
+_MAX_CACHED_TENANTS = 8
 
 
 def _index_key() -> str:
@@ -140,19 +144,51 @@ def _fresh(idx: dict[str, Any]) -> bool:
     return (time.monotonic() - idx["_built_at"]) < _INDEX_TTL_S
 
 
+def _tenant_lock(key: str) -> threading.Lock:
+    """Get (or lazily create) the rebuild lock for a tenant."""
+    with _INDEX_LOCK:
+        lock = _TENANT_LOCKS.get(key)
+        if lock is None:
+            lock = threading.Lock()
+            _TENANT_LOCKS[key] = lock
+        return lock
+
+
+def _cache_get(key: str) -> dict[str, Any] | None:
+    """Return a cached index, marking it most-recently-used."""
+    with _INDEX_LOCK:
+        idx = _INDEXES.pop(key, None)
+        if idx is not None:
+            _INDEXES[key] = idx
+        return idx
+
+
+def _cache_put(key: str, idx: dict[str, Any]) -> None:
+    """Store an index, evicting the least-recently-used tenant past the cap."""
+    with _INDEX_LOCK:
+        _INDEXES[key] = idx
+        while len(_INDEXES) > _MAX_CACHED_TENANTS:
+            oldest = next(iter(_INDEXES))
+            _INDEXES.pop(oldest, None)
+
+
 def _index() -> dict[str, Any]:
     """Return the current tenant's index, building it on first use and rebuilding
-    once it ages past the TTL."""
+    once it ages past the TTL.
+
+    Rebuilds run under a per-tenant lock so one tenant's reload never blocks
+    another's searches, and the cache is LRU-bounded by `_MAX_CACHED_TENANTS`.
+    """
     key = _index_key()
-    idx = _INDEXES.get(key)
+    idx = _cache_get(key)
     if idx is not None and _fresh(idx):
         return idx
-    with _INDEX_LOCK:
-        idx = _INDEXES.get(key)  # re-check under lock
+    with _tenant_lock(key):
+        idx = _cache_get(key)  # re-check under the tenant lock
         if idx is None or not _fresh(idx):
             idx = _load_index()
             idx["_built_at"] = time.monotonic()
-            _INDEXES[key] = idx
+            _cache_put(key, idx)
         return idx
 
 
@@ -819,10 +855,52 @@ _COLLECTION_DESCRIPTIONS = {
 
 _BLOCKED_STAGES = {"$out", "$merge", "$function", "$accumulator", "$where"}
 
+# Stages that read a second collection: their target is checked against the read
+# whitelist so the agent can't $lookup/$unionWith into auth_users or connector_configs.
+_CROSS_COLLECTION_STAGES = {"$lookup", "$unionWith", "$graphLookup"}
+
 _MAX_PIPELINE_STAGES = 20
 _MAX_INLINE_RESULTS = 100
 _HIDDEN_FIELDS = {"embedding", "text"}
 _DESCRIBE_DROP_FIELDS = {"_id", "embedding", "text", "description"}
+
+
+def _cross_collection_target(op: str, spec: Any) -> str | None:
+    """The foreign collection a cross-collection stage reads from, if any."""
+    if op == "$unionWith":
+        return spec if isinstance(spec, str) else (spec or {}).get("coll")
+    if isinstance(spec, dict):  # $lookup / $graphLookup name it in `from`
+        return spec.get("from")
+    return None
+
+
+def _validate_stage(stage: Any, i: int) -> None:
+    if not isinstance(stage, dict) or len(stage) != 1:
+        raise ValueError(f"stage {i} must be a single-key dict {{'$op': {{...}}}}")
+    op = next(iter(stage))
+    if not op.startswith("$"):
+        raise ValueError(f"stage {i} key {op!r} is not a Mongo operator (missing $)")
+    if op in _BLOCKED_STAGES:
+        raise ValueError(f"stage {i} uses blocked operator {op!r}")
+    spec = stage[op]
+    if op in _CROSS_COLLECTION_STAGES:
+        target = _cross_collection_target(op, spec)
+        if not isinstance(target, str) or target not in ALLOWED_COLLECTIONS:
+            raise ValueError(
+                f"stage {i} {op} reads collection {target!r}, which is not on the read "
+                f"whitelist {sorted(ALLOWED_COLLECTIONS)}"
+            )
+    # Recurse into nested sub-pipelines so they can't smuggle a blocked stage.
+    if isinstance(spec, dict):
+        nested = spec.get("pipeline")
+        if isinstance(nested, list):
+            for j, sub in enumerate(nested):
+                _validate_stage(sub, j)
+    if op == "$facet" and isinstance(spec, dict):
+        for sub_pipeline in spec.values():
+            if isinstance(sub_pipeline, list):
+                for j, sub in enumerate(sub_pipeline):
+                    _validate_stage(sub, j)
 
 
 def _validate_pipeline(pipeline: list[dict]) -> None:
@@ -831,13 +909,7 @@ def _validate_pipeline(pipeline: list[dict]) -> None:
     if len(pipeline) > _MAX_PIPELINE_STAGES:
         raise ValueError(f"pipeline has {len(pipeline)} stages; max is {_MAX_PIPELINE_STAGES}")
     for i, stage in enumerate(pipeline):
-        if not isinstance(stage, dict) or len(stage) != 1:
-            raise ValueError(f"stage {i} must be a single-key dict {{'$op': {{...}}}}")
-        op = next(iter(stage))
-        if op in _BLOCKED_STAGES:
-            raise ValueError(f"stage {i} uses blocked operator {op!r}")
-        if not op.startswith("$"):
-            raise ValueError(f"stage {i} key {op!r} is not a Mongo operator (missing $)")
+        _validate_stage(stage, i)
 
 
 @tool
@@ -947,6 +1019,7 @@ def mongo_query(
     Safety bounds (enforced server-side):
     - pipeline must be <= 20 stages, each a single-key {"$op": {...}} dict
     - blocked stages: $out, $merge, $function, $accumulator, $where
+    - $lookup / $unionWith / $graphLookup may only target whitelisted collections
     - results capped at min(limit, 100); $limit auto-appended if absent
     - fields `embedding` and `text` are stripped from results to save tokens
 

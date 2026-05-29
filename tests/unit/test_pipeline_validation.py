@@ -36,3 +36,59 @@ def test_rejects_multi_key_stage():
 def test_rejects_non_operator_key():
     with pytest.raises(ValueError, match="not a Mongo operator"):
         _validate_pipeline([{"match": {}}])  # missing $
+
+
+def test_allows_lookup_into_whitelisted_collection():
+    _validate_pipeline(
+        [
+            {
+                "$lookup": {
+                    "from": "github_prs",
+                    "localField": "key",
+                    "foreignField": "jira_keys",
+                    "as": "prs",
+                }
+            }
+        ]
+    )
+
+
+def test_blocks_lookup_into_non_whitelisted_collection():
+    with pytest.raises(ValueError, match="whitelist"):
+        _validate_pipeline(
+            [{"$lookup": {"from": "auth_users", "localField": "x", "foreignField": "y", "as": "z"}}]
+        )
+
+
+def test_blocks_unionwith_object_form_into_non_whitelisted_collection():
+    with pytest.raises(ValueError, match="whitelist"):
+        _validate_pipeline([{"$unionWith": {"coll": "auth_users"}}])
+
+
+def test_blocks_unionwith_string_form_into_non_whitelisted_collection():
+    with pytest.raises(ValueError, match="whitelist"):
+        _validate_pipeline([{"$unionWith": "connector_configs"}])
+
+
+def test_blocks_graphlookup_into_non_whitelisted_collection():
+    with pytest.raises(ValueError, match="whitelist"):
+        _validate_pipeline(
+            [
+                {
+                    "$graphLookup": {
+                        "from": "auth_users",
+                        "startWith": "$x",
+                        "connectFromField": "a",
+                        "connectToField": "b",
+                        "as": "c",
+                    }
+                }
+            ]
+        )
+
+
+def test_blocks_blocked_stage_smuggled_in_nested_pipeline():
+    with pytest.raises(ValueError, match="blocked"):
+        _validate_pipeline(
+            [{"$lookup": {"from": "github_prs", "as": "x", "pipeline": [{"$out": "evil"}]}}]
+        )
