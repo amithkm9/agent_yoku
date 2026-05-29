@@ -122,7 +122,9 @@ def slack_messages_collection() -> Collection:
         _db()["slack_messages"],
         [
             IndexModel("key", unique=True),
-            IndexModel("channel_id"),
+            IndexModel("channel_name"),
+            IndexModel("author_name"),
+            IndexModel("jira_keys"),
             IndexModel([("updated", DESCENDING)]),
         ],
     )
