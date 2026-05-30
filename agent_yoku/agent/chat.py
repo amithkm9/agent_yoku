@@ -1,7 +1,7 @@
-"""Agent-driven Q&A over Asato JIRA + GitHub PRs.
+"""Agent-driven Q&A over Asato connector data (JIRA, GitHub, Slack, …).
 
-Replaces the old one-shot RAG with a deepagent that plans, delegates to
-sub-agents (jira_researcher, github_researcher), and synthesizes a cited answer.
+Replaces the old one-shot RAG with a deepagent that plans with todos and answers
+over a source-agnostic toolkit, then synthesizes a cited answer.
 
 Usage:
     python chat.py                              # interactive

@@ -11,8 +11,8 @@ into MongoDB, indexes them with OpenAI embeddings, and exposes a deepagent
 ```
   ┌──────────────┐    JWT      ┌────────────────────┐    invoke    ┌──────────────────┐
   │  React UI    │ ──────────▶ │  FastAPI           │ ───────────▶ │ deepagent        │
-  │  (Vite :5173)│             │  (uvicorn :8000)   │              │ + 13 tools       │
-  └──────────────┘             │  + tenant ContextVar│              │ + 2 sub-agents   │
+  │  (Vite :5173)│             │  (uvicorn :8000)   │              │ + 11 tools       │
+  └──────────────┘             │  + tenant ContextVar│              │ + source registry│
                                └──────┬─────────────┘              └──────┬───────────┘
                                       │                                    │
                                       ▼ db-per-tenant                      ▼
@@ -71,7 +71,8 @@ agent-yoku/
 │   ├── agent/
 │   │   ├── agent.py                # deepagent factory
 │   │   ├── chat.py                 # CLI ask/final_answer helpers
-│   │   └── tools.py                # 13 tools (9 narrow + 4 mongo escape hatches)
+│   │   ├── sources.py              # source registry — one entry per connector
+│   │   └── tools.py                # 11 tools (7 narrow + 4 mongo escape hatches)
 │   └── utils/                      # cross-cutting helpers
 │       ├── bson.py · jira_keys.py · http.py
 ├── web/                            # React + Vite frontend
@@ -183,7 +184,7 @@ JWT secret comes from `settings.jwt_secret` — **rotate before any non-local de
 5. Optional `users_ingest.py` for member directories.
 6. Add a CLI subcommand in `agent_yoku/cli.py`.
 7. Register the collection in `agent_yoku/storage/mongo.py::ALLOWED_COLLECTIONS`.
-8. Add narrow tools in `agent_yoku/agent/tools.py` if useful (agent already has the generic `mongo_query` escape hatch).
+8. Add a `SourceSpec` to `agent_yoku/agent/sources.py::SOURCES` — `filter` / `get` / `linked` / `semantic_search` then cover the source automatically, no new tools needed.
 
 `agent-yoku list-connectors` will auto-discover it.
 
@@ -191,15 +192,16 @@ JWT secret comes from `settings.jwt_secret` — **rotate before any non-local de
 
 - **Mongo is the source of truth.** No vector DB — embeddings live as a
   `embedding` field on each doc; cosine runs in-memory via numpy.
-- **Two-layer agent.** Main orchestrator + `jira_researcher` + `github_researcher`
-  sub-agents (isolated context).
-- **Narrow tools + generic escape hatch.** 9 narrow tools for common queries
-  (`get` / `linked` auto-route by key shape across both sources;
-  `semantic_search`, `resolve_user`, `filter_jira`, `filter_prs`, `list_repos`,
-  `data_freshness`, `who_knows`);
+- **Single planning agent.** One deepagent plans with `write_todos` and answers
+  over a source-agnostic toolkit (no sub-agents).
+- **Source registry + generic escape hatch.** Per-source knowledge (collection,
+  key shape, filterable fields, links) lives in `agent_yoku/agent/sources.py`, so
+  the tools are source-agnostic: `get` / `linked` auto-route by key shape across
+  every source, `filter(source, …)` does exact filters with alias resolution,
+  alongside `semantic_search`, `resolve_user`, `data_freshness`, `who_knows`.
   `mongo_query` / `mongo_count` / `describe_collection` / `list_collections`
-  for analytics the narrow tools don't cover. Tool errors return
-  `{"error": "..."}` so the agent can adapt rather than crash.
+  cover analytics the narrow tools don't. Tool errors return `{"error": "..."}`
+  so the agent can adapt rather than crash.
 - **Cross-source link.** PRs auto-extract `AS-XXXX` from branch / title / body
   into `jira_keys`. Reverse pass writes `linked_prs` onto each JIRA ticket.
 - **Sessions** persist in mongo (`chat_sessions`, `chat_messages`); compact

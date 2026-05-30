@@ -1,4 +1,4 @@
-"""Unit tests for the filter_slack agent tool and Slack source in semantic_search."""
+"""Unit tests for filter(source="slack", …) and the Slack source in semantic_search."""
 
 from __future__ import annotations
 
@@ -50,6 +50,11 @@ class _FakeCursor:
         return True
 
 
+def _patch_collections(monkeypatch, **by_name):
+    """Patch the get_collection seam with a name -> fake-collection dispatcher."""
+    monkeypatch.setattr(tools, "get_collection", lambda name: by_name[name])
+
+
 _SLACK_DOCS = [
     {
         "key": "C1/1.0",
@@ -78,32 +83,32 @@ _SLACK_DOCS = [
 
 @pytest.mark.unit
 def test_filter_slack_by_channel(monkeypatch):
-    monkeypatch.setattr(tools, "slack_messages_collection", lambda: _FakeColl(_SLACK_DOCS))
-    results = tools.filter_slack.invoke({"channel": "engineering"})
+    _patch_collections(monkeypatch, slack_messages=_FakeColl(_SLACK_DOCS))
+    results = tools.filter.invoke({"source": "slack", "filters": {"channel": "engineering"}})
     assert len(results) == 1
     assert results[0]["channel_name"] == "engineering"
 
 
 @pytest.mark.unit
 def test_filter_slack_by_author(monkeypatch):
-    monkeypatch.setattr(tools, "slack_messages_collection", lambda: _FakeColl(_SLACK_DOCS))
+    _patch_collections(monkeypatch, slack_messages=_FakeColl(_SLACK_DOCS))
     monkeypatch.setattr(tools, "_resolve_user_doc", lambda _q: None)
-    results = tools.filter_slack.invoke({"author": "bob"})
+    results = tools.filter.invoke({"source": "slack", "filters": {"author": "bob"}})
     assert len(results) == 1
     assert results[0]["author_name"] == "bob"
 
 
 @pytest.mark.unit
 def test_filter_slack_has_jira_link_true(monkeypatch):
-    monkeypatch.setattr(tools, "slack_messages_collection", lambda: _FakeColl(_SLACK_DOCS))
-    results = tools.filter_slack.invoke({"has_jira_link": True})
+    _patch_collections(monkeypatch, slack_messages=_FakeColl(_SLACK_DOCS))
+    results = tools.filter.invoke({"source": "slack", "filters": {"has_jira_link": True}})
     assert all(r["jira_keys"] for r in results)
 
 
 @pytest.mark.unit
 def test_filter_slack_has_jira_link_false(monkeypatch):
-    monkeypatch.setattr(tools, "slack_messages_collection", lambda: _FakeColl(_SLACK_DOCS))
-    results = tools.filter_slack.invoke({"has_jira_link": False})
+    _patch_collections(monkeypatch, slack_messages=_FakeColl(_SLACK_DOCS))
+    results = tools.filter.invoke({"source": "slack", "filters": {"has_jira_link": False}})
     assert all(not r["jira_keys"] for r in results)
 
 
@@ -119,9 +124,12 @@ def test_slack_source_included_in_both(isolated_index, monkeypatch):
             "embedding": [0.9, 0.1, 0.0],
         }
     ]
-    monkeypatch.setattr(tools, "tickets_collection", lambda: _FakeColl(jira))
-    monkeypatch.setattr(tools, "github_prs_collection", lambda: _FakeColl([]))
-    monkeypatch.setattr(tools, "slack_messages_collection", lambda: _FakeColl(slack))
+    _patch_collections(
+        monkeypatch,
+        jira_tickets=_FakeColl(jira),
+        github_prs=_FakeColl([]),
+        slack_messages=_FakeColl(slack),
+    )
     monkeypatch.setattr(
         tools, "_embed_query", lambda _q: np.array([1.0, 0.0, 0.0], dtype=np.float32)
     )
@@ -144,9 +152,12 @@ def test_slack_source_filter_isolates_slack(isolated_index, monkeypatch):
             "embedding": [1.0, 0.0, 0.0],
         }
     ]
-    monkeypatch.setattr(tools, "tickets_collection", lambda: _FakeColl(jira))
-    monkeypatch.setattr(tools, "github_prs_collection", lambda: _FakeColl([]))
-    monkeypatch.setattr(tools, "slack_messages_collection", lambda: _FakeColl(slack))
+    _patch_collections(
+        monkeypatch,
+        jira_tickets=_FakeColl(jira),
+        github_prs=_FakeColl([]),
+        slack_messages=_FakeColl(slack),
+    )
     monkeypatch.setattr(
         tools, "_embed_query", lambda _q: np.array([1.0, 0.0, 0.0], dtype=np.float32)
     )
@@ -157,8 +168,11 @@ def test_slack_source_filter_isolates_slack(isolated_index, monkeypatch):
 
 @pytest.mark.unit
 def test_invalid_source_raises(isolated_index, monkeypatch):
-    monkeypatch.setattr(tools, "tickets_collection", lambda: _FakeColl([]))
-    monkeypatch.setattr(tools, "github_prs_collection", lambda: _FakeColl([]))
-    monkeypatch.setattr(tools, "slack_messages_collection", lambda: _FakeColl([]))
+    _patch_collections(
+        monkeypatch,
+        jira_tickets=_FakeColl([]),
+        github_prs=_FakeColl([]),
+        slack_messages=_FakeColl([]),
+    )
     with pytest.raises(ValueError, match="source must be"):
         tools.semantic_search.invoke({"query": "test", "source": "teams"})

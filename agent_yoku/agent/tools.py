@@ -1,10 +1,13 @@
-"""Tools the deepagent uses to navigate JIRA tickets + GitHub PRs in mongo.
+"""Tools the deepagent uses to navigate connector data (JIRA, GitHub, Slack, …).
 
 Design principles:
 - Each tool is a thin wrapper around mongo or numpy. No LLM calls inside tools.
 - Tools return JSON-serializable data (no ObjectId, no datetime objects).
 - Lightweight by default; the agent calls get_* tools to drill into specific items.
 - Errors raise ValueError with a clear message so the agent can adapt.
+- Source-agnostic: per-source knowledge (collections, key shapes, filterable
+  fields, cross-source links) lives in `agent_yoku.agent.sources`, so onboarding
+  a new connector is a registry entry, not edits across every tool here.
 """
 
 from __future__ import annotations
@@ -20,6 +23,18 @@ import numpy as np
 from langchain_core.tools import ToolException, tool
 
 from agent_yoku.agent.rerank import rerank
+from agent_yoku.agent.sources import (
+    HAS_REFS,
+    USER,
+    FilterField,
+    SourceSpec,
+    embeddable_sources,
+    get_source,
+    referrers_to,
+    source_for_collection,
+    source_for_key,
+    source_names,
+)
 from agent_yoku.config import (
     ALLOWED_COLLECTIONS,
     EMBED_MODEL,
@@ -32,7 +47,6 @@ from agent_yoku.config import (
 )
 from agent_yoku.log import get_logger
 from agent_yoku.storage.freshness import source_freshness
-from agent_yoku.storage.mongo import slack_messages_collection
 from agent_yoku.storage.tenancy import current_tenant
 from agent_yoku.utils import bson_safe
 
@@ -81,21 +95,18 @@ def _load_index() -> dict[str, Any]:
         "updated": 1,
     }
 
-    jira = list(tickets_collection().find({"embedding": {"$ne": None, "$exists": True}}, proj))
-    for d in jira:
-        d["source"] = "jira"
-
-    gh = list(github_prs_collection().find({"embedding": {"$ne": None, "$exists": True}}, proj))
-    for d in gh:
-        d["source"] = "github"
-
-    slack = list(
-        slack_messages_collection().find({"embedding": {"$ne": None, "$exists": True}}, proj)
-    )
-    for d in slack:
-        d["source"] = "slack"
-
-    docs = jira + gh + slack
+    docs: list[dict] = []
+    counts: dict[str, int] = {}
+    for spec in embeddable_sources():
+        rows = list(
+            get_collection(spec.collection).find(
+                {"embedding": {"$ne": None, "$exists": True}}, proj
+            )
+        )
+        for d in rows:
+            d["source"] = spec.name
+        counts[spec.name] = len(rows)
+        docs.extend(rows)
     if not docs:
         raise RuntimeError("no embedded docs found; run ingest + embed first")
 
@@ -107,9 +118,12 @@ def _load_index() -> dict[str, Any]:
         # Keys of the cross-source items this doc links to — a PR's referenced
         # tickets, or the PRs linked onto a ticket. Doubles as the corroboration
         # flag and as the lookup for query-aware adjacency reranking.
-        if d["source"] in ("github", "slack"):
-            d["link_keys"] = list(d.get("jira_keys") or [])
+        spec = get_source(d["source"])
+        if spec and spec.ref_field:
+            d["link_keys"] = list(d.get(spec.ref_field) or [])
         else:
+            # The link hub (e.g. JIRA) has no outbound ref_field; its links are
+            # materialised on the doc as `linked_prs` at ingest time.
             d["link_keys"] = [
                 p["key"]
                 for p in (d.get("linked_prs") or [])
@@ -130,7 +144,7 @@ def _load_index() -> dict[str, Any]:
 
     key_to_idx = {d["key"]: i for i, d in enumerate(docs)}
 
-    log.info("index loaded jira=%d github=%d slack=%d", len(jira), len(gh), len(slack))
+    log.info("index loaded %s", " ".join(f"{k}={v}" for k, v in counts.items()))
     return {
         "docs": docs,
         "matrix": matrix,
@@ -366,16 +380,16 @@ def _feature_rerank(
 
 
 def _fetch_texts(keys: list[str]) -> dict[str, str]:
-    """Pull the full embedded `text` for the given doc keys, split by key shape."""
-    jira = [k for k in keys if not _is_pr_key(k)]
-    prs = [k for k in keys if _is_pr_key(k)]
+    """Pull the full embedded `text` for the given doc keys, grouped by source."""
+    by_collection: dict[str, list[str]] = {}
+    for k in keys:
+        spec = source_for_key(k)
+        if spec:
+            by_collection.setdefault(spec.collection, []).append(k)
     out: dict[str, str] = {}
-    if jira:
-        for d in tickets_collection().find({"key": {"$in": jira}}, {"_id": 0, "key": 1, "text": 1}):
-            out[d["key"]] = d.get("text") or ""
-    if prs:
-        for d in github_prs_collection().find(
-            {"key": {"$in": prs}}, {"_id": 0, "key": 1, "text": 1}
+    for collection, group in by_collection.items():
+        for d in get_collection(collection).find(
+            {"key": {"$in": group}}, {"_id": 0, "key": 1, "text": 1}
         ):
             out[d["key"]] = d.get("text") or ""
     return out
@@ -447,17 +461,18 @@ def semantic_search(query: str, k: int = 50, source: str = "both") -> list[dict]
     Args:
         query: Natural-language or identifier search string.
         k: Number of results to return. Default 50, max 200.
-        source: "jira" | "github" | "both" (default).
+        source: a source name (e.g. "jira", "github", "slack") or "both" for all.
 
     Returns:
-        List of {key, summary, status, assignee, score, url, source, jira_keys?, repo?}.
+        List of {key, summary, status, assignee, score, url, source, …}.
         `score` is the cosine similarity; ordering is the fused rank.
     """
     if not query or not query.strip():
         raise ValueError("query must not be empty")
     k = max(1, min(int(k), 200))
-    if source not in ("jira", "github", "slack", "both"):
-        raise ValueError(f"source must be jira/github/slack/both, got {source!r}")
+    valid_sources = {s.name for s in embeddable_sources()} | {"both"}
+    if source not in valid_sources:
+        raise ValueError(f"source must be one of {sorted(valid_sources)}, got {source!r}")
 
     idx = _index()
     docs = idx["docs"]
@@ -498,9 +513,11 @@ def semantic_search(query: str, k: int = 50, source: str = "both") -> list[dict]
             "source": d["source"],
             "score": round(float(cos[i]), 4),
         }
-        if d["source"] == "github":
+        spec = get_source(d["source"])
+        if d.get("repo") is not None:
             card["repo"] = d.get("repo")
-            card["jira_keys"] = d.get("jira_keys") or []
+        if spec and spec.ref_field:
+            card[spec.ref_field] = d.get(spec.ref_field) or []
         out.append(card)
     return out
 
@@ -550,11 +567,11 @@ def _resolve_user_doc(query: str) -> dict | None:
 @tool
 def resolve_user(query: str) -> dict:
     """Resolve a free-form user reference (name, GitHub login, email, or JIRA
-    displayName) into a unified user record with both JIRA and GitHub identifiers.
+    displayName) into a unified user record with each source's identifiers.
 
-    Use this before calling filter_jira(assignee=…) or filter_prs(author=…) when
-    the user references someone by partial name or alias — it returns the exact
-    strings needed for those filters.
+    `filter(source, …)` already auto-resolves person-valued fields, so you rarely
+    need this directly — reach for it when you want to inspect a person's
+    cross-source identities, or disambiguate a partial name before filtering.
 
     Returns a dict with: email, jira.displayName, jira.accountId, github.login,
     is_bot, match_source. Raises ValueError if no user matches.
@@ -565,84 +582,95 @@ def resolve_user(query: str) -> dict:
     return doc
 
 
-def _is_pr_key(key: str) -> bool:
-    """PR keys look like 'org/repo#123'; JIRA keys look like 'AS-4163'.
+def _identity(value: str, identity_path: str | None) -> str:
+    """Translate a person reference to one source's stored identity string.
 
-    The '#' separator is unique to PR keys, so it disambiguates the two sources.
+    `identity_path` is a dotted path into the unified_users record (e.g.
+    "jira.displayName", "github.login"). Falls back to the raw value when the
+    user can't be resolved, so an exact stored name still matches.
     """
-    return "#" in key
+    if not identity_path:
+        return value
+    user = _resolve_user_doc(value)
+    if not user:
+        return value
+    node: Any = user
+    for part in identity_path.split("."):
+        if not isinstance(node, dict):
+            return value
+        node = node.get(part)
+    return node or value
 
 
 @tool
 def get(key: str) -> dict:
-    """Fetch a single JIRA ticket or GitHub PR by key, auto-routed by key shape.
+    """Fetch a single item by key, auto-routed to its source by key shape.
 
     - JIRA ticket key (e.g. 'AS-4163') → full ticket fields including the
       description text and `linked_prs` (PRs that reference this ticket).
     - GitHub PR key (e.g. 'AsatoCorp/agent-svc#173') → full PR fields including
       body, branch, status, jira_keys, etc.
+    - Slack message key (e.g. 'C0AB123/1700000000.123456') → full message.
 
-    Raises ValueError if no item matches the key.
+    Raises ValueError if the key shape is unrecognised or no item matches.
     """
-    if _is_pr_key(key):
-        doc = github_prs_collection().find_one({"key": key}, {"embedding": 0})
-        if not doc:
-            raise ToolException(f"PR {key!r} not found")
-        return _clean(doc)
-    doc = tickets_collection().find_one({"key": key}, {"embedding": 0})
+    spec = source_for_key(key)
+    if not spec:
+        raise ToolException(f"unrecognised key shape: {key!r}")
+    doc = get_collection(spec.collection).find_one({"key": key}, {"embedding": 0})
     if not doc:
-        raise ToolException(f"JIRA ticket {key!r} not found")
+        raise ToolException(f"{spec.label} {key!r} not found")
     return _clean(doc)
 
 
-def _prs_for_jira(jira_key: str, limit: int) -> list[dict]:
+def _outbound_links(spec: SourceSpec, key: str, limit: int) -> list[dict]:
+    """Items that `key` points at (e.g. the JIRA tickets a PR references)."""
+    if not spec.ref_field or not spec.ref_target:
+        return []
+    doc = get_collection(spec.collection).find_one({"key": key}, {spec.ref_field: 1})
+    if not doc:
+        raise ToolException(f"{spec.label} {key!r} not found")
+    ref_keys = doc.get(spec.ref_field) or []
+    target = get_source(spec.ref_target)
+    if not ref_keys or not target:
+        return []
     cursor = (
-        github_prs_collection()
-        .find(
-            {"jira_keys": jira_key},
-            {
-                "key": 1,
-                "repo": 1,
-                "summary": 1,
-                "status": 1,
-                "url": 1,
-                "author": 1,
-                "merged": 1,
-                "updated": 1,
-            },
-        )
+        get_collection(target.collection)
+        .find({"key": {"$in": ref_keys}}, target.projection)
         .limit(int(limit))
     )
-    return [_clean(d) for d in cursor]
+    return [{**_clean(d), "source": target.name} for d in cursor]
 
 
-def _jira_for_pr(pr_key: str) -> list[dict]:
-    pr = github_prs_collection().find_one({"key": pr_key}, {"jira_keys": 1})
-    if not pr:
-        raise ValueError(f"PR {pr_key!r} not found")
-    keys = pr.get("jira_keys") or []
-    if not keys:
-        return []
-    cursor = tickets_collection().find(
-        {"key": {"$in": keys}},
-        {"key": 1, "summary": 1, "status": 1, "assignee": 1, "url": 1},
-    )
-    return [_clean(d) for d in cursor]
+def _inbound_links(spec: SourceSpec, key: str, limit: int) -> list[dict]:
+    """Items that point at `key` (e.g. the PRs / Slack msgs citing a ticket)."""
+    out: list[dict] = []
+    for referrer in referrers_to(spec.name):
+        cursor = (
+            get_collection(referrer.collection)
+            .find({referrer.ref_field: key}, referrer.projection)
+            .limit(int(limit))
+        )
+        out.extend({**_clean(d), "source": referrer.name} for d in cursor)
+    return out
 
 
 @tool
 def linked(key: str, limit: int = 20) -> list[dict]:
-    """Cross-source link hop, auto-routed by key shape.
+    """Cross-source link hop, auto-routed by key shape. Each result is tagged
+    with its `source`.
 
-    - JIRA key (e.g. 'AS-4163') → GitHub PRs whose branch/title/body references
-      it. Use when you have a ticket and need the code that addresses it.
-    - PR key (e.g. 'AsatoCorp/agent-svc#173') → JIRA tickets the PR references.
+    - A hub key (e.g. JIRA 'AS-4163') → the PRs and Slack messages that
+      reference it (inbound links).
+    - A referencing key (e.g. PR 'AsatoCorp/agent-svc#173') → the JIRA tickets
+      it points at (outbound links).
 
-    `limit` applies only to the JIRA → PRs direction.
+    `limit` caps results per related source.
     """
-    if _is_pr_key(key):
-        return _jira_for_pr(key)
-    return _prs_for_jira(key, limit)
+    spec = source_for_key(key)
+    if not spec:
+        raise ToolException(f"unrecognised key shape: {key!r}")
+    return _outbound_links(spec, key, limit) + _inbound_links(spec, key, limit)
 
 
 def _since(days: int | None) -> datetime | None:
@@ -651,198 +679,72 @@ def _since(days: int | None) -> datetime | None:
     return datetime.now(UTC) - timedelta(days=int(days))
 
 
+def _filter_clause(fld: FilterField, value: Any) -> dict:
+    """Translate one {field: value} criterion into a mongo find clause."""
+    if fld.kind == HAS_REFS:
+        if bool(value):
+            return {fld.mongo_field: {"$ne": []}}
+        return {fld.mongo_field: {"$in": [[], None]}}
+    if fld.kind == USER:
+        return {fld.mongo_field: _identity(str(value), fld.identity)}
+    v = fld.normalize(value) if fld.normalize and isinstance(value, str) else value
+    return {fld.mongo_field: v}
+
+
 @tool
-def filter_jira(
-    status: str | None = None,
-    assignee: str | None = None,
-    label: str | None = None,
-    issuetype: str | None = None,
-    epic_key: str | None = None,
-    fix_version: str | None = None,
+def filter(
+    source: str,
+    filters: dict[str, Any] | None = None,
     since_days: int | None = None,
     limit: int = 20,
-) -> list[dict]:
-    """Filter JIRA tickets by exact criteria (no semantic search).
+) -> list[dict] | dict:
+    """Filter one source's items by exact field criteria (no semantic search).
 
     Args:
-        status: e.g. 'To Do', 'In Progress', 'Done', 'Testing'.
-        assignee: JIRA displayName, GitHub login, or email — auto-resolved
-                  via unified_users.
-        label: any label, e.g. 'apr-bug-bash'.
-        issuetype: 'Task', 'Story', 'Bug', 'Epic'.
-        epic_key: parent epic key, e.g. 'AS-1000' — returns issues directly
-                  under that epic (Sub-tasks roll up via their Story, not here).
-        fix_version: target release name, e.g. 'Sprint 24' or 'v2.5'.
-        since_days: only tickets updated within last N days.
+        source: which source to filter — a name from list_collections()
+            (e.g. "jira", "github", "slack").
+        filters: {field: value} exact-match criteria. Valid fields vary by
+            source — list_collections() reports each source's filterable fields.
+            Person-valued fields (assignee, author) auto-resolve via
+            unified_users, so a GitHub login, JIRA name, or email all match.
+            Examples:
+              jira:   {"status": "In Progress", "assignee": "Akshay Reddy"}
+              github: {"repo": "agent-svc", "status": "merged"}
+                      {"has_jira_link": true}
+              slack:  {"channel": "engineering"}
+        since_days: only items updated within the last N days.
         limit: max results, default 20.
+
+    On an unknown source or field, returns {"error": …, "valid_*": [...]} so you
+    can correct the call rather than failing the turn.
     """
+    spec = get_source(source)
+    if not spec:
+        return {"error": f"unknown source {source!r}", "valid_sources": source_names()}
+
     q: dict = {}
-    if status:
-        q["status"] = status
-    if assignee:
-        u = _resolve_user_doc(assignee)
-        jira_name = (u.get("jira") or {}).get("displayName") if u else None
-        q["assignee"] = jira_name or assignee
-    if label:
-        q["labels"] = label
-    if issuetype:
-        q["issuetype"] = issuetype
-    if epic_key:
-        q["epic_key"] = epic_key
-    if fix_version:
-        q["fix_versions"] = fix_version
+    for arg, value in (filters or {}).items():
+        if value is None:
+            continue
+        fld = spec.field(arg)
+        if not fld:
+            return {
+                "error": f"source {source!r} has no filter field {arg!r}",
+                "valid_fields": spec.filterable_args(),
+            }
+        q.update(_filter_clause(fld, value))
+
     since = _since(since_days)
     if since:
-        q["updated"] = {"$gte": since.isoformat()}
+        q[spec.sort_field] = {"$gte": since.isoformat()}
+
     cursor = (
-        tickets_collection()
-        .find(
-            q,
-            {
-                "key": 1,
-                "summary": 1,
-                "status": 1,
-                "assignee": 1,
-                "issuetype": 1,
-                "epic_key": 1,
-                "parent_key": 1,
-                "labels": 1,
-                "updated": 1,
-                "url": 1,
-            },
-        )
-        .sort("updated", -1)
+        get_collection(spec.collection)
+        .find(q, spec.projection)
+        .sort(spec.sort_field, -1)
         .limit(int(limit))
     )
     return [_clean(d) for d in cursor]
-
-
-@tool
-def filter_prs(
-    repo: str | None = None,
-    status: str | None = None,
-    author: str | None = None,
-    has_jira_link: bool | None = None,
-    since_days: int | None = None,
-    limit: int = 20,
-) -> list[dict]:
-    """Filter GitHub PRs by exact criteria.
-
-    Args:
-        repo: 'AsatoCorp/agent-svc' (full name) or 'agent-svc' (short).
-        status: 'open' | 'closed' | 'merged' | 'draft'.
-        author: GitHub login, JIRA displayName, or email — auto-resolved
-                via unified_users.
-        has_jira_link: True to return only PRs with at least one jira_keys entry.
-        since_days: PRs updated within last N days.
-        limit: max results, default 20.
-    """
-    q: dict = {}
-    if repo:
-        q["repo"] = repo if "/" in repo else f"AsatoCorp/{repo}"
-    if status:
-        q["status"] = status
-    if author:
-        u = _resolve_user_doc(author)
-        gh_login = (u.get("github") or {}).get("login") if u else None
-        q["author"] = gh_login or author
-    if has_jira_link is True:
-        q["jira_keys"] = {"$ne": []}
-    elif has_jira_link is False:
-        q["jira_keys"] = {"$in": [[], None]}
-    since = _since(since_days)
-    if since:
-        q["updated"] = {"$gte": since.isoformat()}
-    cursor = (
-        github_prs_collection()
-        .find(
-            q,
-            {
-                "key": 1,
-                "repo": 1,
-                "summary": 1,
-                "status": 1,
-                "author": 1,
-                "jira_keys": 1,
-                "updated": 1,
-                "url": 1,
-                "merged": 1,
-            },
-        )
-        .sort("updated", -1)
-        .limit(int(limit))
-    )
-    return [_clean(d) for d in cursor]
-
-
-@tool
-def filter_slack(
-    channel: str | None = None,
-    author: str | None = None,
-    has_jira_link: bool | None = None,
-    since_days: int | None = None,
-    limit: int = 20,
-) -> list[dict]:
-    """Filter Slack messages by channel, author, JIRA link presence, or recency.
-
-    Args:
-        channel: channel name without the # prefix, e.g. 'engineering'.
-        author: display name, GitHub login, or email — auto-resolved via unified_users.
-        has_jira_link: True to return only messages that mention a JIRA ticket key.
-        since_days: only messages from the last N days.
-        limit: max results, default 20.
-    """
-    q: dict = {}
-    if channel:
-        q["channel_name"] = channel
-    if author:
-        u = _resolve_user_doc(author)
-        slack_name = None
-        if u:
-            identities = u.get("slack") or {}
-            slack_name = identities.get("display_name")
-        q["author_name"] = slack_name or author
-    if has_jira_link is True:
-        q["jira_keys"] = {"$ne": []}
-    elif has_jira_link is False:
-        q["jira_keys"] = {"$in": [[], None]}
-    since = _since(since_days)
-    if since:
-        q["updated"] = {"$gte": since.isoformat()}
-    cursor = (
-        slack_messages_collection()
-        .find(
-            q,
-            {
-                "key": 1,
-                "channel_name": 1,
-                "author_name": 1,
-                "summary": 1,
-                "jira_keys": 1,
-                "thread_ts": 1,
-                "is_thread_reply": 1,
-                "updated": 1,
-                "url": 1,
-            },
-        )
-        .sort("updated", -1)
-        .limit(int(limit))
-    )
-    return [_clean(d) for d in cursor]
-
-
-@tool
-def list_repos(min_prs: int = 1, limit: int = 50) -> list[dict]:
-    """List repos that have at least `min_prs` indexed PRs, sorted by count desc."""
-    pipeline = [
-        {"$group": {"_id": "$repo", "n": {"$sum": 1}}},
-        {"$match": {"n": {"$gte": int(min_prs)}}},
-        {"$sort": {"n": -1}},
-        {"$limit": int(limit)},
-    ]
-    return [
-        {"repo": d["_id"], "pr_count": d["n"]} for d in github_prs_collection().aggregate(pipeline)
-    ]
 
 
 _COLLECTION_DESCRIPTIONS = {
@@ -912,25 +814,64 @@ def _validate_pipeline(pipeline: list[dict]) -> None:
         _validate_stage(stage, i)
 
 
+_MAX_FIELD_EXAMPLES = 3
+_EXAMPLE_STR_CAP = 60
+
+
+def _collect_example(bucket: list, value: Any) -> None:
+    """Record up to a few distinct, compact example values for a field."""
+    if value is None or len(bucket) >= _MAX_FIELD_EXAMPLES:
+        return
+    if isinstance(value, list | dict):
+        return  # skip nested containers — keep examples readable
+    sample = value
+    if isinstance(value, str):
+        s = value.strip()
+        if not s:
+            return
+        sample = s[:_EXAMPLE_STR_CAP] + ("…" if len(s) > _EXAMPLE_STR_CAP else "")
+    if sample not in bucket:
+        bucket.append(sample)
+
+
+def _indexed_fields(coll: Any) -> list[str]:
+    """Top-level indexed fields — cheap to $match / sort on. Best-effort."""
+    fields: list[str] = []
+    try:
+        for spec in coll.index_information().values():
+            for field_name, _direction in spec.get("key", []):
+                if field_name != "_id" and field_name not in fields:
+                    fields.append(field_name)
+    except Exception:
+        return []
+    return fields
+
+
 @tool
 def list_collections() -> list[dict] | dict:
     """Enumerate the mongo collections the agent may read from.
 
-    Returns each collection's name, current document count, and a one-line
-    description of its purpose. Use this when you don't know which collection
+    For each collection: name, document count, a one-line description, indexed
+    fields (cheap to $match / sort on), and — for collections backed by a
+    connector source — the `source` name plus the fields you can pass to
+    `filter(source, …)`. Use this when you don't know which collection or source
     holds the data you need.
     """
     try:
         out = []
         for name, factory in ALLOWED_COLLECTIONS.items():
             coll = factory()
-            out.append(
-                {
-                    "name": name,
-                    "count": coll.estimated_document_count(),
-                    "description": _COLLECTION_DESCRIPTIONS.get(name, ""),
-                }
-            )
+            entry: dict[str, Any] = {
+                "name": name,
+                "count": coll.estimated_document_count(),
+                "description": _COLLECTION_DESCRIPTIONS.get(name, ""),
+                "indexed_fields": _indexed_fields(coll),
+            }
+            spec = source_for_collection(name)
+            if spec:
+                entry["source"] = spec.name
+                entry["filter_fields"] = {f.arg: f.help for f in spec.filter_fields}
+            out.append(entry)
         return out
     except Exception as e:
         return {"error": f"list_collections failed: {e}"}
@@ -948,8 +889,10 @@ def describe_collection(collection: str, sample_size: int = 20) -> dict:
         sample_size: how many docs to sample (default 20, max 100).
 
     Returns:
-        {"collection", "sampled", "fields": {field: {"types": [...], "coverage": float}}}
-        or {"error": str} on failure.
+        {"collection", "sampled", "fields": {field: {"types": [...],
+         "coverage": float, "examples": [...]}}} or {"error": str} on failure.
+        `examples` lists a few distinct sample values — handy for spotting enum
+        fields (e.g. status) before composing a query.
     """
     try:
         coll = get_collection(collection)
@@ -965,13 +908,15 @@ def describe_collection(collection: str, sample_size: int = 20) -> dict:
             if k in _DESCRIBE_DROP_FIELDS:
                 continue
             t = "null" if v is None else type(v).__name__
-            entry = fields.setdefault(k, {"types": set(), "count": 0})
+            entry = fields.setdefault(k, {"types": set(), "count": 0, "examples": []})
             entry["types"].add(t)
             entry["count"] += 1
+            _collect_example(entry["examples"], v)
     out_fields = {
         k: {
             "types": sorted(v["types"]),
             "coverage": round(v["count"] / sampled, 2) if sampled else 0.0,
+            "examples": v["examples"],
         }
         for k, v in sorted(fields.items())
     }
@@ -1012,9 +957,9 @@ def mongo_query(
 ) -> dict:
     """Run a read-only aggregation pipeline on one collection.
 
-    Use this for ad-hoc queries the narrow tools (filter_jira / filter_prs /
-    count_*) don't cover — e.g. grouping, joins via $lookup, custom projections,
-    or filters on fields like fix_versions / labels / nested jira_keys.
+    Use this for ad-hoc queries the narrow tools (filter / mongo_count) don't
+    cover — e.g. grouping, joins via $lookup, custom projections, or filters on
+    fields like fix_versions / labels / nested jira_keys.
 
     Safety bounds (enforced server-side):
     - pipeline must be <= 20 stages, each a single-key {"$op": {...}} dict
@@ -1193,35 +1138,16 @@ def who_knows(topic: str, limit: int = 5) -> list[dict]:
 
 GENERIC_MONGO_TOOLS = [list_collections, describe_collection, mongo_count, mongo_query]
 
-JIRA_TOOLS = [
-    get,
-    filter_jira,
-    linked,
-    resolve_user,
-    semantic_search,
-    data_freshness,
-    *GENERIC_MONGO_TOOLS,
-]
-GITHUB_TOOLS = [
-    get,
-    filter_prs,
-    linked,
-    list_repos,
-    resolve_user,
-    semantic_search,
-    data_freshness,
-    *GENERIC_MONGO_TOOLS,
-]
+#: The agent's full toolkit. Source-agnostic: `filter`, `get`, `linked`, and
+#: `semantic_search` all work across every registered source, so adding a
+#: connector needs no change here.
 ALL_TOOLS = [
     semantic_search,
     resolve_user,
     who_knows,
     get,
-    filter_jira,
-    filter_prs,
-    filter_slack,
+    filter,
     linked,
-    list_repos,
     data_freshness,
     *GENERIC_MONGO_TOOLS,
 ]

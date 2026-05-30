@@ -82,10 +82,16 @@ def test_chat_persists_messages(client, monkeypatch):
             msgs.append(
                 AIMessage(
                     content="",
-                    tool_calls=[{"id": "c1", "name": "filter_jira", "args": {"status": "open"}}],
+                    tool_calls=[
+                        {
+                            "id": "c1",
+                            "name": "filter",
+                            "args": {"source": "jira", "filters": {"status": "open"}},
+                        }
+                    ],
                 )
             )
-            msgs.append(ToolMessage(content="42", tool_call_id="c1", name="filter_jira"))
+            msgs.append(ToolMessage(content="42", tool_call_id="c1", name="filter"))
             msgs.append(AIMessage(content="There are 42 open tickets."))
             return {"messages": msgs}
 
@@ -107,7 +113,7 @@ def test_chat_persists_messages(client, monkeypatch):
         assert r.status_code == 200, r.text
         data = r.json()
         assert "42" in data["answer"]
-        assert any(tc["name"] == "filter_jira" for tc in data["tool_calls"])
+        assert any(tc["name"] == "filter" for tc in data["tool_calls"])
 
         detail = client.get(f"/api/sessions/{sid}", headers=hdrs).json()
         assert len(detail["messages"]) >= 4  # human + ai+tool_call + tool + final ai

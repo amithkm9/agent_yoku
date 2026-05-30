@@ -47,7 +47,7 @@ search.** Depth across the chain beats breadth across the company.
 
 - Three sources: JIRA + GitHub + Slack
 - Source-specific collections: `jira_tickets`, `github_prs`
-- Source-specific agent tools: `filter_jira`, `filter_prs`, `semantic_search`
+- Source-agnostic agent tools driven by a source registry: `filter(source, …)`, `get`, `linked`, `semantic_search`
 - Linking: regex for `AS-\d+` JIRA keys in PR text only
 - Identity: JIRA ↔ GitHub join on email (`unified_users`)
 - Search: hybrid vector + BM25 + RRF + ZeroEntropy reranker

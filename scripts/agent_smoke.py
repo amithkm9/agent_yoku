@@ -32,15 +32,14 @@ CASES: list[dict] = [
     {
         "name": "count tickets by fix_version",
         "query": "how many JIRA tickets target release-05-26-2026?",
-        "expect_tools": {"mongo_count", "filter_jira"},  # either is fine
+        "expect_tools": {"mongo_count", "filter"},  # either is fine
         "tools_mode": "any",
         "expect_in_answer": ["release-05-26-2026"],
     },
     {
-        "name": "list repos by PR count",
+        "name": "repos by PR count",
         "query": "top 3 repos by PR count",
-        "expect_tools": {"list_repos", "mongo_query"},
-        "tools_mode": "any",
+        "expect_tools": {"mongo_query"},
         "expect_in_answer": ["AsatoCorp/"],
     },
     {

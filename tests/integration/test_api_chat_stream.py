@@ -79,12 +79,18 @@ class FakeStreamAgent:
         # State snapshot 1: tool call emitted.
         ai_tool_msg = AIMessage(
             content="",
-            tool_calls=[{"id": "tc1", "name": "filter_jira", "args": {"status": "open"}}],
+            tool_calls=[
+                {
+                    "id": "tc1",
+                    "name": "filter",
+                    "args": {"source": "jira", "filters": {"status": "open"}},
+                }
+            ],
         )
         yield {"messages": prior[:-1] + [human_msg, ai_tool_msg]}
 
         # State snapshot 2: tool result + final answer.
-        tool_result = ToolMessage(content="7", tool_call_id="tc1", name="filter_jira")
+        tool_result = ToolMessage(content="7", tool_call_id="tc1", name="filter")
         final_ai = AIMessage(content="There are 7 open tickets.")
         yield {"messages": prior[:-1] + [human_msg, ai_tool_msg, tool_result, final_ai]}
 
@@ -149,7 +155,7 @@ def test_stream_emits_tool_then_answer(client, monkeypatch):
         answer_events = [e for e in events if e.get("event") == "answer"]
 
         assert len(tool_events) >= 1, "expected at least one 'tool' SSE event"
-        assert tool_events[0]["data"]["name"] == "filter_jira"
+        assert tool_events[0]["data"]["name"] == "filter"
 
         assert len(answer_events) == 1, "expected exactly one 'answer' SSE event"
         answer_data = answer_events[0]["data"]
@@ -179,7 +185,7 @@ def test_stream_answer_contains_tool_calls_summary(client, monkeypatch):
         events = _parse_sse(r.content)
         answer = next(e for e in events if e.get("event") == "answer")
         tool_calls = answer["data"].get("tool_calls", [])
-        assert any(tc["name"] == "filter_jira" for tc in tool_calls)
+        assert any(tc["name"] == "filter" for tc in tool_calls)
     finally:
         _drop(tenant)
 

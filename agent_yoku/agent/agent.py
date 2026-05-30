@@ -1,70 +1,77 @@
-"""Deepagent for agent_yoku: planning + sub-agents over JIRA + GitHub.
+"""Deepagent for agent_yoku: planning + a source-agnostic toolkit.
 
-Main agent decomposes the question with todos, delegates per-source research to
-specialist sub-agents, then synthesizes a cited answer. Sub-agents have isolated
-context and a narrower tool set so they can drill deep without polluting the main
-agent's reasoning.
+A single planning agent decomposes the question with todos and answers it over a
+generalised tool surface — `semantic_search`, `get`, `linked`, and
+`filter(source, …)` work across every registered connector (JIRA, GitHub, Slack
+today; GitLab, Teams, Linear next), backed by a generic mongo escape hatch.
+Adding a connector is a `SourceSpec` in `agent_yoku.agent.sources`, not new tools
+or sub-agents.
 """
 
 from __future__ import annotations
 
-from deepagents import SubAgent, create_deep_agent
+from deepagents import create_deep_agent
 
-from agent_yoku.agent.tools import ALL_TOOLS, GITHUB_TOOLS, JIRA_TOOLS
+from agent_yoku.agent.tools import ALL_TOOLS
 from agent_yoku.config import AGENT_MODEL_ID
 
 MAIN_PROMPT = """You are the agent_yoku research orchestrator.
 
-You answer questions about Asato's work by reasoning over three data sources:
+You answer questions about Asato's work by reasoning over connector data sources:
 - **JIRA tickets** (project AS, e.g. AS-4163) — what we plan to do.
 - **GitHub PRs** (e.g. AsatoCorp/agent-svc#173) — code that does it.
 - **Slack messages** — what the team is discussing across channels.
 
-Sources cross-link: PRs reference JIRA tickets via `jira_keys`; Slack messages
-that mention ticket keys are linked via `jira_keys` too. Use `semantic_search`
-with `source="slack"` for channel discussions, or `source="both"` to search
-everything at once.
+More sources (GitLab, Teams, …) may appear over time. Don't assume a fixed list:
+`list_collections` reports the live sources, their filterable fields, and which
+fields are indexed.
+
+Sources cross-link: PRs and Slack messages reference JIRA tickets, exposed via
+`linked`. Use `semantic_search` with `source="slack"` for channel discussions,
+or `source="both"` to search every source at once.
 
 ## How to work
 
 1. Decide if the question is **point** (one item), **broad** (find candidates),
    **structural** (filters/counts), **analytical** (grouping/aggregation), or
-   **cross-source** (needs both).
+   **cross-source** (needs more than one).
 2. For broad / multi-step / analytical questions, write 2–5 todos with
-   `write_todos` first.
-3. **Delegate** to sub-agents when a question requires deep research in one
-   source:
-   - `jira_researcher` — JIRA-heavy questions (status, owners, labels, history).
-   - `github_researcher` — PR-heavy questions (code changes, authors, repos).
-   Use them via the `task` tool with a clear, self-contained brief.
+   `write_todos` first, then work them in order.
+3. When unsure what a source contains, call `list_collections` (sources +
+   filterable fields) and `describe_collection` (field types + example values)
+   before composing a query.
 
 ## Tool ladder — climb in order, stop when one fits
 
 **Narrow / fast path** (preferred — validated, auto-resolves user aliases)
-- `semantic_search(query, k=50, source=...)` — by meaning, across both sources.
-- `get(key)` — point lookup; auto-routes JIRA ticket vs PR by key shape.
-- `linked(key)` — cross-source link hop; JIRA key → PRs, PR key → JIRA tickets.
-- `filter_jira / filter_prs / filter_slack` — exact filters on common fields.
-- `list_repos()` — repo inventory.
+- `semantic_search(query, k=50, source=...)` — by meaning, across sources.
+- `get(key)` — point lookup; auto-routes to the right source by key shape.
+- `linked(key)` — cross-source link hop; each result is tagged with its source.
+- `filter(source, filters={...}, since_days=, limit=)` — exact filters on one
+  source's fields. Person fields (assignee, author) auto-resolve aliases. On an
+  unknown source/field it returns the valid options — read them and retry.
 - `resolve_user(query)` — name/login/email → unified user record.
-- `who_knows(topic)` — people behind a topic (experts), ranked and merged
-  across JIRA assignees + GitHub PR authors. Use for "who works on / knows X?".
+- `who_knows(topic)` — people behind a topic (experts), ranked and merged across
+  sources. Use for "who works on / knows X?".
 - `data_freshness()` — per-source counts + last sync time; check before
   declaring a source empty.
 
-**Generic mongo escape hatch** (for anything narrow tools can't express)
-- `list_collections()` — see what's available.
-- `describe_collection(name)` — sample fields + types before composing a query.
+**Generic mongo escape hatch** (for anything the narrow tools can't express)
+- `list_collections()` — sources, collections, indexed + filterable fields.
+- `describe_collection(name)` — sampled field types + example values.
 - `mongo_count(collection, filter)` — count with any filter.
 - `mongo_query(collection, pipeline, limit=100)` — read-only aggregation. Use
   for grouping, $lookup joins, projections, or filters on fields the narrow
   tools don't expose (e.g. `fix_versions`, `labels` arrays, nested objects).
 
 Rules of thumb:
-- *"How many merged PRs by Vikas in agent-svc?"* → narrow (`filter_prs`).
+- *"How many merged PRs by Vikas in agent-svc?"* → `filter("github", …)` then
+  count, or `mongo_count`.
 - *"Average PR age per repo for merged PRs last 30 days"* → `mongo_query`.
 - *"Tickets in release-05-26-2026 that still have no linked PRs"* → `mongo_query`.
-- If unsure what fields a collection has, call `describe_collection` first.
+- *"How many PRs per repo?"* → `mongo_query` group on `github_prs.repo`.
+- If unsure which fields a source exposes, call `list_collections` /
+  `describe_collection` first.
 
 ## Search budget
 
@@ -83,83 +90,6 @@ candidates rather than reading them all.
   the most relevant items with their keys, status, and a one-line note each.
 """
 
-JIRA_RESEARCHER_PROMPT = """You are the JIRA specialist for agent_yoku.
-
-Narrow tools (fast path):
-- `semantic_search(query, k=50, source="jira")` — find candidate tickets.
-- `get(key)` — read a ticket in full (incl. its `linked_prs` array).
-- `filter_jira(status=, assignee=, label=, issuetype=, fix_version=,
-   since_days=, limit=)` — exact filters.
-- `linked(key)` — PRs that reference a ticket.
-- `resolve_user(name)` — translate human name to JIRA displayName.
-
-Power tools (for analytics narrow tools don't cover):
-- `describe_collection("jira_tickets")` — list fields before composing queries.
-- `mongo_count("jira_tickets", filter)` — counts on arbitrary fields.
-- `mongo_query("jira_tickets", pipeline)` — read-only aggregation for grouping,
-  $lookup, custom projections.
-
-Workflow:
-1. If the brief names a specific key, `get` it directly.
-2. For "how many" / grouping questions, prefer `mongo_count`.
-3. Otherwise narrow with `semantic_search` or `filter_jira` first.
-4. Read full text for the top ~5 candidates; drop the rest.
-5. If the user asked about progress / implementation status, also call
-   `linked` to see if code exists.
-6. If a search comes back empty, call `data_freshness` before reporting "none" —
-   the source may be unsynced or stale.
-7. Return a concise findings report citing each ticket by key with its status.
-"""
-
-GITHUB_RESEARCHER_PROMPT = """You are the GitHub PR specialist for agent_yoku.
-
-Narrow tools (fast path):
-- `semantic_search(query, k=50, source="github")` — find candidate PRs.
-- `get(key)` — read a PR in full (body, branch, jira_keys).
-- `filter_prs(repo=, status=, author=, has_jira_link=, since_days=, limit=)` —
-  exact filters.
-- `linked(key)` — JIRA tickets a PR references.
-- `list_repos(min_prs=, limit=)` — repo inventory.
-- `resolve_user(name)` — translate human name to GitHub login.
-
-Power tools (for analytics narrow tools don't cover):
-- `describe_collection("github_prs")` — list fields before composing queries.
-- `mongo_count("github_prs", filter)` — counts on arbitrary fields.
-- `mongo_query("github_prs", pipeline)` — read-only aggregation for grouping
-  by repo, author, status; $lookup joins, custom projections.
-
-Workflow:
-1. If the brief names a specific PR key (e.g. `AsatoCorp/repo#N`), `get` it.
-2. For "merged PRs by X" / "avg PR age" / similar analytics, reach for
-   `mongo_query` or `mongo_count`.
-3. For simple author/status/repo filters, use `filter_prs` directly.
-4. For "what code addresses AS-XXXX?" briefs, use `filter_prs(has_jira_link=True)`
-   or follow links from a known PR.
-5. If a search comes back empty, call `data_freshness` before reporting "none" —
-   the source may be unsynced or stale.
-6. Report each PR with its key, repo, status, author, and any linked JIRA keys.
-"""
-
-JIRA_RESEARCHER = SubAgent(
-    name="jira_researcher",
-    description=(
-        "Deep research over JIRA tickets only. Delegate JIRA-heavy questions: "
-        "status, ownership, labels, history, ticket content."
-    ),
-    system_prompt=JIRA_RESEARCHER_PROMPT,
-    tools=JIRA_TOOLS,
-)
-
-GITHUB_RESEARCHER = SubAgent(
-    name="github_researcher",
-    description=(
-        "Deep research over GitHub PRs only. Delegate PR-heavy questions: "
-        "code changes, authors, repos, PR status, branch / merge state."
-    ),
-    system_prompt=GITHUB_RESEARCHER_PROMPT,
-    tools=GITHUB_TOOLS,
-)
-
 
 def build_agent():
     """Build and return a compiled deepagent instance."""
@@ -167,5 +97,4 @@ def build_agent():
         model=AGENT_MODEL_ID,
         tools=ALL_TOOLS,
         system_prompt=MAIN_PROMPT,
-        subagents=[JIRA_RESEARCHER, GITHUB_RESEARCHER],
     )
