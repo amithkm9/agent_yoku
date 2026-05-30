@@ -141,6 +141,49 @@ POST /api/v1/ingest
   "author": "alice@company.ai", "updated": "2024-03-15T10:00:00Z", "meta": {} }
 ```
 
+### Canonical datasets (the primitives)
+
+The chain ingests many *sources*, but the agent reasons over a small set of **canonical datasets**
+(primitives). Because this is an LLM/semantic product — it reasons over text + relationships, not
+tabular joins — a small uniform vocabulary beats many precise schemas. Everything else is a variant,
+not a new dataset:
+
+- **New vendor of an existing kind → a mapper.** GitLab → `pull_request`, Teams → `conversation`.
+- **A variant of a kind → a `type` field.** email / meeting transcript / chat are all
+  `conversation` (`channel_type`); ticket / incident / epic are all `work_item` (`type`).
+- **A genuinely new kind → a new primitive.** Only a new *domain* earns one.
+
+| Primitive      | Absorbs (via `type`)                          | Fed by |
+|----------------|-----------------------------------------------|--------|
+| `person`       | —                                             | every source's users → unified |
+| `conversation` | chat, **email**, **meeting transcript**, comments | Slack, Teams, Outlook, Zoom |
+| `work_item`    | ticket, issue, task, incident, epic           | Jira, Linear, PagerDuty, Planner |
+| `pull_request` | *(kept separate — see decision)*              | GitHub, GitLab, Bitbucket |
+| `document`     | page, wiki, spec, file, README                | Confluence, Notion, SharePoint, repos |
+| `event` *(with ops)* | deploy, build, commit, alert            | Argo CD, GitHub Actions, Sentry |
+
+`conversation` deliberately absorbs **email and meeting transcripts** — both are "people exchanging
+text over time," distinguished by `channel_type`, not separate datasets. Same logic folds `incident`
+into `work_item` (tracked work with a `severity`).
+
+**Decision — `pull_request` stays its own primitive (not folded into `document`/`artifact`).**
+A PR is a *process* artifact — lifecycle (open → merged), branch, CI state, review threads, and a
+typed link to work items — not inert content. Code is central to this product, so keeping PRs
+first-class makes "what shipped / what's unmerged / unreviewed" first-class queries. This is the
+deliberate **engineering-intelligence** stance; a horizontal "any-org knowledge" product would
+instead fold PR into a generic `artifact`. The door stays open: because every primitive shares one
+common core (`key, title, body, author, updated, url, refs, embedding`), PR can be demoted to an
+`artifact` subtype later — a cheap, reversible change.
+
+The agent filters along three axes: **primitive** (`conversation`), **type** (`meeting`), and
+**provider** (`teams`). `semantic_search` is unchanged by this — it indexes the text blob uniformly
+and never cares which primitive a row is; primitives just relabel the filter axis from vendor →
+concept.
+
+The `domain` field in the unified model below carries the primitive. The granular labels used
+elsewhere in this doc map onto them: `messages → conversation`, `issues`/`incidents → work_item`,
+`code → pull_request`, `docs → document`, `deploy`/`errors → event`.
+
 ### Unified document model
 
 Every source produces the same shape — the agent never needs to know which source is underneath:
