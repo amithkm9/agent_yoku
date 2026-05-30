@@ -5,9 +5,10 @@ Design principles:
 - Tools return JSON-serializable data (no ObjectId, no datetime objects).
 - Lightweight by default; the agent calls get_* tools to drill into specific items.
 - Errors raise ValueError with a clear message so the agent can adapt.
-- Source-agnostic: per-source knowledge (collections, key shapes, filterable
-  fields, cross-source links) lives in `agent_yoku.agent.sources`, so onboarding
-  a new connector is a registry entry, not edits across every tool here.
+- Schema-driven: collection descriptions + filterable fields come from the
+  Pydantic models via `schema_registry`; cross-collection links from
+  `relationships`; key routing from `sources`. Onboarding a connector is a model
+  + a SourceSpec + relationship entries, not edits across every tool here.
 """
 
 from __future__ import annotations
@@ -22,15 +23,25 @@ from typing import Any
 import numpy as np
 from langchain_core.tools import ToolException, tool
 
+from agent_yoku.agent.relationships import (
+    Relationship,
+    inbound_relationships,
+    outbound_relationships,
+    relationships_for,
+)
 from agent_yoku.agent.rerank import rerank
-from agent_yoku.agent.sources import (
+from agent_yoku.agent.schema_registry import (
     HAS_REFS,
     USER,
     FilterField,
-    SourceSpec,
+    collection_description,
+    field_specs,
+)
+from agent_yoku.agent.schema_registry import filter_fields as schema_filter_fields
+from agent_yoku.agent.schema_registry import projection as schema_projection
+from agent_yoku.agent.sources import (
     embeddable_sources,
     get_source,
-    referrers_to,
     source_for_collection,
     source_for_key,
     source_names,
@@ -119,10 +130,11 @@ def _load_index() -> dict[str, Any]:
         # tickets, or the PRs linked onto a ticket. Doubles as the corroboration
         # flag and as the lookup for query-aware adjacency reranking.
         spec = get_source(d["source"])
-        if spec and spec.ref_field:
-            d["link_keys"] = list(d.get(spec.ref_field) or [])
+        outs = outbound_relationships(spec.collection) if spec else []
+        if outs:
+            d["link_keys"] = list(d.get(outs[0].join.local_field) or [])
         else:
-            # The link hub (e.g. JIRA) has no outbound ref_field; its links are
+            # The link hub (e.g. JIRA) has no outbound relationship; its links are
             # materialised on the doc as `linked_prs` at ingest time.
             d["link_keys"] = [
                 p["key"]
@@ -516,8 +528,9 @@ def semantic_search(query: str, k: int = 50, source: str = "both") -> list[dict]
         spec = get_source(d["source"])
         if d.get("repo") is not None:
             card["repo"] = d.get("repo")
-        if spec and spec.ref_field:
-            card[spec.ref_field] = d.get(spec.ref_field) or []
+        if spec:
+            for rel in outbound_relationships(spec.collection):
+                card[rel.join.local_field] = d.get(rel.join.local_field) or []
         out.append(card)
     return out
 
@@ -623,54 +636,61 @@ def get(key: str) -> dict:
     return _clean(doc)
 
 
-def _outbound_links(spec: SourceSpec, key: str, limit: int) -> list[dict]:
-    """Items that `key` points at (e.g. the JIRA tickets a PR references)."""
-    if not spec.ref_field or not spec.ref_target:
-        return []
-    doc = get_collection(spec.collection).find_one({"key": key}, {spec.ref_field: 1})
+def _entity_source_name(collection: str) -> str:
+    """Tag for results from a collection — its source name, else the collection."""
+    spec = source_for_collection(collection)
+    return spec.name if spec else collection
+
+
+def _outbound_links(rel: Relationship, key: str, limit: int) -> list[dict]:
+    """Items `key` references, via `rel` (key belongs to rel.entity1)."""
+    doc = get_collection(rel.entity1).find_one({"key": key}, {rel.join.local_field: 1})
     if not doc:
-        raise ToolException(f"{spec.label} {key!r} not found")
-    ref_keys = doc.get(spec.ref_field) or []
-    target = get_source(spec.ref_target)
-    if not ref_keys or not target:
+        raise ToolException(f"{key!r} not found")
+    ref_keys = doc.get(rel.join.local_field) or []
+    if not ref_keys:
         return []
     cursor = (
-        get_collection(target.collection)
-        .find({"key": {"$in": ref_keys}}, target.projection)
+        get_collection(rel.entity2)
+        .find({rel.join.foreign_field: {"$in": ref_keys}}, schema_projection(rel.entity2))
         .limit(int(limit))
     )
-    return [{**_clean(d), "source": target.name} for d in cursor]
+    tag = _entity_source_name(rel.entity2)
+    return [{**_clean(d), "source": tag} for d in cursor]
 
 
-def _inbound_links(spec: SourceSpec, key: str, limit: int) -> list[dict]:
-    """Items that point at `key` (e.g. the PRs / Slack msgs citing a ticket)."""
-    out: list[dict] = []
-    for referrer in referrers_to(spec.name):
-        cursor = (
-            get_collection(referrer.collection)
-            .find({referrer.ref_field: key}, referrer.projection)
-            .limit(int(limit))
-        )
-        out.extend({**_clean(d), "source": referrer.name} for d in cursor)
-    return out
+def _inbound_links(rel: Relationship, key: str, limit: int) -> list[dict]:
+    """Items referencing `key`, via `rel` (key belongs to rel.entity2)."""
+    cursor = (
+        get_collection(rel.entity1)
+        .find({rel.join.local_field: key}, schema_projection(rel.entity1))
+        .limit(int(limit))
+    )
+    tag = _entity_source_name(rel.entity1)
+    return [{**_clean(d), "source": tag} for d in cursor]
 
 
 @tool
 def linked(key: str, limit: int = 20) -> list[dict]:
     """Cross-source link hop, auto-routed by key shape. Each result is tagged
-    with its `source`.
+    with its `source`. Links come from the relationship registry.
 
     - A hub key (e.g. JIRA 'AS-4163') → the PRs and Slack messages that
       reference it (inbound links).
     - A referencing key (e.g. PR 'AsatoCorp/agent-svc#173') → the JIRA tickets
       it points at (outbound links).
 
-    `limit` caps results per related source.
+    `limit` caps results per related collection.
     """
     spec = source_for_key(key)
     if not spec:
         raise ToolException(f"unrecognised key shape: {key!r}")
-    return _outbound_links(spec, key, limit) + _inbound_links(spec, key, limit)
+    out: list[dict] = []
+    for rel in outbound_relationships(spec.collection):
+        out += _outbound_links(rel, key, limit)
+    for rel in inbound_relationships(spec.collection):
+        out += _inbound_links(rel, key, limit)
+    return out
 
 
 def _since(days: int | None) -> datetime | None:
@@ -722,15 +742,16 @@ def filter(
     if not spec:
         return {"error": f"unknown source {source!r}", "valid_sources": source_names()}
 
+    fields = {f.arg: f for f in schema_filter_fields(spec.collection)}
     q: dict = {}
     for arg, value in (filters or {}).items():
         if value is None:
             continue
-        fld = spec.field(arg)
+        fld = fields.get(arg)
         if not fld:
             return {
                 "error": f"source {source!r} has no filter field {arg!r}",
-                "valid_fields": spec.filterable_args(),
+                "valid_fields": list(fields),
             }
         q.update(_filter_clause(fld, value))
 
@@ -740,20 +761,12 @@ def filter(
 
     cursor = (
         get_collection(spec.collection)
-        .find(q, spec.projection)
+        .find(q, schema_projection(spec.collection))
         .sort(spec.sort_field, -1)
         .limit(int(limit))
     )
     return [_clean(d) for d in cursor]
 
-
-_COLLECTION_DESCRIPTIONS = {
-    "jira_tickets": "Asato JIRA tickets (project AS). Fields: key, summary, description, status, issuetype, epic_key, parent_key, assignee, reporter, priority, labels, fix_versions, created, updated, url, linked_prs.",
-    "github_prs": "AsatoCorp GitHub PRs. Fields: key (org/repo#N), repo, number, summary, description, status (open|closed|merged|draft), author, author_email, assignee, labels, base, head, merged, merged_at, comments_count, created, updated, url, jira_keys.",
-    "users": "JIRA users directory. Fields: accountId, displayName, emailAddress, active, accountType.",
-    "github_users": "AsatoCorp GitHub org members. Fields: login, id, name, email, is_bot, type, company.",
-    "unified_users": "Cross-walk between JIRA + GitHub users. Fields: user_id, email, jira.accountId, jira.displayName, github.login, github.name, is_bot, match_source.",
-}
 
 _BLOCKED_STAGES = {"$out", "$merge", "$function", "$accumulator", "$where"}
 
@@ -847,69 +860,69 @@ def _indexed_fields(coll: Any) -> list[str]:
     return fields
 
 
+def _relationship_summaries(collection: str) -> list[dict]:
+    """Relationships a collection participates in, for discovery."""
+    out = []
+    for r in relationships_for(collection):
+        other = r.entity2 if r.entity1 == collection else r.entity1
+        out.append({"with": other, "type": r.relationship_type, "via": r.join.local_field})
+    return out
+
+
 @tool
 def list_collections() -> list[dict] | dict:
     """Enumerate the mongo collections the agent may read from.
 
-    For each collection: name, document count, a one-line description, indexed
-    fields (cheap to $match / sort on), and — for collections backed by a
-    connector source — the `source` name plus the fields you can pass to
-    `filter(source, …)`. Use this when you don't know which collection or source
-    holds the data you need.
+    For each collection: name, document count, a description (from its schema),
+    indexed fields (cheap to $match / sort on), and the relationships it
+    participates in. Collections backed by a connector source also report the
+    `source` name, an example `key`, and the fields you can pass to
+    `filter(source, …)`. This is the live source of truth — call it to discover
+    which sources, collections, and links exist; don't assume a fixed set.
     """
     try:
         out = []
         for name, factory in ALLOWED_COLLECTIONS.items():
             coll = factory()
+            spec = source_for_collection(name)
             entry: dict[str, Any] = {
                 "name": name,
                 "count": coll.estimated_document_count(),
-                "description": _COLLECTION_DESCRIPTIONS.get(name, ""),
+                "description": collection_description(name),
                 "indexed_fields": _indexed_fields(coll),
+                "relationships": _relationship_summaries(name),
             }
-            spec = source_for_collection(name)
             if spec:
                 entry["source"] = spec.name
-                entry["filter_fields"] = {f.arg: f.help for f in spec.filter_fields}
+                entry["key_example"] = spec.key_example
+                entry["filter_fields"] = {f.arg: f.help for f in schema_filter_fields(name)}
             out.append(entry)
         return out
     except Exception as e:
         return {"error": f"list_collections failed: {e}"}
 
 
-@tool
-def describe_collection(collection: str, sample_size: int = 20) -> dict:
-    """Sample N documents from a collection and report which fields appear and
-    what types they have. Useful before composing a `mongo_query` to make sure
-    you reference field names that actually exist.
+def _sample_examples(coll: Any, n: int, field_names: set[str]) -> dict[str, list]:
+    """A few distinct live example values per field, from a random sample."""
+    examples: dict[str, list] = {}
+    for doc in coll.aggregate([{"$sample": {"size": n}}]):
+        for k, v in doc.items():
+            if k in field_names:
+                _collect_example(examples.setdefault(k, []), v)
+    return examples
 
-    Args:
-        collection: name from list_collections() (e.g. "jira_tickets",
-            "github_prs", "unified_users").
-        sample_size: how many docs to sample (default 20, max 100).
 
-    Returns:
-        {"collection", "sampled", "fields": {field: {"types": [...],
-         "coverage": float, "examples": [...]}}} or {"error": str} on failure.
-        `examples` lists a few distinct sample values — handy for spotting enum
-        fields (e.g. status) before composing a query.
-    """
-    try:
-        coll = get_collection(collection)
-    except ValueError as e:
-        return {"error": str(e), "allowed": sorted(ALLOWED_COLLECTIONS)}
-    n = max(1, min(int(sample_size), 100))
-    cursor = coll.aggregate([{"$sample": {"size": n}}])
+def _describe_by_sampling(coll: Any, collection: str, n: int) -> dict:
+    """Fallback for collections with no model — infer fields from a sample."""
     fields: dict[str, dict] = {}
     sampled = 0
-    for doc in cursor:
+    for doc in coll.aggregate([{"$sample": {"size": n}}]):
         sampled += 1
         for k, v in doc.items():
             if k in _DESCRIBE_DROP_FIELDS:
                 continue
-            t = "null" if v is None else type(v).__name__
             entry = fields.setdefault(k, {"types": set(), "count": 0, "examples": []})
-            entry["types"].add(t)
+            entry["types"].add("null" if v is None else type(v).__name__)
             entry["count"] += 1
             _collect_example(entry["examples"], v)
     out_fields = {
@@ -921,6 +934,50 @@ def describe_collection(collection: str, sample_size: int = 20) -> dict:
         for k, v in sorted(fields.items())
     }
     return {"collection": collection, "sampled": sampled, "fields": out_fields}
+
+
+@tool
+def describe_collection(collection: str, sample_size: int = 20) -> dict:
+    """Report a collection's fields from its schema — name, type, and description
+    — plus a few live example values per field. Use before composing a
+    `mongo_query` to reference fields that actually exist and learn enum-like
+    values (e.g. status).
+
+    Args:
+        collection: name from list_collections() (e.g. "jira_tickets",
+            "github_prs", "unified_users").
+        sample_size: how many docs to sample for example values (default 20, max 100).
+
+    Returns:
+        {"collection", "description", "fields": {field: {"type", "description",
+         "display", "filterable", "examples": [...]}}} or {"error": str}.
+    """
+    try:
+        coll = get_collection(collection)
+    except ValueError as e:
+        return {"error": str(e), "allowed": sorted(ALLOWED_COLLECTIONS)}
+    n = max(1, min(int(sample_size), 100))
+
+    specs = field_specs(collection)
+    if not specs:
+        return _describe_by_sampling(coll, collection, n)
+
+    examples = _sample_examples(coll, n, {s.name for s in specs})
+    fields = {
+        s.name: {
+            "type": s.type,
+            "description": s.description,
+            "display": s.display,
+            "filterable": s.filterable,
+            "examples": examples.get(s.name, []),
+        }
+        for s in specs
+    }
+    return {
+        "collection": collection,
+        "description": collection_description(collection),
+        "fields": fields,
+    }
 
 
 @tool

@@ -1,0 +1,44 @@
+# Cross-collection relationships — the single source of truth for how the agent
+# joins collections. `linked` traverses the cross-source references; every
+# relationship is also surfaced by `list_collections` for discovery. Add a
+# connector's links here, not in code.
+#
+# entity1/entity2 are collection names. `join.local_field` is the field on
+# entity1 holding entity2 keys; `join.foreign_field` is the matched field on
+# entity2 (dotted paths allowed). relationship_type is informational.
+relationships:
+  - name: github_pr_references_jira_ticket
+    entity1: github_prs
+    entity2: jira_tickets
+    relationship_type: many-to-many
+    join:
+      local_field: jira_keys
+      foreign_field: key
+    description: A PR references the JIRA tickets named in its branch, title, or body.
+
+  - name: slack_message_references_jira_ticket
+    entity1: slack_messages
+    entity2: jira_tickets
+    relationship_type: many-to-many
+    join:
+      local_field: jira_keys
+      foreign_field: key
+    description: A Slack message references the JIRA tickets it mentions.
+
+  - name: jira_user_to_unified
+    entity1: users
+    entity2: unified_users
+    relationship_type: one-to-one
+    join:
+      local_field: accountId
+      foreign_field: jira.accountId
+    description: A JIRA user maps to a unified person record.
+
+  - name: github_user_to_unified
+    entity1: github_users
+    entity2: unified_users
+    relationship_type: one-to-one
+    join:
+      local_field: login
+      foreign_field: github.login
+    description: A GitHub user maps to a unified person record.

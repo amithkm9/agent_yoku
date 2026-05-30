@@ -184,7 +184,8 @@ JWT secret comes from `settings.jwt_secret` — **rotate before any non-local de
 5. Optional `users_ingest.py` for member directories.
 6. Add a CLI subcommand in `agent_yoku/cli.py`.
 7. Register the collection in `agent_yoku/storage/mongo.py::ALLOWED_COLLECTIONS`.
-8. Add a `SourceSpec` to `agent_yoku/agent/sources.py::SOURCES` — `filter` / `get` / `linked` / `semantic_search` then cover the source automatically, no new tools needed.
+8. Add a Pydantic model in `agent_yoku/models/` (its docstring is the collection description; fields carry `description` + `display`/`filterable` metadata) and map it in `agent_yoku/agent/schema_registry.py::COLLECTION_MODELS`.
+9. Add a `SourceSpec` to `agent_yoku/agent/sources.py::SOURCES` (key shape + example) and any links to `agent_yoku/agent/relationships.yaml`. `filter` / `get` / `linked` / `semantic_search` / `list_collections` then cover the source automatically — no tool or prompt edits.
 
 `agent-yoku list-connectors` will auto-discover it.
 
@@ -194,14 +195,18 @@ JWT secret comes from `settings.jwt_secret` — **rotate before any non-local de
   `embedding` field on each doc; cosine runs in-memory via numpy.
 - **Single planning agent.** One deepagent plans with `write_todos` and answers
   over a source-agnostic toolkit (no sub-agents).
-- **Source registry + generic escape hatch.** Per-source knowledge (collection,
-  key shape, filterable fields, links) lives in `agent_yoku/agent/sources.py`, so
-  the tools are source-agnostic: `get` / `linked` auto-route by key shape across
+- **Schema-driven, nothing hardcoded.** Three registries are the single sources
+  of truth: the **Pydantic models** (`agent_yoku/models/`) define each
+  collection's description + fields + what's `display`/`filterable`; the
+  **source registry** (`agent/sources.py`) holds only key-routing facts; the
+  **relationship registry** (`agent/relationships.yaml`) declares cross-collection
+  joins. `list_collections` / `describe_collection` / `filter` / `linked` all read
+  from them, so onboarding a connector touches no tool, prompt, or description.
+- **Source-agnostic toolkit.** `get` / `linked` auto-route by key shape across
   every source, `filter(source, …)` does exact filters with alias resolution,
   alongside `semantic_search`, `resolve_user`, `data_freshness`, `who_knows`.
-  `mongo_query` / `mongo_count` / `describe_collection` / `list_collections`
-  cover analytics the narrow tools don't. Tool errors return `{"error": "..."}`
-  so the agent can adapt rather than crash.
+  `mongo_query` / `mongo_count` cover analytics the narrow tools don't. Tool
+  errors return `{"error": "..."}` so the agent can adapt rather than crash.
 - **Cross-source link.** PRs auto-extract `AS-XXXX` from branch / title / body
   into `jira_keys`. Reverse pass writes `linked_prs` onto each JIRA ticket.
 - **Sessions** persist in mongo (`chat_sessions`, `chat_messages`); compact

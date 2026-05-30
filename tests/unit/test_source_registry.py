@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from agent_yoku.agent import sources, tools
+from agent_yoku.agent import relationships, sources, tools
 
 
 @pytest.mark.unit
@@ -24,9 +24,9 @@ def test_source_for_key(key, expected):
 
 
 @pytest.mark.unit
-def test_referrers_to_jira_are_github_and_slack():
-    names = {s.name for s in sources.referrers_to("jira")}
-    assert names == {"github", "slack"}
+def test_jira_tickets_referenced_by_github_and_slack():
+    referrers = {r.entity1 for r in relationships.inbound_relationships("jira_tickets")}
+    assert referrers == {"github_prs", "slack_messages"}
 
 
 class _FakeColl:

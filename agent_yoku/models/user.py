@@ -23,8 +23,10 @@ class GitHubUserBlock(BaseModel):
 
 
 class UnifiedUser(BaseModel):
-    """Shape of a document in `unified_users`. Either jira or github (or both)
-    populated; `match_source` describes how the join was made.
+    """Cross-walk between JIRA and GitHub users — one row per person.
+
+    Either `jira` or `github` (or both) is populated; `match_source` records how
+    the join was made. Backs alias resolution for person-valued filters.
     """
 
     model_config = ConfigDict(extra="allow")
