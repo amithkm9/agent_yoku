@@ -1,7 +1,7 @@
 # agent-yoku
 
-Cross-source agent over Asato's **JIRA tickets** + **GitHub PRs**. Ingests both
-into MongoDB, indexes them with OpenAI embeddings, and exposes a deepagent
+Cross-source agent over Asato's **JIRA tickets**, **GitHub PRs**, and **Slack
+messages**. Ingests them into MongoDB, indexes them with OpenAI embeddings, and exposes a deepagent
 (LangChain `deepagents` + `gpt-5.4-mini`) through:
 
 - **FastAPI** REST API with JWT auth + multi-tenant mongo isolation
@@ -30,8 +30,10 @@ into MongoDB, indexes them with OpenAI embeddings, and exposes a deepagent
 ```
 agent-yoku/
 ├── pyproject.toml  Makefile  Dockerfile  .dockerignore
-├── README.md  .env.example  .gitignore  .python-version
+├── README.md  ROADMAP.md  CLAUDE.md  .env.example  .gitignore  .python-version
 ├── .pre-commit-config.yaml
+├── docs/                          # reference docs (see docs/README.md)
+│   └── adding-a-connector.md      #   step-by-step connector recipe
 ├── agent_yoku/                    ← installable Python package
 │   ├── config.py                   # Pydantic Settings (JWT secret, Mongo, OpenAI, etc.)
 │   ├── exceptions.py
@@ -144,6 +146,7 @@ Commands:
     jira-users       …  JIRA user directory
     github           …  AsatoCorp PRs (last 365d, all non-archived repos)
     github-users     …  GitHub org members
+    slack-export     …  Slack workspace export (messages + users)
   embed              Generate embeddings for any docs with embedding=null
   link               Reverse-link PRs onto their referenced JIRA tickets
   unify-users        Build unified_users by joining JIRA + GitHub users
@@ -176,6 +179,10 @@ Passwords are bcrypt-hashed (72-byte cap enforced).
 JWT secret comes from `settings.jwt_secret` — **rotate before any non-local deploy.**
 
 ## Adding a new connector
+
+> Full recipe with the registry contract, `ConnectorMeta` fields, and gotchas:
+> [`docs/adding-a-connector.md`](docs/adding-a-connector.md). Working on this repo
+> with a coding agent? Start from [`CLAUDE.md`](CLAUDE.md).
 
 1. Copy `agent_yoku/connectors/jira/` → `agent_yoku/connectors/<source>/`.
 2. Replace `client.py` with your auth/REST helpers — use `@make_retry("yourname", log)` from `agent_yoku.utils`.
@@ -262,6 +269,8 @@ docker run --rm --env-file .env agent-yoku python -m agent_yoku.cli refresh-all
 | `github_prs`      | AsatoCorp PRs + embedding + `jira_keys` + `author_email`|
 | `github_users`    | AsatoCorp org members                                  |
 | `unified_users`   | JIRA ↔ GitHub cross-walk                               |
+| `slack_messages`  | Slack messages + embedding (what the team is discussing)|
+| `slack_users`     | Slack workspace user directory                         |
 | `chat_sessions`   | One row per New Session click                          |
 | `chat_messages`   | Every persisted agent message                          |
 | `auth_users`      | Login users (per tenant, bcrypt-hashed passwords)      |
