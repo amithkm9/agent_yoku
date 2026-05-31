@@ -72,7 +72,7 @@ class FakeStreamAgent:
     Exposes .stream() as required by _stream_agent_turn.
     """
 
-    def stream(self, inputs: dict, stream_mode: str = "values"):
+    def stream(self, inputs: dict, stream_mode: str = "values", **kwargs):
         prior = list(inputs.get("messages", []))
         human_msg = prior[-1] if prior else HumanMessage(content="?")
 
@@ -98,7 +98,7 @@ class FakeStreamAgent:
 class FakeStreamAgentNoTools:
     """Simulates an agent that answers directly with no tool calls."""
 
-    def stream(self, inputs: dict, stream_mode: str = "values"):
+    def stream(self, inputs: dict, stream_mode: str = "values", **kwargs):
         prior = list(inputs.get("messages", []))
         human_msg = prior[-1] if prior else HumanMessage(content="?")
         final_ai = AIMessage(content="Direct answer, no tools.")
@@ -108,7 +108,7 @@ class FakeStreamAgentNoTools:
 class FakeStreamAgentError:
     """Simulates an agent that raises an exception mid-stream."""
 
-    def stream(self, inputs: dict, stream_mode: str = "values"):
+    def stream(self, inputs: dict, stream_mode: str = "values", **kwargs):
         raise RuntimeError("simulated agent failure")
         yield  # make it a generator
 

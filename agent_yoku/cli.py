@@ -325,6 +325,95 @@ def status() -> None:
         click.echo(f"  {label:18s} {n:>8d}")
 
 
+def _check_mongo() -> tuple[bool, str]:
+    """MongoDB reachable via a ping."""
+    try:
+        from agent_yoku.storage.mongo import ping
+
+        ping()
+        return True, "MongoDB reachable"
+    except Exception as e:
+        return False, f"MongoDB unreachable: {e}"
+
+
+def _check_secrets() -> tuple[bool, str]:
+    """Required secrets present (values never printed)."""
+    try:
+        from agent_yoku.config import settings
+
+        missing = []
+        if not settings.openai_api_key.get_secret_value():
+            missing.append("OPENAI_API_KEY")
+        if not settings.jwt_secret.get_secret_value():
+            missing.append("JWT_SECRET")
+        if missing:
+            return False, f"missing secrets: {', '.join(missing)}"
+        if settings.is_default_jwt_secret:
+            return False, "JWT_SECRET is the built-in dev default (override in prod)"
+        return True, "required secrets present"
+    except Exception as e:
+        return False, f"could not read secrets: {e}"
+
+
+def _check_connectors() -> tuple[bool, str]:
+    """At least one connector has credentials configured (per-tenant or env)."""
+    try:
+        from agent_yoku.config import settings
+        from agent_yoku.constants import SUPPORTED_CONNECTORS
+        from agent_yoku.storage import connector_configs as cc
+
+        configured = {c["name"] for c in cc.list_configs()}
+        env_configured = []
+        if settings.jira_email and settings.jira_token.get_secret_value():
+            env_configured.append("jira")
+        if settings.github_token.get_secret_value():
+            env_configured.append("github")
+        if settings.slack_bot_token and settings.slack_workspace:
+            env_configured.append("slack")
+        ready = sorted((configured | set(env_configured)) & set(SUPPORTED_CONNECTORS))
+        if not ready:
+            return False, "no connector credentials configured"
+        return True, f"connectors configured: {', '.join(ready)}"
+    except Exception as e:
+        return False, f"could not read connector config: {e}"
+
+
+def _check_freshness() -> tuple[bool, str]:
+    """Index/data freshness — every source has been synced at least once."""
+    try:
+        from agent_yoku.storage.freshness import source_freshness
+
+        rows = source_freshness()
+        stale = [r["source"] for r in rows if not r.get("last_synced_at")]
+        if stale:
+            return False, f"never synced: {', '.join(stale)}"
+        ages = ", ".join(f"{r['source']} {r['synced_ago']}" for r in rows)
+        return True, f"data fresh ({ages})"
+    except Exception as e:
+        return False, f"could not read freshness: {e}"
+
+
+@cli.command()
+def doctor() -> None:
+    """Run health checks (mongo, secrets, connectors, freshness); exit non-zero on failure."""
+    checks = [
+        ("mongodb", _check_mongo),
+        ("secrets", _check_secrets),
+        ("connectors", _check_connectors),
+        ("freshness", _check_freshness),
+    ]
+    all_ok = True
+    for name, fn in checks:
+        ok, detail = fn()
+        all_ok = all_ok and ok
+        click.secho(
+            f"[{'PASS' if ok else 'FAIL'}] {name:12s} {detail}",
+            fg="green" if ok else "red",
+        )
+    if not all_ok:
+        raise SystemExit(1)
+
+
 @cli.command()
 @click.option("--sample", default=10, help="Max example keys to show per check.")
 def consistency(sample: int) -> None:

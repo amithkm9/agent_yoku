@@ -12,6 +12,7 @@ from langchain_core.messages import HumanMessage
 
 from agent_yoku.agent.agent import build_agent
 from agent_yoku.agent.chat import _extract_text
+from agent_yoku.agent.usage import UsageCallback
 from agent_yoku.deps import CurrentUser
 from agent_yoku.log import get_logger, set_session
 from agent_yoku.schemas import ChatRequest, ChatResponse, ToolCallSummary
@@ -74,10 +75,11 @@ def _stream_agent_turn(session_id: str, query: str, prior: list, agent) -> Itera
     """
     try:
         inputs = {"messages": prior + [HumanMessage(content=query)]}
+        usage = UsageCallback(session_id=session_id)
         final_msgs = list(prior)
         seen: set[str] = set()
         scanned = 0  # only inspect messages added since the last state snapshot
-        for state in agent.stream(inputs, stream_mode="values"):
+        for state in agent.stream(inputs, stream_mode="values", config={"callbacks": [usage]}):
             final_msgs = state.get("messages", final_msgs)
             for m in final_msgs[scanned:]:
                 if m.type == "ai":
@@ -87,6 +89,7 @@ def _stream_agent_turn(session_id: str, query: str, prior: list, agent) -> Itera
                             yield _sse("tool", {"name": c.get("name")})
             scanned = len(final_msgs)
 
+        usage.log_totals()
         new_msgs = final_msgs[len(prior) :]
         turn_id = sess_mod.new_turn_id()
         sess_mod.save_turn(session_id, turn_id, new_msgs, user_query=query)
@@ -109,7 +112,12 @@ async def post_chat(req: ChatRequest, user: CurrentUser) -> ChatResponse:
     set_session(req.session_id)
 
     prior = sess_mod.load_agent_history(req.session_id)
-    result = _agent().invoke({"messages": prior + [HumanMessage(content=req.query)]})
+    usage = UsageCallback(session_id=req.session_id)
+    result = _agent().invoke(
+        {"messages": prior + [HumanMessage(content=req.query)]},
+        config={"callbacks": [usage]},
+    )
+    usage.log_totals()
     all_msgs = result.get("messages", [])
     new_msgs = all_msgs[len(prior) :]
 

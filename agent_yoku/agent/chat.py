@@ -16,6 +16,7 @@ import time
 from langchain_core.messages import HumanMessage
 
 from agent_yoku.agent.agent import build_agent
+from agent_yoku.agent.usage import UsageCallback
 from agent_yoku.log import get_logger
 
 log = get_logger("chat")
@@ -36,7 +37,11 @@ def ask(query: str) -> dict:
     t0 = time.monotonic()
     agent = get_agent()
     log.info("agent invoke query=%r", query)
-    result = agent.invoke({"messages": [HumanMessage(content=query)]})
+    usage = UsageCallback()
+    result = agent.invoke(
+        {"messages": [HumanMessage(content=query)]}, config={"callbacks": [usage]}
+    )
+    usage.log_totals()
     elapsed = time.monotonic() - t0
     log.info("agent done elapsed=%.1fs messages=%d", elapsed, len(result.get("messages", [])))
     return result

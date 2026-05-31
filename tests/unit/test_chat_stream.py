@@ -13,7 +13,7 @@ from agent_yoku.routers import chat as chat_mod
 class _FakeAgent:
     """Yields full-state snapshots like LangGraph stream_mode='values'."""
 
-    def stream(self, inputs, stream_mode):
+    def stream(self, inputs, stream_mode, **kwargs):
         base = inputs["messages"]
         ai_call = AIMessage(
             content="", tool_calls=[{"id": "t1", "name": "semantic_search", "args": {}}]
@@ -25,7 +25,7 @@ class _FakeAgent:
 
 
 class _BoomAgent:
-    def stream(self, inputs, stream_mode):
+    def stream(self, inputs, stream_mode, **kwargs):
         raise RuntimeError("boom")
         yield {}  # pragma: no cover - makes this a generator
 

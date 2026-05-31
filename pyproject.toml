@@ -5,7 +5,10 @@ description = "JIRA + GitHub PR deepagent over local mongo + OpenAI embeddings."
 authors = ["Akshay Reddy <akshay.reddy@asato.ai>"]
 readme = "README.md"
 packages = [{include = "agent_yoku"}]
-include = [{ path = "agent_yoku/agent/relationships.yaml", format = ["sdist", "wheel"] }]
+include = [
+    { path = "agent_yoku/agent/relationships.yaml", format = ["sdist", "wheel"] },
+    { path = "agent_yoku/agent/prompts/*.md", format = ["sdist", "wheel"] },
+]
 
 [tool.poetry.dependencies]
 python = "^3.12"

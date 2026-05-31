@@ -77,7 +77,7 @@ def test_chat_persists_messages(client, monkeypatch):
     """Mock the agent so we exercise the route without burning OpenAI tokens."""
 
     class FakeAgent:
-        def invoke(self, payload):
+        def invoke(self, payload, **kwargs):
             msgs = list(payload["messages"])
             msgs.append(
                 AIMessage(
@@ -127,7 +127,7 @@ def test_chat_compact_history_on_followup(client, monkeypatch):
     captured: list = []
 
     class FakeAgent:
-        def invoke(self, payload):
+        def invoke(self, payload, **kwargs):
             captured.append(list(payload["messages"]))
             return {
                 "messages": [
