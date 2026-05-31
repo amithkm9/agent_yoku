@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from yoku.connectors._runtime import GithubConfig, JiraConfig, use_github, use_jira
-from yoku.connectors.github import ingest as gh_ingest
-from yoku.connectors.jira import ingest as jira_ingest
+from yoku.pipeline.connectors._runtime import GithubConfig, JiraConfig, use_github, use_jira
+from yoku.pipeline.connectors.github import ingest as gh_ingest
+from yoku.pipeline.connectors.jira import ingest as jira_ingest
 
 
 class _FakeCollection:

@@ -2,7 +2,7 @@
 
 Single Click entry point for all maintenance + dev tasks. Each subcommand
 delegates to a module's main() — the underlying scripts also remain runnable
-standalone via `python -m yoku.connectors.jira.ingest`.
+standalone via `python -m yoku.pipeline.connectors.jira.ingest`.
 
 Usage:
     yoku --help
@@ -24,7 +24,7 @@ _HERE = Path(__file__).resolve().parent
 
 
 def _normalize_cli_tenant(tenant: str) -> str:
-    from yoku.storage import tenancy
+    from yoku.core.storage import tenancy
 
     normalized = tenancy.normalize_tenant_id(tenant)
     if not tenancy.is_valid_tenant_id(normalized):
@@ -41,7 +41,7 @@ def _normalize_cli_tenant(tenant: str) -> str:
 def cli(tenant: str | None, log_level: str | None) -> None:
     """yoku — JIRA + GitHub deepagent."""
     if tenant:
-        from yoku.storage import tenancy
+        from yoku.core.storage import tenancy
 
         tenancy.set_tenant(_normalize_cli_tenant(tenant))
     if log_level:
@@ -57,7 +57,7 @@ def ingest() -> None:
 @click.argument("extra_jql", required=False)
 def ingest_jira(extra_jql: str | None) -> None:
     """Pull all (or filtered) JIRA tickets from project AS."""
-    from yoku.connectors.jira import ingest as mod
+    from yoku.pipeline.connectors.jira import ingest as mod
 
     mod.main(extra=extra_jql)
 
@@ -65,7 +65,7 @@ def ingest_jira(extra_jql: str | None) -> None:
 @ingest.command("jira-users")
 def ingest_jira_users() -> None:
     """Pull JIRA users directory."""
-    from yoku.connectors.jira import users_ingest
+    from yoku.pipeline.connectors.jira import users_ingest
 
     users_ingest.main()
 
@@ -74,7 +74,7 @@ def ingest_jira_users() -> None:
 @click.argument("repos", nargs=-1)
 def ingest_github(repos: tuple[str, ...]) -> None:
     """Pull GitHub PRs (no args = all non-archived AsatoCorp repos)."""
-    from yoku.connectors.github import ingest as mod
+    from yoku.pipeline.connectors.github import ingest as mod
 
     mod.main(filter_names=list(repos) or None)
 
@@ -82,7 +82,7 @@ def ingest_github(repos: tuple[str, ...]) -> None:
 @ingest.command("github-users")
 def ingest_github_users_cmd() -> None:
     """Pull AsatoCorp org members + profiles."""
-    from yoku.connectors.github import users_ingest
+    from yoku.pipeline.connectors.github import users_ingest
 
     users_ingest.main()
 
@@ -96,7 +96,7 @@ def ingest_github_users_cmd() -> None:
 )
 def ingest_slack_export(export_path: str, workspace: str) -> None:
     """Ingest a Slack workspace export (directory or .zip)."""
-    from yoku.connectors.slack import export_ingest
+    from yoku.pipeline.connectors.slack import export_ingest
 
     total = export_ingest.main(export_path, workspace=workspace)
     click.echo(f"Ingested {total} Slack messages.")
@@ -112,7 +112,7 @@ def ingest_slack_export(export_path: str, workspace: str) -> None:
 @click.option("--all", "re_embed_all", is_flag=True, help="Re-embed everything, not just missing.")
 def embed(coll: str | None, re_embed_all: bool) -> None:
     """Generate embeddings for any docs with embedding=null."""
-    from yoku.embeddings import embed as mod
+    from yoku.pipeline import embed as mod
 
     sys.argv = ["embed"]
     if coll:
@@ -126,7 +126,7 @@ def embed(coll: str | None, re_embed_all: bool) -> None:
 @click.option("--reset", is_flag=True, help="Clear linked_prs on JIRA tickets first.")
 def link(reset: bool) -> None:
     """Reverse-link PRs onto their referenced JIRA tickets."""
-    from yoku.linking import pr_to_jira
+    from yoku.pipeline import pr_to_jira
 
     sys.argv = ["link_prs_to_jira"] + (["--reset"] if reset else [])
     pr_to_jira.main()
@@ -135,7 +135,7 @@ def link(reset: bool) -> None:
 @cli.command("unify-users")
 def unify_users() -> None:
     """Build unified_users by joining JIRA + GitHub users."""
-    from yoku.storage import unified_users as mod
+    from yoku.core.storage import unified_users as mod
 
     mod.main()
 
@@ -143,7 +143,7 @@ def unify_users() -> None:
 @cli.command("backfill-pr-emails")
 def backfill_pr_emails() -> None:
     """Backfill author_email / assignee_email on PR docs from unified_users."""
-    from yoku.storage import backfill
+    from yoku.core.storage import backfill
 
     backfill.main()
 
@@ -155,38 +155,38 @@ def refresh_all(skip_jira: bool, skip_github: bool) -> None:
     """Full refresh: ingest -> embed -> unify -> link -> backfill."""
     if not skip_jira:
         click.secho("→ ingest jira", fg="cyan")
-        from yoku.connectors.jira import ingest as jira_ingest
+        from yoku.pipeline.connectors.jira import ingest as jira_ingest
 
         jira_ingest.main()
         click.secho("→ ingest jira-users", fg="cyan")
-        from yoku.connectors.jira import users_ingest as jira_users
+        from yoku.pipeline.connectors.jira import users_ingest as jira_users
 
         jira_users.main()
     if not skip_github:
         click.secho("→ ingest github", fg="cyan")
-        from yoku.connectors.github import ingest as gh_ingest
+        from yoku.pipeline.connectors.github import ingest as gh_ingest
 
         gh_ingest.main()
         click.secho("→ ingest github-users", fg="cyan")
-        from yoku.connectors.github import users_ingest as gh_users
+        from yoku.pipeline.connectors.github import users_ingest as gh_users
 
         gh_users.main()
     click.secho("→ embed (deltas only)", fg="cyan")
     sys.argv = ["embed"]
-    from yoku.embeddings import embed as _embed
+    from yoku.pipeline import embed as _embed
 
     _embed.main()
     click.secho("→ unify-users", fg="cyan")
-    from yoku.storage import unified_users as _unified
+    from yoku.core.storage import unified_users as _unified
 
     _unified.main()
     click.secho("→ link prs -> jira", fg="cyan")
     sys.argv = ["link_prs_to_jira"]
-    from yoku.linking import pr_to_jira
+    from yoku.pipeline import pr_to_jira
 
     pr_to_jira.main()
     click.secho("→ backfill pr emails", fg="cyan")
-    from yoku.storage import backfill
+    from yoku.core.storage import backfill
 
     backfill.main()
     click.secho("✓ refresh-all done", fg="green")
@@ -197,7 +197,7 @@ def refresh_all(skip_jira: bool, skip_github: bool) -> None:
 def chat(query: tuple[str, ...]) -> None:
     """One-shot agent query (CLI). Use `web` for the React UI."""
     from yoku.agent.chat import ask, final_answer
-    from yoku.log import set_session
+    from yoku.core.logging import set_session
 
     set_session(str(uuid.uuid4()))
 
@@ -216,7 +216,7 @@ def api(port: int, host: str, reload: bool) -> None:
         sys.executable,
         "-m",
         "uvicorn",
-        "yoku.main:app",
+        "yoku.api.main:app",
         "--host",
         host,
         "--port",
@@ -244,9 +244,9 @@ def auth_create_user(email: str, password: str, name: str | None, tenant: str, a
     from datetime import UTC
     from datetime import datetime as _dt
 
-    from yoku.deps import hash_password
-    from yoku.storage import tenancy
-    from yoku.storage.mongo import auth_users_collection
+    from yoku.core.auth import hash_password
+    from yoku.core.storage import tenancy
+    from yoku.core.storage.mongo import auth_users_collection
 
     tenancy.set_tenant(_normalize_cli_tenant(tenant))
     coll = auth_users_collection()
@@ -275,8 +275,8 @@ def auth_create_user(email: str, password: str, name: str | None, tenant: str, a
 @click.option("--tenant", required=True)
 def auth_list_users(tenant: str) -> None:
     """List users in the named tenant."""
-    from yoku.storage import tenancy
-    from yoku.storage.mongo import auth_users_collection
+    from yoku.core.storage import tenancy
+    from yoku.core.storage.mongo import auth_users_collection
 
     tenancy.set_tenant(_normalize_cli_tenant(tenant))
     for u in auth_users_collection().find({}, {"_id": 0, "password_hash": 0}):
@@ -289,7 +289,7 @@ def auth_list_users(tenant: str) -> None:
 @cli.command("list-connectors")
 def list_connectors_cmd() -> None:
     """List all registered data connectors."""
-    from yoku.connectors.base import list_connectors
+    from yoku.pipeline.connectors.base import list_connectors
 
     for meta in list_connectors():
         click.echo(
@@ -301,7 +301,7 @@ def list_connectors_cmd() -> None:
 @cli.command()
 def status() -> None:
     """Print mongo collection counts."""
-    from yoku.storage.mongo import (
+    from yoku.core.storage.mongo import (
         chat_messages_collection,
         chat_sessions_collection,
         github_prs_collection,
@@ -328,7 +328,7 @@ def status() -> None:
 def _check_mongo() -> tuple[bool, str]:
     """MongoDB reachable via a ping."""
     try:
-        from yoku.storage.mongo import ping
+        from yoku.core.storage.mongo import ping
 
         ping()
         return True, "MongoDB reachable"
@@ -339,7 +339,7 @@ def _check_mongo() -> tuple[bool, str]:
 def _check_secrets() -> tuple[bool, str]:
     """Required secrets present (values never printed)."""
     try:
-        from yoku.config import settings
+        from yoku.core.config import settings
 
         missing = []
         if not settings.openai_api_key.get_secret_value():
@@ -358,9 +358,9 @@ def _check_secrets() -> tuple[bool, str]:
 def _check_connectors() -> tuple[bool, str]:
     """At least one connector has credentials configured (per-tenant or env)."""
     try:
-        from yoku.config import settings
-        from yoku.constants import SUPPORTED_CONNECTORS
-        from yoku.storage import connector_configs as cc
+        from yoku.core.config import settings
+        from yoku.core.constants import SUPPORTED_CONNECTORS
+        from yoku.core.storage import connector_configs as cc
 
         configured = {c["name"] for c in cc.list_configs()}
         env_configured = []
@@ -381,7 +381,7 @@ def _check_connectors() -> tuple[bool, str]:
 def _check_freshness() -> tuple[bool, str]:
     """Index/data freshness — every source has been synced at least once."""
     try:
-        from yoku.storage.freshness import source_freshness
+        from yoku.core.storage.freshness import source_freshness
 
         rows = source_freshness()
         stale = [r["source"] for r in rows if not r.get("last_synced_at")]
@@ -418,7 +418,7 @@ def doctor() -> None:
 @click.option("--sample", default=10, help="Max example keys to show per check.")
 def consistency(sample: int) -> None:
     """Report JIRA/GitHub inconsistencies (done-no-PR, merged-no-ticket)."""
-    from yoku.analysis.consistency import consistency_report
+    from yoku.pipeline.consistency import consistency_report
 
     report = consistency_report(sample=sample)
     for label, key in (

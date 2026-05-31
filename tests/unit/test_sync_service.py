@@ -9,9 +9,9 @@ from __future__ import annotations
 
 import pytest
 
-from yoku import sync_service
-from yoku.storage import connector_configs as cc
-from yoku.storage import mongo, tenancy
+from yoku.core.storage import connector_configs as cc
+from yoku.core.storage import mongo, tenancy
+from yoku.pipeline import sync_service
 
 
 @pytest.fixture

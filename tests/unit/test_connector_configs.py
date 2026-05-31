@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import pytest
 
-from yoku.storage import connector_configs as cc
-from yoku.storage import tenancy
+from yoku.core.storage import connector_configs as cc
+from yoku.core.storage import tenancy
 
 
 class TestEncryption:

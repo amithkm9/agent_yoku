@@ -1,4 +1,4 @@
-"""Unit tests for yoku.log + RequestContext middleware."""
+"""Unit tests for yoku.core.logging + RequestContext middleware."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import pytest
 from fastapi import FastAPI
 from starlette.testclient import TestClient
 
-from yoku.log import (
+from yoku.core.logging import (
     SERVICE_NAME,
     _AgentYokuFormatter,
     _ContextFilter,
@@ -18,7 +18,7 @@ from yoku.log import (
     safe_log_str,
     set_session,
 )
-from yoku.middleware import (
+from yoku.core.middleware import (
     RequestContext,
     correlation_id_context,
     request_id_context,

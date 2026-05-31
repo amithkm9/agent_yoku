@@ -22,7 +22,7 @@ pytestmark = pytest.mark.integration
 
 @pytest.fixture
 def client(scratch_db):
-    from yoku.main import app
+    from yoku.api.main import app
 
     return TestClient(app)
 
@@ -45,7 +45,7 @@ def _signup(client, tenant, email, password="pw-strong-123") -> tuple[str, dict]
 def _drop(tenant: str) -> None:
     from pymongo import MongoClient
 
-    from yoku.config import settings
+    from yoku.core.config import settings
 
     MongoClient(settings.mongo_uri).drop_database(f"{settings.mongo_db}_{tenant}")
 
@@ -134,8 +134,8 @@ def test_blank_token_on_edit_keeps_existing(client):
 
         # Verify decrypt still produces the original token by reaching into storage
         # under the same tenant context the API used.
-        from yoku.storage import connector_configs as cc
-        from yoku.storage import tenancy
+        from yoku.core.storage import connector_configs as cc
+        from yoku.core.storage import tenancy
 
         tenancy.set_tenant(tenant)
         assert cc.get_config_decrypted("jira")["token"] == "first-token"

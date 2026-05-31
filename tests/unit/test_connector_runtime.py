@@ -8,7 +8,7 @@ Verifies that:
 
 from __future__ import annotations
 
-from yoku.connectors._runtime import (
+from yoku.pipeline.connectors._runtime import (
     GithubConfig,
     JiraConfig,
     current_github_config,

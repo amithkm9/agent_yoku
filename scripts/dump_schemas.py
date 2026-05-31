@@ -14,7 +14,7 @@ from pathlib import Path
 # Make the package importable when run as a plain script (without installing).
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from yoku.models import (
+from yoku.core.models import (
     ChatMessage,
     ChatSession,
     GitHubPR,

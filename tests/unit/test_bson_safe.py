@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 
 from bson import ObjectId
 
-from yoku.utils import bson_safe
+from yoku.core.utils import bson_safe
 
 
 def test_passthrough_primitives():

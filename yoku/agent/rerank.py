@@ -14,8 +14,8 @@ from functools import lru_cache
 
 from zeroentropy import ZeroEntropy
 
-from yoku.config import settings
-from yoku.log import get_logger
+from yoku.core.config import settings
+from yoku.core.logging import get_logger
 
 log = get_logger("rerank")
 

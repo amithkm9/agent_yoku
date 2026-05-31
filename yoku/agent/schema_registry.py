@@ -1,6 +1,6 @@
 """Schema registry — reads collection details off the Pydantic models.
 
-Every collection maps to one model (`yoku.models`). The model is the single
+Every collection maps to one model (`yoku.core.models`). The model is the single
 source of truth: its docstring is the collection description and its fields carry
 descriptions plus `display` / `filterable` metadata (see `models._fields`). The
 agent tools read everything from here, so nothing about a collection's shape is
@@ -16,7 +16,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from yoku.models import (
+from yoku.core.models import (
     GitHubPR,
     GitHubUser,
     JiraTicket,

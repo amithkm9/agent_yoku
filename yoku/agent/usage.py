@@ -14,7 +14,7 @@ from typing import Any
 
 from langchain_core.callbacks import BaseCallbackHandler
 
-from yoku.log import get_logger
+from yoku.core.logging import get_logger
 
 log = get_logger("usage")
 

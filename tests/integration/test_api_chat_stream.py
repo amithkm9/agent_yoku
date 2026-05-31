@@ -24,7 +24,7 @@ def _tenant() -> str:
 def _drop(tenant: str) -> None:
     from pymongo import MongoClient
 
-    from yoku.config import settings
+    from yoku.core.config import settings
 
     MongoClient(settings.mongo_uri).drop_database(f"{settings.mongo_db}_{tenant}")
 
@@ -120,7 +120,7 @@ class FakeStreamAgentError:
 
 @pytest.fixture
 def client(scratch_db):
-    from yoku.main import app
+    from yoku.api.main import app
 
     return TestClient(app)
 
@@ -131,7 +131,7 @@ def test_stream_requires_auth(client):
 
 
 def test_stream_emits_tool_then_answer(client, monkeypatch):
-    from yoku.routers import chat as chat_route
+    from yoku.api.routers import chat as chat_route
 
     monkeypatch.setattr(chat_route, "_AGENT", FakeStreamAgent())
 
@@ -167,7 +167,7 @@ def test_stream_emits_tool_then_answer(client, monkeypatch):
 
 
 def test_stream_answer_contains_tool_calls_summary(client, monkeypatch):
-    from yoku.routers import chat as chat_route
+    from yoku.api.routers import chat as chat_route
 
     monkeypatch.setattr(chat_route, "_AGENT", FakeStreamAgent())
 
@@ -191,7 +191,7 @@ def test_stream_answer_contains_tool_calls_summary(client, monkeypatch):
 
 
 def test_stream_no_tools_emits_only_answer(client, monkeypatch):
-    from yoku.routers import chat as chat_route
+    from yoku.api.routers import chat as chat_route
 
     monkeypatch.setattr(chat_route, "_AGENT", FakeStreamAgentNoTools())
 
@@ -220,7 +220,7 @@ def test_stream_no_tools_emits_only_answer(client, monkeypatch):
 
 def test_stream_persists_messages(client, monkeypatch):
     """After streaming completes, messages must be queryable via GET /api/sessions/{id}."""
-    from yoku.routers import chat as chat_route
+    from yoku.api.routers import chat as chat_route
 
     monkeypatch.setattr(chat_route, "_AGENT", FakeStreamAgent())
 
@@ -250,7 +250,7 @@ def test_stream_persists_messages(client, monkeypatch):
 
 
 def test_stream_turn_count_increments(client, monkeypatch):
-    from yoku.routers import chat as chat_route
+    from yoku.api.routers import chat as chat_route
 
     monkeypatch.setattr(chat_route, "_AGENT", FakeStreamAgent())
 
@@ -273,7 +273,7 @@ def test_stream_turn_count_increments(client, monkeypatch):
 
 
 def test_stream_error_emits_error_event(client, monkeypatch):
-    from yoku.routers import chat as chat_route
+    from yoku.api.routers import chat as chat_route
 
     monkeypatch.setattr(chat_route, "_AGENT", FakeStreamAgentError())
 
@@ -300,7 +300,7 @@ def test_stream_error_emits_error_event(client, monkeypatch):
 
 def test_stream_tenant_isolation(client, monkeypatch):
     """Messages streamed for tenant A are not visible from tenant B."""
-    from yoku.routers import chat as chat_route
+    from yoku.api.routers import chat as chat_route
 
     monkeypatch.setattr(chat_route, "_AGENT", FakeStreamAgentNoTools())
 

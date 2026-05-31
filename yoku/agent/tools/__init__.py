@@ -51,7 +51,7 @@ from yoku.agent.tools._ranking import (
     _to_epoch,
     _tokenize,
 )
-from yoku.config import (
+from yoku.core.config import (
     ALLOWED_COLLECTIONS,
     EMBED_MODEL,
     get_collection,
@@ -61,9 +61,9 @@ from yoku.config import (
     tickets_collection,
     unified_users_collection,
 )
-from yoku.log import get_logger
-from yoku.storage.tenancy import current_tenant
-from yoku.utils import bson_safe
+from yoku.core.logging import get_logger
+from yoku.core.storage.tenancy import current_tenant
+from yoku.core.utils import bson_safe
 
 __all__ = [
     "ALLOWED_COLLECTIONS",

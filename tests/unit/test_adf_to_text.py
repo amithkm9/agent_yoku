@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from yoku.connectors.jira.client import adf_to_text
+from yoku.pipeline.connectors.jira.client import adf_to_text
 
 
 def test_none_returns_empty():

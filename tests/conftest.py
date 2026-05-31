@@ -56,7 +56,7 @@ def isolated_index(monkeypatch):
     exercise the rerank path stub `tools.rerank` themselves.
     """
     from yoku.agent import tools
-    from yoku.storage import tenancy
+    from yoku.core.storage import tenancy
 
     monkeypatch.setattr(tools, "_INDEXES", {})
     monkeypatch.setattr(tools, "rerank", lambda *a, **k: None)

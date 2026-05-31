@@ -13,7 +13,7 @@ def _route(app, path: str, method: str) -> APIRoute:
 
 
 def test_204_delete_routes_disable_response_models():
-    from yoku.main import app
+    from yoku.api.main import app
 
     connector_delete = _route(app, "/api/connectors/{name}", "DELETE")
     session_delete = _route(app, "/api/sessions/{session_id}", "DELETE")

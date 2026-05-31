@@ -233,7 +233,7 @@ def test_rerank_does_not_overturn_clear_leader():
 def test_index_is_isolated_per_tenant(isolated_index, monkeypatch):
     # The agent is process-global; the index must NOT be shared across tenants,
     # or one tenant's tickets leak into another's search.
-    from yoku.storage import tenancy
+    from yoku.core.storage import tenancy
 
     monkeypatch.setattr(
         tools,

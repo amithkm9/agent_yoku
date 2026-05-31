@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from yoku.storage.sessions import _compact_turns
+from yoku.core.storage.sessions import _compact_turns
 
 
 def _turn(seq: int):

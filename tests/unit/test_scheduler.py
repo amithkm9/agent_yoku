@@ -7,8 +7,8 @@ from __future__ import annotations
 
 import pytest
 
-from yoku import scheduler as sched_mod
-from yoku import sync_service
+from yoku.pipeline import scheduler as sched_mod
+from yoku.pipeline import sync_service
 
 
 class FakeScheduler:

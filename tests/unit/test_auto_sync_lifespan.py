@@ -5,9 +5,9 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from yoku import scheduler as sched_mod
-from yoku.config import settings
-from yoku.main import create_app
+from yoku.api.main import create_app
+from yoku.core.config import settings
+from yoku.pipeline import scheduler as sched_mod
 
 
 @pytest.fixture

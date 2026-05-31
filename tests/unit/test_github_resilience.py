@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 import requests
 
-from yoku.connectors.github import client as gh
+from yoku.pipeline.connectors.github import client as gh
 
 
 def _http_error(status_code: int, message: str = "Not Found") -> requests.HTTPError:

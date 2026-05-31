@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from yoku import main
-from yoku.config import settings
+from yoku.api import main
+from yoku.core.config import settings
 
 
 @pytest.mark.unit

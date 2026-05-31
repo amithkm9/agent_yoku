@@ -16,7 +16,7 @@ from deepagents import create_deep_agent
 
 from yoku.agent.prompts import load_prompt
 from yoku.agent.tools import get_all_tools
-from yoku.config import settings
+from yoku.core.config import settings
 
 
 def build_agent(model: str | None = None) -> Any:
