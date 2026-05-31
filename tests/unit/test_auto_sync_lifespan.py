@@ -5,9 +5,9 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from agent_yoku import scheduler as sched_mod
-from agent_yoku.config import settings
-from agent_yoku.main import create_app
+from yoku import scheduler as sched_mod
+from yoku.config import settings
+from yoku.main import create_app
 
 
 @pytest.fixture

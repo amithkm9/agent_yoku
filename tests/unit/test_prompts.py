@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from agent_yoku.agent.prompts import load_prompt
+from yoku.agent.prompts import load_prompt
 
 
 @pytest.mark.unit
@@ -16,7 +16,7 @@ def test_load_main_prompt_non_empty():
 @pytest.mark.unit
 def test_main_prompt_has_expected_content():
     text = load_prompt("main")
-    assert text.startswith("You are the agent_yoku research orchestrator.")
+    assert text.startswith("You are the yoku research orchestrator.")
     assert "## Tool ladder" in text
     assert "semantic_search" in text
 

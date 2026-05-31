@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from agent_yoku.agent import tools
+from yoku.agent import tools
 
 
 class _FakeColl:

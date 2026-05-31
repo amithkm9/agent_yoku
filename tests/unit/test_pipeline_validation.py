@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from agent_yoku.agent.tools import _validate_pipeline
+from yoku.agent.tools import _validate_pipeline
 
 
 def test_accepts_simple_pipeline():

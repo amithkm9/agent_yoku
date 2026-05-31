@@ -1,4 +1,4 @@
-# agent-yoku — agent guide
+# yoku — agent guide
 
 Cross-source agent over Asato's JIRA tickets, GitHub PRs, and Slack messages.
 Ingests them into MongoDB, embeds them, and answers questions through a `deepagents` planning
@@ -10,30 +10,30 @@ This codebase is **schema-driven**. Three registries are the single source of
 truth — the agent tools read everything from them, nothing about a collection is
 hardcoded in the tool layer:
 
-- **Pydantic models** (`agent_yoku/models/`) — each collection's description
+- **Pydantic models** (`yoku/models/`) — each collection's description
   (the model docstring) + its fields (`description` + `display`/`filterable`).
-- **Source registry** (`agent_yoku/agent/sources.py`) — one `SourceSpec` per
+- **Source registry** (`yoku/agent/sources.py`) — one `SourceSpec` per
   source, key-routing facts only: `name`, `collection`, `label`, `key_pattern` +
   `key_example`, `sort_field` (recency), and `embeddable` (in the semantic index).
-- **Relationship registry** (`agent_yoku/agent/relationships.yaml`) —
+- **Relationship registry** (`yoku/agent/relationships.yaml`) —
   cross-collection joins.
 
 So: **to add or change a data source, edit the registries — never the tools or
 prompts.** `filter` / `get` / `linked` / `semantic_search` / `list_collections`
 all derive from the registries and cover a new source automatically. If you find
-yourself editing `agent_yoku/agent/tools.py` to teach the agent about a
+yourself editing `yoku/agent/tools.py` to teach the agent about a
 collection, stop — you're in the wrong layer.
 
 To add a connector, follow the recipe: `docs/adding-a-connector.md`.
 
 ## Layout (the parts you'll touch)
 
-- `agent_yoku/connectors/<source>/` — one folder per external source (auto-discovered)
-- `agent_yoku/models/` — Pydantic DTOs = collection schemas
-- `agent_yoku/agent/` — the deepagent: `tools.py`, `sources.py`,
+- `yoku/connectors/<source>/` — one folder per external source (auto-discovered)
+- `yoku/models/` — Pydantic DTOs = collection schemas
+- `yoku/agent/` — the deepagent: `tools.py`, `sources.py`,
   `schema_registry.py`, `relationships.yaml`, `agent.py`
-- `agent_yoku/routers/` — FastAPI routes  ·  `agent_yoku/storage/mongo.py` — tenant-aware accessors
-- `agent_yoku/cli.py` — Click CLI (`agent-yoku …`)
+- `yoku/routers/` — FastAPI routes  ·  `yoku/storage/mongo.py` — tenant-aware accessors
+- `yoku/cli.py` — Click CLI (`yoku …`)
 - `web/` — React (Vite + TS) frontend
 - `tests/` — pytest
 
@@ -65,6 +65,6 @@ make web-build       # frontend production build
 - **Tenancy is implicit** — set by `current_user` into a `ContextVar`; storage
   helpers read it. Don't thread a tenant string through call chains.
 - **Secrets** via Pydantic Settings + `SecretStr`. Never hardcode tokens.
-- **External HTTP** goes through `agent_yoku.utils.http.make_retry` (tenacity).
+- **External HTTP** goes through `yoku.utils.http.make_retry` (tenacity).
 - Tools return JSON-serializable data and surface errors as `{"error": "..."}`
   so the agent can adapt — they never raise into the agent loop.

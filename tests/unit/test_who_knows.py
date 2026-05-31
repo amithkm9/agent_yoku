@@ -6,7 +6,7 @@ import types
 
 import pytest
 
-from agent_yoku.agent import tools
+from yoku.agent import tools
 
 
 def _stub_search(monkeypatch, cards):

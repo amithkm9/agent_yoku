@@ -12,7 +12,7 @@ pytestmark = pytest.mark.integration
 
 @pytest.fixture
 def client(scratch_db):
-    from agent_yoku.main import app
+    from yoku.main import app
 
     return TestClient(app)
 
@@ -34,7 +34,7 @@ def _signup(client, tenant: str, email: str = "alice@example.com") -> str:
 def _drop(tenant: str) -> None:
     from pymongo import MongoClient
 
-    from agent_yoku.config import settings
+    from yoku.config import settings
 
     MongoClient(settings.mongo_uri).drop_database(f"{settings.mongo_db}_{tenant}")
 

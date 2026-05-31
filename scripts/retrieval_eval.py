@@ -18,10 +18,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from agent_yoku.agent import tools
-from agent_yoku.config import github_prs_collection, tickets_collection
-from agent_yoku.eval.retrieval import EvalCase, evaluate
-from agent_yoku.storage import tenancy
+from yoku.agent import tools
+from yoku.config import github_prs_collection, tickets_collection
+from yoku.eval.retrieval import EvalCase, evaluate
+from yoku.storage import tenancy
 
 
 def _sample_keys(collection, n: int) -> list[str]:

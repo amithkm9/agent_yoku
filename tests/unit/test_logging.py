@@ -1,4 +1,4 @@
-"""Unit tests for agent_yoku.log + RequestContext middleware."""
+"""Unit tests for yoku.log + RequestContext middleware."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import pytest
 from fastapi import FastAPI
 from starlette.testclient import TestClient
 
-from agent_yoku.log import (
+from yoku.log import (
     SERVICE_NAME,
     _AgentYokuFormatter,
     _ContextFilter,
@@ -18,7 +18,7 @@ from agent_yoku.log import (
     safe_log_str,
     set_session,
 )
-from agent_yoku.middleware import (
+from yoku.middleware import (
     RequestContext,
     correlation_id_context,
     request_id_context,
@@ -28,7 +28,7 @@ from agent_yoku.middleware import (
 
 def _record(msg: str = "hello") -> logging.LogRecord:
     return logging.LogRecord(
-        name="agent_yoku.test",
+        name="yoku.test",
         level=logging.INFO,
         pathname=__file__,
         lineno=1,
@@ -97,9 +97,9 @@ def test_json_formatter_emits_required_fields() -> None:
 
 def test_get_logger_returns_namespaced_child() -> None:
     log = get_logger("unit.test")
-    assert log.name == "agent_yoku.unit.test"
+    assert log.name == "yoku.unit.test"
     # propagation off so messages don't leak to root in test runs
-    assert logging.getLogger("agent_yoku").propagate is False
+    assert logging.getLogger("yoku").propagate is False
 
 
 # --------- middleware ---------

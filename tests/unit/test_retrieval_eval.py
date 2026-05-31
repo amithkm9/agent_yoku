@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from agent_yoku.eval.retrieval import EvalCase, evaluate
+from yoku.eval.retrieval import EvalCase, evaluate
 
 
 def _fake_search(ranked_by_query):

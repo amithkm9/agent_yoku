@@ -20,7 +20,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from agent_yoku.agent.chat import ask, final_answer
+from yoku.agent.chat import ask, final_answer
 
 CASES: list[dict] = [
     {

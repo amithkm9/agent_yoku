@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from agent_yoku.connectors.base import list_connectors
+from yoku.connectors.base import list_connectors
 
 
 def test_lists_jira_and_github():

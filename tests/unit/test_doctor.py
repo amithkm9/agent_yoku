@@ -1,20 +1,20 @@
-"""`agent-yoku doctor` health checks — hermetic via CliRunner + mocked externals."""
+"""`yoku doctor` health checks — hermetic via CliRunner + mocked externals."""
 
 from __future__ import annotations
 
 import pytest
 from click.testing import CliRunner
 
-from agent_yoku import cli as cli_mod
+from yoku import cli as cli_mod
 
 
 @pytest.fixture
 def all_healthy(monkeypatch):
     """Stub every external the doctor checks so all four pass."""
-    import agent_yoku.storage.connector_configs as cc
-    import agent_yoku.storage.freshness as freshness
-    import agent_yoku.storage.mongo as mongo
-    from agent_yoku.config import Settings
+    import yoku.storage.connector_configs as cc
+    import yoku.storage.freshness as freshness
+    import yoku.storage.mongo as mongo
+    from yoku.config import Settings
 
     monkeypatch.setattr(mongo, "ping", lambda: None)
     monkeypatch.setattr(cc, "list_configs", lambda: [{"name": "jira"}])
@@ -48,7 +48,7 @@ def test_doctor_all_pass(all_healthy):
 
 @pytest.mark.unit
 def test_doctor_exits_nonzero_when_mongo_down(all_healthy, monkeypatch):
-    import agent_yoku.storage.mongo as mongo
+    import yoku.storage.mongo as mongo
 
     def _boom():
         raise RuntimeError("connection refused")
@@ -61,7 +61,7 @@ def test_doctor_exits_nonzero_when_mongo_down(all_healthy, monkeypatch):
 
 @pytest.mark.unit
 def test_doctor_flags_default_jwt_secret(all_healthy, monkeypatch):
-    from agent_yoku.config import Settings
+    from yoku.config import Settings
 
     monkeypatch.setattr(Settings, "is_default_jwt_secret", property(lambda self: True))
     result = CliRunner().invoke(cli_mod.cli, ["doctor"])
@@ -71,7 +71,7 @@ def test_doctor_flags_default_jwt_secret(all_healthy, monkeypatch):
 
 @pytest.mark.unit
 def test_doctor_reports_never_synced(all_healthy, monkeypatch):
-    import agent_yoku.storage.freshness as freshness
+    import yoku.storage.freshness as freshness
 
     monkeypatch.setattr(
         freshness,

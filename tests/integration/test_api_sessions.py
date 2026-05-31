@@ -18,7 +18,7 @@ def _tenant() -> str:
 def _drop(tenant: str) -> None:
     from pymongo import MongoClient
 
-    from agent_yoku.config import settings
+    from yoku.config import settings
 
     MongoClient(settings.mongo_uri).drop_database(f"{settings.mongo_db}_{tenant}")
 
@@ -35,7 +35,7 @@ def _signup(client, tenant: str) -> str:
 
 @pytest.fixture
 def client(scratch_db):
-    from agent_yoku.main import app
+    from yoku.main import app
 
     return TestClient(app)
 
@@ -95,7 +95,7 @@ def test_chat_persists_messages(client, monkeypatch):
             msgs.append(AIMessage(content="There are 42 open tickets."))
             return {"messages": msgs}
 
-    from agent_yoku.routers import chat as chat_route
+    from yoku.routers import chat as chat_route
 
     monkeypatch.setattr(chat_route, "_AGENT", FakeAgent())
 
@@ -136,7 +136,7 @@ def test_chat_compact_history_on_followup(client, monkeypatch):
                 ]
             }
 
-    from agent_yoku.routers import chat as chat_route
+    from yoku.routers import chat as chat_route
 
     monkeypatch.setattr(chat_route, "_AGENT", FakeAgent())
 

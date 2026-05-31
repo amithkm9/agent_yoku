@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from agent_yoku.agent import tools
+from yoku.agent import tools
 
 
 def test_mongo_count_unknown_collection_returns_error(fake_collections):

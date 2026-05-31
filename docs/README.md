@@ -1,4 +1,4 @@
-# agent-yoku docs
+# yoku docs
 
 Focused reference docs. Start with the root [`README.md`](../README.md) for the
 overview and [`CLAUDE.md`](../CLAUDE.md) if you're working on the repo with a

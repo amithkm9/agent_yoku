@@ -1,4 +1,4 @@
-# Multi-stage build for agent_yoku. Pattern lifted from asato-svc:
+# Multi-stage build for yoku. Pattern lifted from asato-svc:
 # builder installs poetry deps into a venv; runtime stage copies only the venv
 # + source so the final image stays small and rootless.
 
@@ -47,7 +47,7 @@ RUN groupadd -r app && useradd -r -g app -d /app -s /sbin/nologin app
 
 WORKDIR /app
 COPY --from=builder /opt/venv /opt/venv
-COPY agent_yoku /app/agent_yoku
+COPY yoku /app/yoku
 COPY scripts /app/scripts
 
 RUN mkdir -p /app/logs && chown -R app:app /app
@@ -55,4 +55,4 @@ USER app
 
 EXPOSE 8000
 
-CMD ["python", "-m", "agent_yoku.cli", "api", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "-m", "yoku.cli", "api", "--host", "0.0.0.0", "--port", "8000"]

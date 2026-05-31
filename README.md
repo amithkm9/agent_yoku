@@ -1,4 +1,4 @@
-# agent-yoku
+# yoku
 
 Cross-source agent over Asato's **JIRA tickets**, **GitHub PRs**, and **Slack
 messages**. Ingests them into MongoDB, indexes them with OpenAI embeddings, and exposes a deepagent
@@ -18,7 +18,7 @@ messages**. Ingests them into MongoDB, indexes them with OpenAI embeddings, and 
                                       ▼ db-per-tenant                      ▼
                                ┌────────────────────────────────────────────────┐
                                │   MongoDB (single cluster)                     │
-                               │   agent_yoku / agent_yoku_<tenant_id>        │
+                               │   yoku / yoku_<tenant_id>        │
                                │   collections: jira_tickets, github_prs,       │
                                │   unified_users, chat_sessions, chat_messages, │
                                │   auth_users …                                 │
@@ -28,17 +28,17 @@ messages**. Ingests them into MongoDB, indexes them with OpenAI embeddings, and 
 ## Project layout
 
 ```
-agent-yoku/
+yoku/
 ├── pyproject.toml  Makefile  Dockerfile  .dockerignore
 ├── README.md  ROADMAP.md  CLAUDE.md  .env.example  .gitignore  .python-version
 ├── .pre-commit-config.yaml
 ├── docs/                          # reference docs (see docs/README.md)
 │   └── adding-a-connector.md      #   step-by-step connector recipe
-├── agent_yoku/                    ← installable Python package
+├── yoku/                    ← installable Python package
 │   ├── config.py                   # Pydantic Settings (JWT secret, Mongo, OpenAI, etc.)
 │   ├── exceptions.py
 │   ├── log.py                      # session_id ContextVar + optional Sentry
-│   ├── cli.py                      # Click entry: `agent-yoku …`
+│   ├── cli.py                      # Click entry: `yoku …`
 │   ├── main.py                     # FastAPI app factory + lifespan
 │   ├── deps.py                     # JWT, current_user, password hashing
 │   ├── schemas.py                  # request/response Pydantic models
@@ -110,7 +110,7 @@ cp .env.example .env               # JIRA_TOKEN, GITHUB_TOKEN, OPENAI_API_KEY,
 make refresh-all                   # ~10 min on first run, idempotent
 
 # 5. Bootstrap an admin user
-poetry run agent-yoku auth create-user --email you@asato.ai --tenant asato --admin
+poetry run yoku auth create-user --email you@asato.ai --tenant asato --admin
 
 # 6. Run
 make api                           # http://localhost:8000  (FastAPI + Swagger /docs)
@@ -138,7 +138,7 @@ non-overlapping. Auto-sync is always off under `ENV=test`/`ci`. On-demand
 ## CLI
 
 ```
-$ agent-yoku --help
+$ yoku --help
 
 Commands:
   ingest             Pull source data into mongo
@@ -165,7 +165,7 @@ Commands:
 ## Auth + multi-tenancy
 
 One mongo cluster, one db per tenant:
-- every tenant gets its own db: `agent_yoku_<tenant_id>`
+- every tenant gets its own db: `yoku_<tenant_id>`
 - the db is auto-created on first signup for that tenant
 
 Tenant flow:
@@ -184,17 +184,17 @@ JWT secret comes from `settings.jwt_secret` — **rotate before any non-local de
 > [`docs/adding-a-connector.md`](docs/adding-a-connector.md). Working on this repo
 > with a coding agent? Start from [`CLAUDE.md`](CLAUDE.md).
 
-1. Copy `agent_yoku/connectors/jira/` → `agent_yoku/connectors/<source>/`.
-2. Replace `client.py` with your auth/REST helpers — use `@make_retry("yourname", log)` from `agent_yoku.utils`.
+1. Copy `yoku/connectors/jira/` → `yoku/connectors/<source>/`.
+2. Replace `client.py` with your auth/REST helpers — use `@make_retry("yourname", log)` from `yoku.utils`.
 3. Adapt `ingest.py` to upsert into a new mongo collection.
 4. In `__init__.py` declare `META: ConnectorMeta = {...}`.
 5. Optional `users_ingest.py` for member directories.
-6. Add a CLI subcommand in `agent_yoku/cli.py`.
-7. Register the collection in `agent_yoku/storage/mongo.py::ALLOWED_COLLECTIONS`.
-8. Add a Pydantic model in `agent_yoku/models/` (its docstring is the collection description; fields carry `description` + `display`/`filterable` metadata) and map it in `agent_yoku/agent/schema_registry.py::COLLECTION_MODELS`.
-9. Add a `SourceSpec` to `agent_yoku/agent/sources.py::SOURCES` (key shape + example) and any links to `agent_yoku/agent/relationships.yaml`. `filter` / `get` / `linked` / `semantic_search` / `list_collections` then cover the source automatically — no tool or prompt edits.
+6. Add a CLI subcommand in `yoku/cli.py`.
+7. Register the collection in `yoku/storage/mongo.py::ALLOWED_COLLECTIONS`.
+8. Add a Pydantic model in `yoku/models/` (its docstring is the collection description; fields carry `description` + `display`/`filterable` metadata) and map it in `yoku/agent/schema_registry.py::COLLECTION_MODELS`.
+9. Add a `SourceSpec` to `yoku/agent/sources.py::SOURCES` (key shape + example) and any links to `yoku/agent/relationships.yaml`. `filter` / `get` / `linked` / `semantic_search` / `list_collections` then cover the source automatically — no tool or prompt edits.
 
-`agent-yoku list-connectors` will auto-discover it.
+`yoku list-connectors` will auto-discover it.
 
 ## Architecture decisions
 
@@ -203,7 +203,7 @@ JWT secret comes from `settings.jwt_secret` — **rotate before any non-local de
 - **Single planning agent.** One deepagent plans with `write_todos` and answers
   over a source-agnostic toolkit (no sub-agents).
 - **Schema-driven, nothing hardcoded.** Three registries are the single sources
-  of truth: the **Pydantic models** (`agent_yoku/models/`) define each
+  of truth: the **Pydantic models** (`yoku/models/`) define each
   collection's description + fields + what's `display`/`filterable`; the
   **source registry** (`agent/sources.py`) holds only key-routing facts; the
   **relationship registry** (`agent/relationships.yaml`) declares cross-collection
@@ -225,7 +225,7 @@ JWT secret comes from `settings.jwt_secret` — **rotate before any non-local de
 
 ## Observability
 
-- Rotating file log at `logs/agent_yoku.log` + stderr.
+- Rotating file log at `logs/yoku.log` + stderr.
 - Per-session correlation: every record carries `[sid=<8-char>]`.
 - `LOG_JSON=1` switches the file handler to JSON-line output.
 - `SENTRY_DSN=…` auto-attaches the sentry SDK (no-op if package missing).
@@ -250,14 +250,14 @@ Pre-commit hooks: autoflake, ruff, black, standard hygiene.
 ## Docker
 
 ```bash
-docker build -t agent-yoku .
-docker run --rm -p 8000:8000 --env-file .env agent-yoku
+docker build -t yoku .
+docker run --rm -p 8000:8000 --env-file .env yoku
 # API on http://localhost:8000  /docs for Swagger
 ```
 
 For batch ingest:
 ```bash
-docker run --rm --env-file .env agent-yoku python -m agent_yoku.cli refresh-all
+docker run --rm --env-file .env yoku python -m yoku.cli refresh-all
 ```
 
 ## Data model

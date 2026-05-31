@@ -7,8 +7,8 @@ from __future__ import annotations
 
 import pytest
 
-from agent_yoku.connectors._runtime import slack_config_from_dict, use_slack
-from agent_yoku.connectors.slack.client import message_to_doc
+from yoku.connectors._runtime import slack_config_from_dict, use_slack
+from yoku.connectors.slack.client import message_to_doc
 
 _USER_MAP = {
     "U001": {"display_name": "Alice Chen", "email": "alice@co.ai"},
@@ -142,7 +142,7 @@ def test_slack_config_from_dict_overrides():
 
 @pytest.mark.unit
 def test_current_slack_config_raises_when_unbound():
-    from agent_yoku.connectors._runtime import current_slack_config
+    from yoku.connectors._runtime import current_slack_config
 
     with pytest.raises(RuntimeError, match="no Slack config bound"):
         current_slack_config()
@@ -150,7 +150,7 @@ def test_current_slack_config_raises_when_unbound():
 
 @pytest.mark.unit
 def test_use_slack_binds_and_unbinds():
-    from agent_yoku.connectors._runtime import current_slack_config
+    from yoku.connectors._runtime import current_slack_config
 
     cfg = slack_config_from_dict({"bot_token": "xoxb-test", "workspace": "acme"})
     with use_slack(cfg):

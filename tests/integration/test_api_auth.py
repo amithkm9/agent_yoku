@@ -15,9 +15,9 @@ def client(scratch_db):
     """TestClient bound to a scratch tenant — drops the db on teardown.
 
     Uses the existing scratch_db fixture's name as the tenant_id so collections
-    land in `agent_yoku_<scratch_db_name>` and get cleaned up by that fixture.
+    land in `yoku_<scratch_db_name>` and get cleaned up by that fixture.
     """
-    from agent_yoku.main import app
+    from yoku.main import app
 
     return TestClient(app)
 
@@ -42,7 +42,7 @@ def _signup(
 def _drop(tenant: str) -> None:
     from pymongo import MongoClient
 
-    from agent_yoku.config import settings
+    from yoku.config import settings
 
     MongoClient(settings.mongo_uri).drop_database(f"{settings.mongo_db}_{tenant}")
 

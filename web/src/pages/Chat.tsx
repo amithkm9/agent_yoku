@@ -254,7 +254,7 @@ function firstNameOf(user: User | null): string {
   return first.charAt(0).toUpperCase() + first.slice(1);
 }
 
-// Quick-start prompts tailored to what agent_yoku actually knows about:
+// Quick-start prompts tailored to what yoku actually knows about:
 // the tenant's JIRA tickets + GitHub PRs.
 interface Suggestion {
   label: string;

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from agent_yoku.connectors._runtime import JiraConfig, use_jira
-from agent_yoku.connectors.jira.client import issue_to_doc
+from yoku.connectors._runtime import JiraConfig, use_jira
+from yoku.connectors.jira.client import issue_to_doc
 
 
 @pytest.fixture(autouse=True)

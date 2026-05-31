@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 
 from bson import ObjectId
 
-from agent_yoku.agent.tools import _clean
+from yoku.agent.tools import _clean
 
 
 def test_drops_underscore_id():

@@ -26,7 +26,7 @@ def repo_root() -> Path:
 @pytest.fixture(scope="session")
 def scratch_db_name() -> str:
     """Random per-session mongo db name so integration tests don't trample data."""
-    return f"agent_yoku_test_{uuid.uuid4().hex[:8]}"
+    return f"yoku_test_{uuid.uuid4().hex[:8]}"
 
 
 @pytest.fixture(scope="session")
@@ -55,8 +55,8 @@ def isolated_index(monkeypatch):
     Also disables the ZeroEntropy reranker so search stays hermetic — tests that
     exercise the rerank path stub `tools.rerank` themselves.
     """
-    from agent_yoku.agent import tools
-    from agent_yoku.storage import tenancy
+    from yoku.agent import tools
+    from yoku.storage import tenancy
 
     monkeypatch.setattr(tools, "_INDEXES", {})
     monkeypatch.setattr(tools, "rerank", lambda *a, **k: None)
@@ -114,7 +114,7 @@ def fake_collections(monkeypatch):
 
     Yields a dict of name -> FakeCollection so tests can inspect call args.
     """
-    from agent_yoku.agent import tools
+    from yoku.agent import tools
 
     colls = {
         "jira_tickets": FakeCollection(),

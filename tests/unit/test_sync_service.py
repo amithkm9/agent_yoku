@@ -9,9 +9,9 @@ from __future__ import annotations
 
 import pytest
 
-from agent_yoku import sync_service
-from agent_yoku.storage import connector_configs as cc
-from agent_yoku.storage import mongo, tenancy
+from yoku import sync_service
+from yoku.storage import connector_configs as cc
+from yoku.storage import mongo, tenancy
 
 
 @pytest.fixture
@@ -30,13 +30,13 @@ def test_list_tenant_ids_strips_prefix_and_filters(monkeypatch):
                 "admin",
                 "config",
                 "local",
-                "agent_yoku",  # unsuffixed base db — not a tenant
-                "agent_yoku_acme",
-                "agent_yoku_globex",
+                "yoku",  # unsuffixed base db — not a tenant
+                "yoku_acme",
+                "yoku_globex",
                 "other_db",
             ]
 
-    monkeypatch.setattr(sync_service.settings, "mongo_db", "agent_yoku")
+    monkeypatch.setattr(sync_service.settings, "mongo_db", "yoku")
     monkeypatch.setattr(mongo, "_client", lambda: FakeClient())
 
     assert sync_service.list_tenant_ids() == ["acme", "globex"]

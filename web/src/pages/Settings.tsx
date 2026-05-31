@@ -89,7 +89,7 @@ export function Settings() {
           <div>
             <h2>Tenant data connectors</h2>
             <p className="muted">
-              Connect the systems your team already works in so agent_yoku can answer
+              Connect the systems your team already works in so yoku can answer
               questions from live JIRA and GitHub data. Tokens are encrypted at rest
               and kept inside this tenant only.
             </p>
@@ -629,7 +629,7 @@ const defaultFieldHelp: Record<string, string> = {
   base_url: "Your Atlassian site URL.",
   email: "The account email tied to the token.",
   token: "Stored encrypted and never returned to the UI.",
-  project: "The JIRA project key agent_yoku should index.",
+  project: "The JIRA project key yoku should index.",
   api_base: "Use the public GitHub API unless you run GitHub Enterprise.",
   org: "Just the org slug from the URL (e.g. AsatoCorp), not the full link.",
   pr_lookback_days: "How many days of pull request history to ingest on sync.",

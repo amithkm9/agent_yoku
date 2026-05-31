@@ -2,10 +2,10 @@
 
 POETRY := poetry run
 PY := $(POETRY) python
-CLI := $(PY) -m agent_yoku.cli
+CLI := $(PY) -m yoku.cli
 
 help:
-	@echo "agent_yoku — common dev tasks"
+	@echo "yoku — common dev tasks"
 	@echo
 	@echo "Setup:"
 	@echo "  make install         poetry install (runtime only)"

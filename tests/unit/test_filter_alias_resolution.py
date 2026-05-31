@@ -3,7 +3,7 @@ each source's fields onto the right mongo query."""
 
 from __future__ import annotations
 
-from agent_yoku.agent import tools
+from yoku.agent import tools
 
 
 def test_filter_jira_translates_github_login_to_jira_name(fake_collections):

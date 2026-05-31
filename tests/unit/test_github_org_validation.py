@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from agent_yoku.schemas import GithubConfigIn, normalize_github_org
+from yoku.schemas import GithubConfigIn, normalize_github_org
 
 
 @pytest.mark.unit

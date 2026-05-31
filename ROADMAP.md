@@ -1,8 +1,8 @@
-# agent-yoku Roadmap
+# yoku Roadmap
 
 ## Vision
 
-agent-yoku is the **execution-integrity agent for software delivery** — a multi-tenant deep agent
+yoku is the **execution-integrity agent for software delivery** — a multi-tenant deep agent
 that connects the tools a piece of work flows through (plan → code → ship → run → talk → document),
 understands how those tools relate, and proactively catches every place the chain breaks — then
 acts on it inside the tool where the work already lives.
@@ -10,7 +10,7 @@ acts on it inside the tool where the work already lives.
 The most valuable insights don't live inside a single tool. They live in the **edges between
 tools** — the ticket marked Done with no merged PR, the PR merged but never deployed, the deploy
 that caused an incident with no tracking ticket, the decision made in Slack that never made it into
-the ticket. agent-yoku sees across the delivery chain at once and closes the loop.
+the ticket. yoku sees across the delivery chain at once and closes the loop.
 
 This is deliberately **not** a horizontal "search everything" product (that's Glean's lane, and
 breadth + per-user permissions across 35+ apps is a multi-year platform we won't win). Our edge is
@@ -25,7 +25,7 @@ they stay consistent.
      └────────┴───────┴────┬────┴──────────┴──────────┘
                            ▼
                 ┌─────────────────────┐
-                │  agent-yoku brain   │
+                │  yoku brain   │
                 │  embed + index      │
                 │  cross-source links │
                 │  unified identity   │
@@ -108,7 +108,7 @@ Connect engineering work to outcomes, to sell upward.
 
 ### Three ways data gets in
 
-**Built-in connectors** (ship with agent-yoku — the tiers above).
+**Built-in connectors** (ship with yoku — the tiers above).
 
 **Connector SDK** (custom/internal sources):
 
@@ -227,7 +227,7 @@ who_owns(target)
 
 ## Phase 2 — The Chain Graph: Understanding How Work Connects
 
-**Goal:** agent-yoku understands how documents across stages relate. The graph is what turns
+**Goal:** yoku understands how documents across stages relate. The graph is what turns
 indexed data into a brain — and it's the asset Glean's per-document search doesn't build.
 
 ### entity_links collection
@@ -286,7 +286,7 @@ Recency-weighted so current owners surface above past contributors.
 
 ## Phase 3 — Proactive Intelligence: Watch the Chain, Close the Loop
 
-**Goal:** agent-yoku stops waiting to be asked. It continuously scans the delivery chain, finds
+**Goal:** yoku stops waiting to be asked. It continuously scans the delivery chain, finds
 broken links nobody is watching for, and proposes — or executes — the fix in the source tool.
 
 This is the core differentiator. The detection half already exists (`analysis/consistency.py`);
@@ -366,7 +366,7 @@ and one-click approve / edit / dismiss.
 - **Tiers** — comment = auto; mutate (transition ticket, close PR) = human approval.
 - **Kill switch** — global + per-rule.
 
-### Scanner library (ships with agent-yoku)
+### Scanner library (ships with yoku)
 
 | Scanner                  | Stages required          | What it finds |
 |--------------------------|--------------------------|---------------|

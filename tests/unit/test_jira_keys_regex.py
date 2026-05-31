@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from agent_yoku.utils import extract_jira_keys
+from yoku.utils import extract_jira_keys
 
 
 def test_extracts_from_branch():

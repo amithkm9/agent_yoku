@@ -1,4 +1,4 @@
-from agent_yoku.storage import tenancy
+from yoku.storage import tenancy
 
 
 def test_current_tenant_requires_explicit_binding():
@@ -13,6 +13,6 @@ def test_current_tenant_requires_explicit_binding():
 
 
 def test_tenant_maps_to_suffixed_db(monkeypatch):
-    monkeypatch.setattr(tenancy.settings, "mongo_db", "agent_yoku")
+    monkeypatch.setattr(tenancy.settings, "mongo_db", "yoku")
 
-    assert tenancy.tenant_db_name("demo") == "agent_yoku_demo"
+    assert tenancy.tenant_db_name("demo") == "yoku_demo"

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from agent_yoku.agent import schema_registry as sr
+from yoku.agent import schema_registry as sr
 
 
 @pytest.mark.unit

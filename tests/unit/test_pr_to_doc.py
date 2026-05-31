@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from agent_yoku.connectors.github.client import is_bot, pr_to_doc
+from yoku.connectors.github.client import is_bot, pr_to_doc
 
 
 def _fake_pr(**overrides):

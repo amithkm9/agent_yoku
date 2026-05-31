@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import SecretStr
 
-from agent_yoku.agent import rerank as rr
+from yoku.agent import rerank as rr
 
 
 def _enable(monkeypatch) -> None:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from agent_yoku.agent import relationships, sources, tools
+from yoku.agent import relationships, sources, tools
 
 
 @pytest.mark.unit

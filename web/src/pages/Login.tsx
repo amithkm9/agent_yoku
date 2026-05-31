@@ -41,7 +41,7 @@ export function Login() {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <h1 className="auth-title">agent_yoku</h1>
+        <h1 className="auth-title">yoku</h1>
         <p className="auth-subtitle">
           {mode === "login" ? "Sign in to your tenant" : "Create an account"}
         </p>

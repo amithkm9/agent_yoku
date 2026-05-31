@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from agent_yoku.agent.usage import UsageCallback
+from yoku.agent.usage import UsageCallback
 
 
 class _OpenAIResult:
@@ -81,10 +81,10 @@ def test_empty_response_is_ignored():
 def _capture(monkeypatch) -> list[str]:
     """Record messages emitted by the usage logger.
 
-    The agent_yoku logger sets propagate=False, so pytest's caplog (which hangs
+    The yoku logger sets propagate=False, so pytest's caplog (which hangs
     off the root logger) never sees these records — capture them directly.
     """
-    from agent_yoku.agent import usage as usage_mod
+    from yoku.agent import usage as usage_mod
 
     messages: list[str] = []
     monkeypatch.setattr(usage_mod.log, "info", lambda msg, *a: messages.append(msg % a))

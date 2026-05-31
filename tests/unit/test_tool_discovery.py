@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from agent_yoku.agent import tools
-from agent_yoku.agent.tools._registry import discover_tools
+from yoku.agent import tools
+from yoku.agent.tools._registry import discover_tools
 
 _EXPECTED = {
     "data_freshness",

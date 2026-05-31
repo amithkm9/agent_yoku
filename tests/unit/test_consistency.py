@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from agent_yoku.analysis import consistency
+from yoku.analysis import consistency
 
 
 @pytest.mark.unit
