@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -44,10 +45,15 @@ def register_exception_handlers(app: FastAPI) -> None:
         request: Request, exc: RequestValidationError
     ) -> JSONResponse:
         log.warning("422 validation error %s %s", request.method, request.url.path)
+        # `exc.errors()` can carry non-JSON-serializable objects in each error's
+        # `ctx` (e.g. the original ValueError raised by a field validator). Run it
+        # through jsonable_encoder so any field-validator error yields a clean 422
+        # instead of crashing the handler into a 500.
+        detail = jsonable_encoder(exc.errors())
         return JSONResponse(
             status_code=422,
             content={
-                "error": {"message": "Request validation failed", "detail": exc.errors()},
+                "error": {"message": "Request validation failed", "detail": detail},
                 "context": _ctx(),
             },
         )

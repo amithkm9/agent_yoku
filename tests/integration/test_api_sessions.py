@@ -121,6 +121,33 @@ def test_chat_persists_messages(client, monkeypatch):
         _drop(tenant)
 
 
+def test_chat_unknown_session_404(client, monkeypatch):
+    """POST /api/chat against a session that was never created must 404, not
+    silently auto-create it. The agent must not even be invoked."""
+
+    class FakeAgent:
+        def invoke(self, payload, **kwargs):  # pragma: no cover - must not run
+            raise AssertionError("agent should not be invoked for an unknown session")
+
+    from yoku.api.routers import chat as chat_route
+
+    monkeypatch.setattr(chat_route, "_AGENT", FakeAgent())
+
+    tenant = _tenant()
+    try:
+        token = _signup(client, tenant)
+        hdrs = {"Authorization": f"Bearer {token}"}
+
+        r = client.post(
+            "/api/chat",
+            headers=hdrs,
+            json={"session_id": "does-not-exist", "query": "hi"},
+        )
+        assert r.status_code == 404, r.text
+    finally:
+        _drop(tenant)
+
+
 def test_chat_compact_history_on_followup(client, monkeypatch):
     """The agent should be invoked with prior user + final-AI from turn 1."""
 

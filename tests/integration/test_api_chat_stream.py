@@ -298,6 +298,28 @@ def test_stream_error_emits_error_event(client, monkeypatch):
         _drop(tenant)
 
 
+def test_stream_unknown_session_404(client, monkeypatch):
+    """POST /api/chat/stream against a never-created session must 404, not
+    silently auto-create it. The agent must not even be invoked."""
+    from yoku.api.routers import chat as chat_route
+
+    monkeypatch.setattr(chat_route, "_AGENT", FakeStreamAgentError())
+
+    tenant = _tenant()
+    try:
+        token = _signup(client, tenant)
+        hdrs = _auth(token)
+
+        r = client.post(
+            "/api/chat/stream",
+            headers=hdrs,
+            json={"session_id": "does-not-exist", "query": "hi"},
+        )
+        assert r.status_code == 404, r.text
+    finally:
+        _drop(tenant)
+
+
 def test_stream_tenant_isolation(client, monkeypatch):
     """Messages streamed for tenant A are not visible from tenant B."""
     from yoku.api.routers import chat as chat_route

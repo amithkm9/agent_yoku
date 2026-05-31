@@ -6,7 +6,7 @@ import json
 import threading
 from collections.abc import Iterator
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import HumanMessage
 
@@ -61,6 +61,17 @@ def _final_answer(messages: list) -> str:
     return ""
 
 
+def _require_session(session_id: str) -> None:
+    """Reject chat against a session that doesn't exist for the current tenant.
+
+    Sessions are created explicitly via POST /api/sessions; chatting must not
+    silently conjure one. Tenancy is implicit (set by CurrentUser), so this
+    existence check is already scoped to the caller's tenant.
+    """
+    if sess_mod.get_session(session_id) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "session not found")
+
+
 def _sse(event: str, data: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(data, default=str)}\n\n"
 
@@ -110,6 +121,7 @@ def _stream_agent_turn(session_id: str, query: str, prior: list, agent) -> Itera
 @router.post("", response_model=ChatResponse)
 async def post_chat(req: ChatRequest, user: CurrentUser) -> ChatResponse:
     set_session(req.session_id)
+    _require_session(req.session_id)
 
     prior = sess_mod.load_agent_history(req.session_id)
     usage = UsageCallback(session_id=req.session_id)
@@ -147,6 +159,7 @@ async def post_chat_stream(req: ChatRequest, user: CurrentUser) -> StreamingResp
     event per tool call, then a final 'answer' event. The sync generator is run
     in a threadpool by Starlette, so it doesn't block the event loop."""
     set_session(req.session_id)
+    _require_session(req.session_id)
     prior = sess_mod.load_agent_history(req.session_id)
     log.info("chat stream user=%s session=%s", user.id, req.session_id)
     return StreamingResponse(

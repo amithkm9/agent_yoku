@@ -48,6 +48,31 @@ def scratch_db(scratch_db_name):
     client.drop_database(scratch_db_name)
 
 
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter():
+    """Clear the in-memory rate-limit window before each test.
+
+    The limiter is keyed by client IP and the TestClient reuses one IP across
+    the whole session, so without this the cumulative request count trips the
+    per-window cap and later API tests spuriously 429. Resetting per test keeps
+    API tests deterministic regardless of how many run before them.
+    """
+    try:
+        from yoku.api.main import app
+        from yoku.core.middleware.rate_limit import RateLimit
+    except Exception:
+        yield
+        return
+
+    cur = getattr(app, "middleware_stack", None)
+    while cur is not None:
+        if isinstance(cur, RateLimit):
+            cur._hits.clear()
+            break
+        cur = getattr(cur, "app", None)
+    yield
+
+
 @pytest.fixture
 def isolated_index(monkeypatch):
     """Reset the per-tenant index cache + tenant context between tests.
