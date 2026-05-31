@@ -17,8 +17,9 @@ def test_load_main_prompt_non_empty():
 def test_main_prompt_has_expected_content():
     text = load_prompt("main")
     assert text.startswith("You are the yoku research orchestrator.")
-    assert "## Tool ladder" in text
+    assert "## Tools" in text
     assert "semantic_search" in text
+    assert "mongo_query" in text
 
 
 @pytest.mark.unit

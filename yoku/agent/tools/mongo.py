@@ -16,6 +16,7 @@ from yoku.agent.relationships import relationships_for
 from yoku.agent.schema_registry import collection_description, field_specs
 from yoku.agent.schema_registry import filter_fields as schema_filter_fields
 from yoku.agent.sources import source_for_collection
+from yoku.core.storage.freshness import source_freshness
 
 _BLOCKED_STAGES = {"$out", "$merge", "$function", "$accumulator", "$where"}
 
@@ -117,6 +118,53 @@ def _relationship_summaries(collection: str) -> list[dict]:
     return out
 
 
+def _field_links(collection: str) -> dict[str, str]:
+    """Map each field that joins out to another collection -> "coll.foreign_field".
+
+    Lets describe_collection tell the agent which fields are usable join keys
+    (for a `$lookup`) and exactly what they point at.
+    """
+    out: dict[str, str] = {}
+    for r in relationships_for(collection):
+        if r.entity1 == collection:
+            out[r.join.local_field] = f"{r.entity2}.{r.join.foreign_field}"
+    return out
+
+
+def _field_entry(spec: Any, links: dict[str, str], examples: dict[str, list]) -> dict:
+    """The reported shape of one schema field, including filter semantics."""
+    entry: dict[str, Any] = {
+        "type": spec.type,
+        "description": spec.description,
+        "display": spec.display,
+        "filterable": spec.filterable,
+        "examples": examples.get(spec.name, []),
+    }
+    if spec.filterable:
+        # How to filter this field: the arg name, the match kind, and (for person
+        # fields) the identity it resolves to — so the agent filters correctly.
+        entry["filter_arg"] = spec.filter_arg
+        entry["filter_kind"] = spec.filter_kind
+        if spec.identity:
+            entry["identity"] = spec.identity
+        if spec.normalize:
+            entry["normalize"] = spec.normalize
+    if spec.enum:
+        entry["enum"] = list(spec.enum)
+    if spec.name in links:
+        entry["links_to"] = links[spec.name]
+    return entry
+
+
+def _freshness_by_source() -> dict[str, dict]:
+    """Per-source sync freshness, keyed by source name. Best-effort: a storage
+    hiccup must not break listing, so failures degrade to no freshness info."""
+    try:
+        return {r["source"]: r for r in source_freshness()}
+    except Exception:
+        return {}
+
+
 @tool
 def list_collections() -> list[dict] | dict:
     """Enumerate the mongo collections the agent may read from.
@@ -124,11 +172,14 @@ def list_collections() -> list[dict] | dict:
     For each collection: name, document count, a description (from its schema),
     indexed fields (cheap to $match / sort on), and the relationships it
     participates in. Collections backed by a connector source also report the
-    `source` name, an example `key`, and the fields you can pass to
-    `filter(source, …)`. This is the live source of truth — call it to discover
-    which sources, collections, and links exist; don't assume a fixed set.
+    `source` name, an example `key`, its filterable fields, and how fresh the
+    data is (`last_synced_at` + `synced_ago`) — check that before concluding a
+    source is empty, since count 0 can mean unsynced rather than no such work.
+    This is the live source of truth — call it to discover which sources,
+    collections, and links exist; don't assume a fixed set.
     """
     try:
+        fresh = _freshness_by_source()
         out = []
         for name, factory in _t.ALLOWED_COLLECTIONS.items():
             coll = factory()
@@ -144,6 +195,11 @@ def list_collections() -> list[dict] | dict:
                 entry["source"] = spec.name
                 entry["key_example"] = spec.key_example
                 entry["filter_fields"] = {f.arg: f.help for f in schema_filter_fields(name)}
+                row = fresh.get(spec.name)
+                if row:
+                    entry["last_synced_at"] = row.get("last_synced_at")
+                    entry["synced_ago"] = row.get("synced_ago")
+                    entry["last_sync_status"] = row.get("last_sync_status")
             out.append(entry)
         return out
     except Exception as e:
@@ -186,10 +242,16 @@ def _describe_by_sampling(coll: Any, collection: str, n: int) -> dict:
 
 @tool
 def describe_collection(collection: str, sample_size: int = 20) -> dict:
-    """Report a collection's fields from its schema — name, type, and description
-    — plus a few live example values per field. Use before composing a
-    `mongo_query` to reference fields that actually exist and learn enum-like
-    values (e.g. status).
+    """Report a collection's schema in the detail needed to build a correct query.
+
+    For each field: type, description, live example values, and — when filterable
+    — its `filter_arg`, `filter_kind` (exact / user / has_refs), the `identity` a
+    person field resolves to, its `enum` (closed value set, e.g. PR status), and
+    `links_to` (the field is a join key into another collection). Top level also
+    reports the `source`, an example `key`, and the collection's `relationships`.
+
+    Call this before composing a `mongo_query` so you reference fields that exist,
+    match real values, and join on the right keys.
 
     Args:
         collection: name from list_collections() (e.g. "jira_tickets",
@@ -197,8 +259,10 @@ def describe_collection(collection: str, sample_size: int = 20) -> dict:
         sample_size: how many docs to sample for example values (default 20, max 100).
 
     Returns:
-        {"collection", "description", "fields": {field: {"type", "description",
-         "display", "filterable", "examples": [...]}}} or {"error": str}.
+        {"collection", "description", "source"?, "key_example"?, "relationships",
+         "fields": {field: {"type", "description", "display", "filterable",
+         "filter_arg"?, "filter_kind"?, "identity"?, "enum"?, "links_to"?,
+         "examples": [...]}}} or {"error": str}.
     """
     try:
         coll = _t.get_collection(collection)
@@ -211,21 +275,20 @@ def describe_collection(collection: str, sample_size: int = 20) -> dict:
         return _describe_by_sampling(coll, collection, n)
 
     examples = _sample_examples(coll, n, {s.name for s in specs})
-    fields = {
-        s.name: {
-            "type": s.type,
-            "description": s.description,
-            "display": s.display,
-            "filterable": s.filterable,
-            "examples": examples.get(s.name, []),
-        }
-        for s in specs
-    }
-    return {
+    links = _field_links(collection)
+    fields = {s.name: _field_entry(s, links, examples) for s in specs}
+
+    out: dict[str, Any] = {
         "collection": collection,
         "description": collection_description(collection),
+        "relationships": _relationship_summaries(collection),
         "fields": fields,
     }
+    spec = source_for_collection(collection)
+    if spec:
+        out["source"] = spec.name
+        out["key_example"] = spec.key_example
+    return out
 
 
 @tool
@@ -262,9 +325,10 @@ def mongo_query(
 ) -> dict:
     """Run a read-only aggregation pipeline on one collection.
 
-    Use this for ad-hoc queries the narrow tools (filter / mongo_count) don't
-    cover — e.g. grouping, joins via $lookup, custom projections, or filters on
-    fields like fix_versions / labels / nested jira_keys.
+    This is the main way to fetch records: point lookups (`$match` on `key`),
+    exact filters, grouping, joins via `$lookup`, custom projections, and filters
+    on fields like fix_versions / labels / nested jira_keys. Use `mongo_count`
+    first to size the result.
 
     Safety bounds (enforced server-side):
     - pipeline must be <= 20 stages, each a single-key {"$op": {...}} dict

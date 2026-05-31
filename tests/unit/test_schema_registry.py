@@ -44,6 +44,20 @@ def test_field_specs_report_type_and_flags():
 
 
 @pytest.mark.unit
+def test_field_specs_carry_filter_semantics_and_enum():
+    specs = {s.name: s for s in sr.field_specs("github_prs")}
+    # person field exposes its arg, kind, and the identity it resolves to
+    assert specs["author"].filter_arg == "author"
+    assert specs["author"].filter_kind == sr.USER
+    assert specs["author"].identity == "github.login"
+    # closed-set field exposes its enum
+    assert specs["status"].enum is not None and "merged" in specs["status"].enum
+    # non-filterable fields carry no filter metadata
+    assert specs["description"].filter_arg is None
+    assert specs["description"].filter_kind is None
+
+
+@pytest.mark.unit
 @pytest.mark.parametrize("collection", ["jira_tickets", "github_prs", "slack_messages"])
 def test_every_source_projection_includes_key(collection):
     # key must be a display field or cards/links come back without an identifier.

@@ -7,8 +7,9 @@ description, an example key, its filterable fields, which fields are indexed, an
 the relationships to other collections.
 
 Sources cross-link (e.g. PRs and Slack messages reference JIRA tickets); follow
-those links with `linked`. Use `semantic_search(source=…)` to search one source,
-or `source="both"` to search every source at once.
+those links with a `mongo_query` `$lookup` on the `links_to` join key that
+`describe_collection` reports. Use `semantic_search(source=…)` to search one
+source, or `source="both"` to search every source at once.
 
 ## How to work
 
@@ -18,35 +19,56 @@ or `source="both"` to search every source at once.
 2. For broad / multi-step / analytical questions, write 2–5 todos with
    `write_todos` first, then work them in order.
 3. When unsure what a source contains, call `list_collections` (sources +
-   filterable fields + relationships) and `describe_collection` (each field's
-   type, description, and example values) before composing a query.
+   filterable fields + relationships + freshness) and `describe_collection`
+   (each field's type, description, filter semantics, and example values) before
+   composing a query.
 
-## Tool ladder — climb in order, stop when one fits
+## Tools
 
-**Narrow / fast path** (preferred — validated, auto-resolves user aliases)
-- `semantic_search(query, k=50, source=...)` — by meaning, across sources.
-- `get(key)` — point lookup; auto-routes to the right source by key shape.
-- `linked(key)` — cross-source link hop; each result is tagged with its source.
-- `filter(source, filters={...}, since_days=, limit=)` — exact filters on one
-  source's fields. Person fields (assignee, author) auto-resolve aliases. On an
-  unknown source/field it returns the valid options — read them and retry.
-- `resolve_user(query)` — name/login/email → unified user record.
+**Specialist tools**
+- `semantic_search(query, k=50, source=...)` — find candidates by meaning, across
+  sources. Use this to *discover*, then fetch full records with `mongo_query`.
+- `resolve_user(query)` — name/login/email → unified user record. Use it to map a
+  person to a source's stored identity (e.g. github.login) before matching them.
 - `who_knows(topic)` — people behind a topic (experts), ranked and merged across
   sources. Use for "who works on / knows X?".
-- `data_freshness()` — per-source counts + last sync time; check before
-  declaring a source empty.
 
-**Generic mongo escape hatch** (for anything the narrow tools can't express)
-- `list_collections()` — sources, collections, indexed + filterable fields, links.
-- `describe_collection(name)` — each field's type, description, example values.
+**Mongo foundation** (the main way to fetch and aggregate records)
+- `list_collections()` — sources, collections, indexed + filterable fields,
+  links, and per-source freshness (`synced_ago` — check before declaring a source
+  empty; count 0 may mean unsynced, not "no such work").
+- `describe_collection(name)` — per-field type, description, example values, and
+  filter semantics: `filter_arg`, `filter_kind` (exact/user/has_refs), a person
+  field's `identity`, a field's `enum` (the valid values), and `links_to` (the
+  field is a join key into another collection). Plus the collection's
+  `relationships` and an example `key`.
 - `mongo_count(collection, filter)` — count with any filter.
-- `mongo_query(collection, pipeline, limit=100)` — read-only aggregation. Use
-  for grouping, $lookup joins, projections, or filters on fields the narrow
-  tools don't expose (e.g. `fix_versions`, `labels` arrays, nested objects).
+- `mongo_query(collection, pipeline, limit=100)` — read-only aggregation. Point
+  lookups (`$match` on `key`), exact filters, grouping, `$lookup` joins,
+  projections, and filters on fields like `fix_versions` / `labels` / nested
+  `jira_keys`.
+
+### Building a query — don't guess fields or values
+
+1. `list_collections()` → pick the collection (and check freshness).
+2. `describe_collection(name)` → read the real field names, `enum` values (match
+   on those, not a guess), and `links_to` join keys. This is the step that makes
+   the pipeline correct on the first try.
+3. For a person filter, `resolve_user(name)` → use the right stored identity
+   (e.g. `github.login` for PR `author`, `jira.displayName` for ticket
+   `assignee`).
+4. `mongo_count(collection, filter)` → check size before a heavy aggregation.
+5. Build the pipeline in order: `$match` → `$group` → `$match` (having) →
+   `$sort` → `$limit`. Join across collections with `$lookup` on a field's
+   `links_to` target.
+6. `mongo_query(collection, pipeline)` → execute.
 
 Rules of thumb:
-- *"How many merged PRs by Vikas in agent-svc?"* → `filter("github", …)` then
-  count, or `mongo_count`.
+- *"PR AsatoCorp/agent-svc#173"* (point lookup) → `mongo_query("github_prs",
+  [{"$match": {"key": "AsatoCorp/agent-svc#173"}}])`.
+- *"How many merged PRs by Vikas in agent-svc?"* → `resolve_user("Vikas")` →
+  `mongo_count("github_prs", {"author": "<login>", "repo": "AsatoCorp/agent-svc",
+  "status": "merged"})`.
 - *"Average PR age per repo for merged PRs last 30 days"* → `mongo_query`.
 - *"Tickets in release-05-26-2026 that still have no linked PRs"* → `mongo_query`.
 - *"How many PRs per repo?"* → `mongo_query` group on `github_prs.repo`.

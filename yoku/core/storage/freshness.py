@@ -7,11 +7,15 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from yoku.core.storage import connector_configs as cc
-from yoku.core.storage.mongo import github_prs_collection, tickets_collection
+from yoku.core.storage.mongo import get_collection
 
-_SOURCE_COLLECTIONS = {
-    "jira": lambda: tickets_collection(),
-    "github": lambda: github_prs_collection(),
+# Source name -> its primary collection. Listed here (not imported from the agent
+# layer) to keep storage independent of the agent package, but covering every
+# ingestable source so none is silently omitted from freshness.
+_SOURCE_COLLECTIONS: dict[str, str] = {
+    "jira": "jira_tickets",
+    "github": "github_prs",
+    "slack": "slack_messages",
 }
 
 
@@ -40,7 +44,7 @@ def source_freshness() -> list[dict]:
     configs = {c["name"]: c for c in cc.list_configs()}
     now = datetime.now(UTC)
     rows: list[dict] = []
-    for name, coll in _SOURCE_COLLECTIONS.items():
+    for name, collection in _SOURCE_COLLECTIONS.items():
         cfg = configs.get(name) or {}
         ts = cfg.get("last_synced_at")
         if ts is not None and ts.tzinfo is None:
@@ -48,7 +52,7 @@ def source_freshness() -> list[dict]:
         rows.append(
             {
                 "source": name,
-                "count": coll().estimated_document_count(),
+                "count": get_collection(collection).estimated_document_count(),
                 "last_synced_at": ts.isoformat() if ts else None,
                 "synced_ago": _ago((now - ts).total_seconds()) if ts else "never",
                 "last_sync_status": cfg.get("last_sync_status"),

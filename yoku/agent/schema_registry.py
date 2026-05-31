@@ -66,13 +66,24 @@ class FilterField:
 
 @dataclass(frozen=True)
 class FieldSpec:
-    """One field's reported shape, for describe_collection."""
+    """One field's reported shape, for describe_collection.
+
+    Beyond type/description, it carries the filter semantics the agent needs to
+    build a correct query without guessing: whether the field is filterable and
+    under what arg, how a value is matched (exact / person-alias / has-refs),
+    and the closed set of values it may take (`enum`).
+    """
 
     name: str
     type: str
     description: str
     display: bool
     filterable: bool
+    filter_arg: str | None = None
+    filter_kind: str | None = None  # EXACT | USER | HAS_REFS (when filterable)
+    identity: str | None = None  # USER fields: dotted path in unified_users
+    normalize: str | None = None  # named canonicaliser applied before matching
+    enum: tuple[str, ...] | None = None  # closed value set, if any
 
 
 def model_for(collection: str) -> type[BaseModel] | None:
@@ -122,13 +133,20 @@ def field_specs(collection: str) -> list[FieldSpec]:
     out: list[FieldSpec] = []
     for name, field in model.model_fields.items():
         extra = _extra(field)
+        filterable = bool(extra.get("filterable"))
+        enum = extra.get("enum_values")
         out.append(
             FieldSpec(
                 name=name,
                 type=types.get(name, "object"),
                 description=field.description or "",
                 display=bool(extra.get("display")),
-                filterable=bool(extra.get("filterable")),
+                filterable=filterable,
+                filter_arg=extra.get("filter_arg") if filterable else None,
+                filter_kind=extra.get("filter_kind", EXACT) if filterable else None,
+                identity=extra.get("identity"),
+                normalize=extra.get("normalize"),
+                enum=tuple(enum) if enum else None,
             )
         )
     return out

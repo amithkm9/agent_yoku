@@ -30,7 +30,8 @@ def semantic_search(query: str, k: int = 50, source: str = "both") -> list[dict]
     adjacency and recency as additional signals — before returning k results.
 
     Returns lightweight cards sorted by relevance. Use this to *discover*
-    candidate items, then call get(key) to read full content.
+    candidate items, then read full content with
+    mongo_query(collection, [{"$match": {"key": <key>}}]).
 
     Args:
         query: Natural-language or identifier search string.

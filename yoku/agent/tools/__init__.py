@@ -247,17 +247,6 @@ def _embed_query(text: str) -> np.ndarray:
     return v
 
 
-def _clean(doc: dict, drop: tuple[str, ...] = ()) -> dict:
-    """Strip _id + caller-named fields, then recursively JSON-safe the rest.
-
-    Mongo can return nested ObjectId / datetime values (e.g. JIRA's
-    `_synced_at`, the linked_prs blobs). Without bson_safe, those crash the
-    LangChain tool serializer mid-loop. Cheap and always-safe to apply.
-    """
-    out = {k: v for k, v in doc.items() if k not in drop and k != "_id"}
-    return bson_safe(out)
-
-
 def _fetch_texts(keys: list[str]) -> dict[str, str]:
     """Pull the full embedded `text` for the given doc keys, grouped by source."""
     by_collection: dict[str, list[str]] = {}
@@ -324,7 +313,8 @@ def _rerank_order(
 
 def _resolve_user_doc(query: str) -> dict | None:
     """Resolve a free-form identifier (name, login, email, JIRA displayName)
-    to a single unified_users record. Returns None if no match.
+    to a single unified_users record. Returns None if no match. Backs
+    `resolve_user`.
     """
     if not query:
         return None
@@ -364,33 +354,9 @@ def _resolve_user_doc(query: str) -> dict | None:
     return d
 
 
-def _identity(value: str, identity_path: str | None) -> str:
-    """Translate a person reference to one source's stored identity string.
-
-    `identity_path` is a dotted path into the unified_users record (e.g.
-    "jira.displayName", "github.login"). Falls back to the raw value when the
-    user can't be resolved, so an exact stored name still matches.
-    """
-    if not identity_path:
-        return value
-    user = _resolve_user_doc(value)
-    if not user:
-        return value
-    node: Any = user
-    for part in identity_path.split("."):
-        if not isinstance(node, dict):
-            return value
-        node = node.get(part)
-    return node or value
-
-
 # Tool definitions live in sibling modules; importing them registers the @tool
 # objects. `discover_tools` then assembles the toolkit by walking this package.
 from yoku.agent.tools._registry import discover_tools  # noqa: E402
-from yoku.agent.tools.filter import filter  # noqa: E402,F401
-from yoku.agent.tools.freshness import data_freshness  # noqa: E402,F401
-from yoku.agent.tools.get import get  # noqa: E402,F401
-from yoku.agent.tools.linked import linked  # noqa: E402,F401
 from yoku.agent.tools.mongo import (  # noqa: E402,F401
     _validate_pipeline,
     describe_collection,
@@ -406,9 +372,10 @@ from yoku.agent.tools.who_knows import who_knows  # noqa: E402,F401
 def get_all_tools() -> list[BaseTool]:
     """The agent's full toolkit, assembled by auto-discovery.
 
-    Source-agnostic: `filter`, `get`, `linked`, and `semantic_search` all work
-    across every registered source, so adding a connector needs no change here —
-    and adding a tool file is picked up without editing any list.
+    Source-agnostic: the generic mongo tools (`list_collections`,
+    `describe_collection`, `mongo_count`, `mongo_query`) plus `semantic_search`
+    all work across every registered source, so adding a connector needs no
+    change here — and adding a tool file is picked up without editing any list.
     """
     return discover_tools()
 

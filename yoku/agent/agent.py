@@ -1,11 +1,11 @@
 """Deepagent for yoku: planning + a source-agnostic toolkit.
 
 A single planning agent decomposes the question with todos and answers it over a
-generalised tool surface — `semantic_search`, `get`, `linked`, and
-`filter(source, …)` work across every registered connector (JIRA, GitHub, Slack
-today; GitLab, Teams, Linear next), backed by a generic mongo escape hatch.
-Adding a connector is a `SourceSpec` in `yoku.agent.sources`, not new tools
-or sub-agents.
+generalised tool surface — `semantic_search` plus the schema-driven mongo
+foundation (`list_collections`, `describe_collection`, `mongo_count`,
+`mongo_query`) work across every registered connector (JIRA, GitHub, Slack today;
+GitLab, Teams, Linear next). Adding a connector is a `SourceSpec` in
+`yoku.agent.sources`, not new tools or sub-agents.
 """
 
 from __future__ import annotations

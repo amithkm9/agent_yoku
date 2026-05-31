@@ -18,9 +18,9 @@ class _FakeColl:
         return self._n
 
 
-def _patch(monkeypatch, jira_n, github_n, configs):
-    monkeypatch.setattr(freshness, "tickets_collection", lambda: _FakeColl(jira_n))
-    monkeypatch.setattr(freshness, "github_prs_collection", lambda: _FakeColl(github_n))
+def _patch(monkeypatch, jira_n, github_n, configs, slack_n=0):
+    counts = {"jira_tickets": jira_n, "github_prs": github_n, "slack_messages": slack_n}
+    monkeypatch.setattr(freshness, "get_collection", lambda name: _FakeColl(counts[name]))
     monkeypatch.setattr(cc, "list_configs", lambda: configs)
 
 
@@ -91,3 +91,19 @@ def test_naive_timestamp_is_treated_as_utc(monkeypatch):
     rows = {r["source"]: r for r in freshness.source_freshness()}
 
     assert rows["jira"]["synced_ago"] == "5 minutes ago"
+
+
+@pytest.mark.unit
+def test_slack_source_is_reported(monkeypatch):
+    # Slack is an ingestable source and must appear in freshness, not be omitted.
+    _patch(
+        monkeypatch,
+        jira_n=1,
+        github_n=1,
+        slack_n=42,
+        configs=[{"name": "slack", "last_synced_at": datetime.now(UTC), "last_sync_status": "ok"}],
+    )
+    rows = {r["source"]: r for r in freshness.source_freshness()}
+
+    assert rows["slack"]["count"] == 42
+    assert rows["slack"]["last_sync_status"] == "ok"

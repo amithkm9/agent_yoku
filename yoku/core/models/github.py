@@ -39,6 +39,7 @@ class GitHubPR(BaseModel):
         default=PRStatus.OPEN,
         display=True,
         filter_arg="status",
+        enum=[s.value for s in PRStatus],
     )
     assignee: str | None = doc_field("Assignee GitHub login.")
     author: str | None = doc_field(

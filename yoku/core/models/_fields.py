@@ -9,6 +9,8 @@ registry —
 - `filter_kind`— "exact" | "user" | "has_refs"
 - `identity`   — for `user` fields: dotted path in `unified_users` to resolve aliases
 - `normalize`  — named value canonicaliser (e.g. "gh_repo")
+- `enum`       — the closed set of values a field may take (surfaced by
+                 `describe_collection` so the agent filters on real values)
 
 Keeping these on the field (not in a separate hardcoded table) means onboarding a
 collection or changing what's filterable is a schema edit, nothing else.
@@ -31,11 +33,14 @@ def doc_field(
     filter_kind: str = "exact",
     identity: str | None = None,
     normalize: str | None = None,
+    enum: list[str] | None = None,
 ) -> Any:
     """Build a Pydantic `Field` carrying agent metadata in `json_schema_extra`."""
     extra: dict[str, Any] = {}
     if display:
         extra["display"] = True
+    if enum:
+        extra["enum_values"] = list(enum)
     if filter_arg:
         extra["filterable"] = True
         extra["filter_arg"] = filter_arg

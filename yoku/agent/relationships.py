@@ -1,9 +1,10 @@
 """Relationship registry — loads cross-collection links from relationships.yaml.
 
 Mirrors asato-common's relationships model: a declarative list of
-`(entity1, entity2, join)` records. `linked` traverses them and
-`list_collections` surfaces them, so cross-collection wiring is data, never
-hardcoded in the tool layer. Add a connector's links by editing the YAML.
+`(entity1, entity2, join)` records. `list_collections` / `describe_collection`
+surface them (the latter as each join field's `links_to`, for `$lookup`), so
+cross-collection wiring is data, never hardcoded in the tool layer. Add a
+connector's links by editing the YAML.
 """
 
 from __future__ import annotations

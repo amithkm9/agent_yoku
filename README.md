@@ -192,7 +192,7 @@ JWT secret comes from `settings.jwt_secret` — **rotate before any non-local de
 6. Add a CLI subcommand in `yoku/cli.py`.
 7. Register the collection in `yoku/storage/mongo.py::ALLOWED_COLLECTIONS`.
 8. Add a Pydantic model in `yoku/models/` (its docstring is the collection description; fields carry `description` + `display`/`filterable` metadata) and map it in `yoku/agent/schema_registry.py::COLLECTION_MODELS`.
-9. Add a `SourceSpec` to `yoku/agent/sources.py::SOURCES` (key shape + example) and any links to `yoku/agent/relationships.yaml`. `filter` / `get` / `linked` / `semantic_search` / `list_collections` then cover the source automatically — no tool or prompt edits.
+9. Add a `SourceSpec` to `yoku/agent/sources.py::SOURCES` (key shape + example) and any links to `yoku/agent/relationships.yaml`. `semantic_search` / `list_collections` / `describe_collection` / `mongo_query` then cover the source automatically — no tool or prompt edits.
 
 `yoku list-connectors` will auto-discover it.
 

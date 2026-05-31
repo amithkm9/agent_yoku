@@ -8,11 +8,7 @@ from yoku.agent import tools
 from yoku.agent.tools._registry import discover_tools
 
 _EXPECTED = {
-    "data_freshness",
     "describe_collection",
-    "filter",
-    "get",
-    "linked",
     "list_collections",
     "mongo_count",
     "mongo_query",
