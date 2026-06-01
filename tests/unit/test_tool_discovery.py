@@ -9,6 +9,7 @@ from yoku.agent.tools._registry import discover_tools
 
 _EXPECTED = {
     "describe_collection",
+    "describe_collections",
     "list_collections",
     "mongo_count",
     "mongo_query",

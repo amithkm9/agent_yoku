@@ -51,8 +51,8 @@ class _FakeCursor:
 
 
 def _patch_collections(monkeypatch, **by_name):
-    """Patch the get_collection seam with a name -> fake-collection dispatcher."""
-    monkeypatch.setattr(tools, "get_collection", lambda name: by_name[name])
+    """Patch the DC_COLLECTIONS seam with name -> fake-collection factory."""
+    monkeypatch.setattr(tools, "DC_COLLECTIONS", {k: lambda c=v: c for k, v in by_name.items()})
 
 
 @pytest.mark.unit

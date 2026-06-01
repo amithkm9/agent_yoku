@@ -15,15 +15,15 @@ from yoku.agent import tools
 def _seed_index(monkeypatch, jira=None, github=None, slack=None, query_vec=(1.0, 0.0, 0.0)):
     """Populate the lazy index from fake docs and pin the query embedding.
 
-    The index loader resolves each source's collection through `get_collection`,
-    so seeding patches that single seam with a name -> fake-collection dispatcher.
+    The index loader resolves each source's collection through `DC_COLLECTIONS`,
+    so seeding patches that dict with name -> fake-collection factory.
     """
-    by_name = {
-        "dc-jira": _FakeColl(jira or []),
-        "dc-github": _FakeColl(github or []),
-        "dc-slack": _FakeColl(slack or []),
+    fake_dc = {
+        "dc-jira": lambda: _FakeColl(jira or []),
+        "dc-github": lambda: _FakeColl(github or []),
+        "dc-slack": lambda: _FakeColl(slack or []),
     }
-    monkeypatch.setattr(tools, "get_collection", lambda name: by_name[name])
+    monkeypatch.setattr(tools, "DC_COLLECTIONS", fake_dc)
     monkeypatch.setattr(tools, "_embed_query", lambda _q: np.array(query_vec, dtype=np.float32))
 
 
