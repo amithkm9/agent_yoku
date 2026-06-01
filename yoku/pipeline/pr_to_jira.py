@@ -15,7 +15,7 @@ import time
 
 from pymongo import UpdateOne
 
-from yoku.core.config import github_prs_collection, tickets_collection
+from yoku.core.storage.mongo import dc_github_collection, dc_jira_collection
 from yoku.core.constants import LINK_BATCH_SIZE
 from yoku.core.logging import get_logger
 
@@ -24,8 +24,8 @@ log = get_logger("link_prs")
 
 def main() -> None:
     reset = "--reset" in sys.argv[1:]
-    jira_coll = tickets_collection()
-    gh_coll = github_prs_collection()
+    jira_coll = dc_jira_collection()
+    gh_coll = dc_github_collection()
 
     if reset:
         n = jira_coll.update_many({}, {"$unset": {"linked_prs": ""}}).modified_count

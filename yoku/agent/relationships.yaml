@@ -8,8 +8,8 @@
 # entity2 (dotted paths allowed). relationship_type is informational.
 relationships:
   - name: github_pr_references_jira_ticket
-    entity1: github_prs
-    entity2: jira_tickets
+    entity1: dc-github
+    entity2: dc-jira
     relationship_type: many-to-many
     join:
       local_field: jira_keys
@@ -17,8 +17,8 @@ relationships:
     description: A PR references the JIRA tickets named in its branch, title, or body.
 
   - name: slack_message_references_jira_ticket
-    entity1: slack_messages
-    entity2: jira_tickets
+    entity1: dc-slack
+    entity2: dc-jira
     relationship_type: many-to-many
     join:
       local_field: jira_keys
@@ -26,8 +26,8 @@ relationships:
     description: A Slack message references the JIRA tickets it mentions.
 
   - name: jira_user_to_unified
-    entity1: users
-    entity2: unified_users
+    entity1: dc-jira-users
+    entity2: ds-unified-users
     relationship_type: one-to-one
     join:
       local_field: accountId
@@ -35,8 +35,8 @@ relationships:
     description: A JIRA user maps to a unified person record.
 
   - name: github_user_to_unified
-    entity1: github_users
-    entity2: unified_users
+    entity1: dc-github-users
+    entity2: ds-unified-users
     relationship_type: one-to-one
     join:
       local_field: login

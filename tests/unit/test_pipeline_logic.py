@@ -14,7 +14,7 @@ from yoku.pipeline import consistency, embed, pr_to_jira
 
 
 class _FakeEmbedColl:
-    name = "jira_tickets"
+    name = "dc-jira"
 
     def __init__(self, docs):
         self._docs = docs
@@ -72,15 +72,15 @@ def test_embed_collection_returns_zero_when_nothing_to_do():
 def test_embed_parse_args_defaults_to_all_embeddable(monkeypatch):
     monkeypatch.setattr(sys, "argv", ["embed"])
     colls, re_all = embed._parse_args()
-    assert "jira_tickets" in colls
+    assert "dc-jira" in colls
     assert re_all is False
 
 
 @pytest.mark.unit
 def test_embed_parse_args_single_collection(monkeypatch):
-    monkeypatch.setattr(sys, "argv", ["embed", "--coll", "github_prs", "--all"])
+    monkeypatch.setattr(sys, "argv", ["embed", "--coll", "dc-github", "--all"])
     colls, re_all = embed._parse_args()
-    assert colls == ["github_prs"]
+    assert colls == ["dc-github"]
     assert re_all is True
 
 
@@ -109,8 +109,8 @@ def test_consistency_flags_done_without_pr(monkeypatch):
         ]
     )
     prs = _FindColl([])
-    monkeypatch.setattr(consistency, "tickets_collection", lambda: tickets)
-    monkeypatch.setattr(consistency, "github_prs_collection", lambda: prs)
+    monkeypatch.setattr(consistency, "dc_jira_collection", lambda: tickets)
+    monkeypatch.setattr(consistency, "dc_github_collection", lambda: prs)
 
     report = consistency.consistency_report(done_statuses=frozenset({"Done"}))
     assert report["done_without_pr"]["count"] == 1
@@ -127,8 +127,8 @@ def test_consistency_flags_merged_without_ticket(monkeypatch):
             {"key": "o/r#3", "status": "open", "jira_keys": []},
         ]
     )
-    monkeypatch.setattr(consistency, "tickets_collection", lambda: tickets)
-    monkeypatch.setattr(consistency, "github_prs_collection", lambda: prs)
+    monkeypatch.setattr(consistency, "dc_jira_collection", lambda: tickets)
+    monkeypatch.setattr(consistency, "dc_github_collection", lambda: prs)
 
     report = consistency.consistency_report()
     assert report["merged_without_ticket"]["count"] == 1
@@ -138,8 +138,8 @@ def test_consistency_flags_merged_without_ticket(monkeypatch):
 @pytest.mark.unit
 def test_consistency_sample_cap(monkeypatch):
     tickets = _FindColl([{"key": f"AS-{i}", "status": "Done", "linked_prs": []} for i in range(20)])
-    monkeypatch.setattr(consistency, "tickets_collection", lambda: tickets)
-    monkeypatch.setattr(consistency, "github_prs_collection", lambda: _FindColl([]))
+    monkeypatch.setattr(consistency, "dc_jira_collection", lambda: tickets)
+    monkeypatch.setattr(consistency, "dc_github_collection", lambda: _FindColl([]))
 
     report = consistency.consistency_report(done_statuses=frozenset({"Done"}), sample=3)
     assert report["done_without_pr"]["count"] == 20
@@ -178,8 +178,8 @@ def test_pr_to_jira_links_each_referenced_ticket(monkeypatch):
             }
         ]
     )
-    monkeypatch.setattr(pr_to_jira, "tickets_collection", lambda: jira)
-    monkeypatch.setattr(pr_to_jira, "github_prs_collection", lambda: gh)
+    monkeypatch.setattr(pr_to_jira, "dc_jira_collection", lambda: jira)
+    monkeypatch.setattr(pr_to_jira, "dc_github_collection", lambda: gh)
     monkeypatch.setattr(sys, "argv", ["link_prs_to_jira"])
 
     pr_to_jira.main()
@@ -190,8 +190,8 @@ def test_pr_to_jira_links_each_referenced_ticket(monkeypatch):
 def test_pr_to_jira_no_prs_writes_nothing(monkeypatch):
     jira = _LinkColl()
     gh = _LinkColl([])
-    monkeypatch.setattr(pr_to_jira, "tickets_collection", lambda: jira)
-    monkeypatch.setattr(pr_to_jira, "github_prs_collection", lambda: gh)
+    monkeypatch.setattr(pr_to_jira, "dc_jira_collection", lambda: jira)
+    monkeypatch.setattr(pr_to_jira, "dc_github_collection", lambda: gh)
     monkeypatch.setattr(sys, "argv", ["link_prs_to_jira"])
 
     pr_to_jira.main()

@@ -69,9 +69,7 @@ def test_slack_source_included_in_both(isolated_index, monkeypatch):
     ]
     _patch_collections(
         monkeypatch,
-        jira_tickets=_FakeColl(jira),
-        github_prs=_FakeColl([]),
-        slack_messages=_FakeColl(slack),
+        **{"dc-jira": _FakeColl(jira), "dc-github": _FakeColl([]), "dc-slack": _FakeColl(slack)},
     )
     monkeypatch.setattr(
         tools, "_embed_query", lambda _q: np.array([1.0, 0.0, 0.0], dtype=np.float32)
@@ -97,9 +95,7 @@ def test_slack_source_filter_isolates_slack(isolated_index, monkeypatch):
     ]
     _patch_collections(
         monkeypatch,
-        jira_tickets=_FakeColl(jira),
-        github_prs=_FakeColl([]),
-        slack_messages=_FakeColl(slack),
+        **{"dc-jira": _FakeColl(jira), "dc-github": _FakeColl([]), "dc-slack": _FakeColl(slack)},
     )
     monkeypatch.setattr(
         tools, "_embed_query", lambda _q: np.array([1.0, 0.0, 0.0], dtype=np.float32)
@@ -113,9 +109,7 @@ def test_slack_source_filter_isolates_slack(isolated_index, monkeypatch):
 def test_invalid_source_raises(isolated_index, monkeypatch):
     _patch_collections(
         monkeypatch,
-        jira_tickets=_FakeColl([]),
-        github_prs=_FakeColl([]),
-        slack_messages=_FakeColl([]),
+        **{"dc-jira": _FakeColl([]), "dc-github": _FakeColl([]), "dc-slack": _FakeColl([])},
     )
     with pytest.raises(ValueError, match="source must be"):
         tools.semantic_search.invoke({"query": "test", "source": "teams"})

@@ -4,18 +4,26 @@ report the same numbers."""
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from datetime import UTC, datetime
 
-from yoku.core.storage import connector_configs as cc
-from yoku.core.storage.mongo import get_collection
+from pymongo.collection import Collection
 
-# Source name -> its primary collection. Listed here (not imported from the agent
-# layer) to keep storage independent of the agent package, but covering every
-# ingestable source so none is silently omitted from freshness.
-_SOURCE_COLLECTIONS: dict[str, str] = {
-    "jira": "jira_tickets",
-    "github": "github_prs",
-    "slack": "slack_messages",
+from yoku.core.storage import connector_configs as cc
+from yoku.core.storage.mongo import (
+    dc_github_collection,
+    dc_jira_collection,
+    dc_slack_collection,
+)
+
+# Source name -> its primary dc-* collection accessor.
+# Accessed directly (not via get_collection) because dc-* collections are
+# internal and not in ALLOWED_COLLECTIONS.
+_SOURCE_COLLECTIONS: dict[str, Callable[[], Collection]] = {
+    "jira": dc_jira_collection,
+    "github": dc_github_collection,
+    "slack": dc_slack_collection,
 }
 
 
@@ -44,7 +52,7 @@ def source_freshness() -> list[dict]:
     configs = {c["name"]: c for c in cc.list_configs()}
     now = datetime.now(UTC)
     rows: list[dict] = []
-    for name, collection in _SOURCE_COLLECTIONS.items():
+    for name, coll_factory in _SOURCE_COLLECTIONS.items():
         cfg = configs.get(name) or {}
         ts = cfg.get("last_synced_at")
         if ts is not None and ts.tzinfo is None:
@@ -52,7 +60,7 @@ def source_freshness() -> list[dict]:
         rows.append(
             {
                 "source": name,
-                "count": get_collection(collection).estimated_document_count(),
+                "count": coll_factory().estimated_document_count(),
                 "last_synced_at": ts.isoformat() if ts else None,
                 "synced_ago": _ago((now - ts).total_seconds()) if ts else "never",
                 "last_sync_status": cfg.get("last_sync_status"),

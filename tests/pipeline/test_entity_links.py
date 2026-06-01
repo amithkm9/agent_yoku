@@ -52,8 +52,8 @@ class _PairColl:
 def test_build_entity_links_is_idempotent(fake_store, monkeypatch):
     from yoku.pipeline import entity_links as mod
 
-    docs = fake_store["documents"]
-    docs.insert_one(
+    # Seed documents directly into the ds-* stores via the composite view
+    fake_store["documents"].insert_one(
         {
             "key": "github/o/r#1",
             "domain": "pull_request",
@@ -61,12 +61,14 @@ def test_build_entity_links_is_idempotent(fake_store, monkeypatch):
             "refs": ["jira/AS-1"],
         }
     )
-    docs.insert_one(
+    fake_store["documents"].insert_one(
         {"key": "slack/C/1.2", "domain": "conversation", "provider": "slack", "refs": ["jira/AS-1"]}
     )
     links = _PairColl()
-    monkeypatch.setattr(mod, "documents_collection", lambda: docs)
-    monkeypatch.setattr(mod, "entity_links_collection", lambda: links)
+    monkeypatch.setattr(mod, "ds_work_item_collection", lambda: fake_store["ds_work_item"])
+    monkeypatch.setattr(mod, "ds_pull_request_collection", lambda: fake_store["ds_pull_request"])
+    monkeypatch.setattr(mod, "ds_conversation_collection", lambda: fake_store["ds_conversation"])
+    monkeypatch.setattr(mod, "ds_entity_links_collection", lambda: links)
 
     first = build_entity_links()
     second = build_entity_links()

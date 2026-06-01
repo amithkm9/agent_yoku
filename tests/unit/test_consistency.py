@@ -11,18 +11,18 @@ from yoku.pipeline import consistency
 def test_flags_done_tickets_without_prs_and_merged_prs_without_tickets(
     fake_collections, monkeypatch
 ):
-    monkeypatch.setattr(consistency, "tickets_collection", lambda: fake_collections["jira_tickets"])
+    monkeypatch.setattr(consistency, "dc_jira_collection", lambda: fake_collections["dc-jira"])
     monkeypatch.setattr(
-        consistency, "github_prs_collection", lambda: fake_collections["github_prs"]
+        consistency, "dc_github_collection", lambda: fake_collections["dc-github"]
     )
 
-    fake_collections["jira_tickets"].docs = [
+    fake_collections["dc-jira"].docs = [
         {"key": "AS-1", "status": "Done", "linked_prs": []},  # flagged
         {"key": "AS-2", "status": "Done", "linked_prs": [{"key": "r#1"}]},  # has code
         {"key": "AS-3", "status": "In Progress", "linked_prs": []},  # not done -> ignore
         {"key": "AS-4", "status": "Closed"},  # missing field -> flagged
     ]
-    fake_collections["github_prs"].docs = [
+    fake_collections["dc-github"].docs = [
         {"key": "r#1", "status": "merged", "jira_keys": []},  # flagged
         {"key": "r#2", "status": "merged", "jira_keys": ["AS-9"]},  # linked
         {"key": "r#3", "status": "open", "jira_keys": []},  # not merged -> ignore
@@ -38,11 +38,11 @@ def test_flags_done_tickets_without_prs_and_merged_prs_without_tickets(
 
 @pytest.mark.unit
 def test_sample_is_capped(fake_collections, monkeypatch):
-    monkeypatch.setattr(consistency, "tickets_collection", lambda: fake_collections["jira_tickets"])
+    monkeypatch.setattr(consistency, "dc_jira_collection", lambda: fake_collections["dc-jira"])
     monkeypatch.setattr(
-        consistency, "github_prs_collection", lambda: fake_collections["github_prs"]
+        consistency, "dc_github_collection", lambda: fake_collections["dc-github"]
     )
-    fake_collections["jira_tickets"].docs = [
+    fake_collections["dc-jira"].docs = [
         {"key": f"AS-{i}", "status": "Done", "linked_prs": []} for i in range(20)
     ]
 

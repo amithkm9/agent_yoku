@@ -254,8 +254,8 @@ def describe_collection(collection: str, sample_size: int = 20) -> dict:
     match real values, and join on the right keys.
 
     Args:
-        collection: name from list_collections() (e.g. "jira_tickets",
-            "github_prs", "unified_users").
+        collection: name from list_collections() (e.g. "ds-work-item",
+            "ds-pull-request", "ds-unified-users").
         sample_size: how many docs to sample for example values (default 20, max 100).
 
     Returns:
@@ -296,8 +296,8 @@ def mongo_count(collection: str, filter: dict | None = None) -> dict:
     """Count documents in a collection matching an optional filter.
 
     Args:
-        collection: name from list_collections() (e.g. "jira_tickets",
-            "github_prs", "unified_users").
+        collection: name from list_collections() (e.g. "ds-work-item",
+            "ds-pull-request", "ds-unified-users").
         filter: standard MongoDB find filter, e.g. {"status": "merged",
             "jira_keys": {"$ne": []}}. Omit or pass {} for a fast estimated
             count of the whole collection.
@@ -343,8 +343,8 @@ def mongo_query(
         BAD:  [{"$match": {...}, "fields": {...}}]  ← extra sibling key
 
     Args:
-        collection: collection name from list_collections() (e.g. "jira_tickets",
-            "github_prs", "unified_users").
+        collection: collection name from list_collections() (e.g. "ds-work-item",
+            "ds-pull-request", "ds-unified-users").
         pipeline: list of mongo aggregation stages.
         limit: max docs to return (default 100, max 100).
 

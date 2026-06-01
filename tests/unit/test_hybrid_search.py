@@ -19,9 +19,9 @@ def _seed_index(monkeypatch, jira=None, github=None, slack=None, query_vec=(1.0,
     so seeding patches that single seam with a name -> fake-collection dispatcher.
     """
     by_name = {
-        "jira_tickets": _FakeColl(jira or []),
-        "github_prs": _FakeColl(github or []),
-        "slack_messages": _FakeColl(slack or []),
+        "dc-jira": _FakeColl(jira or []),
+        "dc-github": _FakeColl(github or []),
+        "dc-slack": _FakeColl(slack or []),
     }
     monkeypatch.setattr(tools, "get_collection", lambda name: by_name[name])
     monkeypatch.setattr(tools, "_embed_query", lambda _q: np.array(query_vec, dtype=np.float32))

@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 from pymongo import UpdateOne
 
 from yoku.core.logging import get_logger
-from yoku.core.storage.mongo import users_collection
+from yoku.core.storage.mongo import dc_jira_users_collection
 from yoku.pipeline.connectors.jira.users_client import search_users, user_to_doc
 
 log = get_logger("ingest_users")
@@ -21,7 +21,7 @@ log = get_logger("ingest_users")
 def main() -> None:
     log.info("starting users ingest")
     t0 = time.monotonic()
-    coll = users_collection()
+    coll = dc_jira_users_collection()
     now = datetime.now(UTC)
     batch: list[UpdateOne] = []
     seen: set[str] = set()

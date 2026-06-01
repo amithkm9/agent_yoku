@@ -13,9 +13,9 @@ from yoku.pipeline.mappers.slack import map_slack_message
 
 #: source collection -> mapper that projects its docs into a UnifiedDoc.
 SOURCE_MAPPERS: dict[str, Mapper] = {
-    "jira_tickets": map_jira_ticket,
-    "github_prs": map_github_pr,
-    "slack_messages": map_slack_message,
+    "dc-jira": map_jira_ticket,
+    "dc-github": map_github_pr,
+    "dc-slack": map_slack_message,
 }
 
 __all__ = [

@@ -13,7 +13,7 @@ import time
 
 from pymongo import UpdateMany
 
-from yoku.core.config import github_prs_collection, unified_users_collection
+from yoku.core.storage.mongo import dc_github_collection, ds_unified_users_collection
 from yoku.core.logging import get_logger
 
 log = get_logger("backfill_pr_emails")
@@ -22,14 +22,14 @@ log = get_logger("backfill_pr_emails")
 def main() -> None:
     t0 = time.monotonic()
     login_to_email: dict[str, str] = {}
-    for u in unified_users_collection().find(
+    for u in ds_unified_users_collection().find(
         {"github.login": {"$exists": True, "$ne": None}, "email": {"$ne": None}},
         {"github.login": 1, "email": 1},
     ):
         login_to_email[u["github"]["login"]] = u["email"]
     log.info("loaded %d login->email mappings", len(login_to_email))
 
-    coll = github_prs_collection()
+    coll = dc_github_collection()
     ops = []
     for login, email in login_to_email.items():
         ops.append(UpdateMany({"author": login}, {"$set": {"author_email": email}}))

@@ -14,7 +14,7 @@ from pymongo import UpdateOne
 
 from yoku.core.constants import INGEST_BATCH_SIZE
 from yoku.core.logging import get_logger
-from yoku.core.storage.mongo import slack_messages_collection
+from yoku.core.storage.mongo import dc_slack_collection
 from yoku.pipeline.connectors._runtime import current_slack_config
 from yoku.pipeline.connectors.slack.client import (
     fetch_user_map,
@@ -50,7 +50,7 @@ def main(filter_channels: list[str] | None = None) -> None:
     ]
     log.info("scanning %d channel(s)", len(channels))
 
-    coll = slack_messages_collection()
+    coll = dc_slack_collection()
     now = datetime.now(UTC)
     batch: list[UpdateOne] = []
     total = 0

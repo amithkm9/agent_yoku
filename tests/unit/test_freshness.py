@@ -19,8 +19,17 @@ class _FakeColl:
 
 
 def _patch(monkeypatch, jira_n, github_n, configs, slack_n=0):
-    counts = {"jira_tickets": jira_n, "github_prs": github_n, "slack_messages": slack_n}
-    monkeypatch.setattr(freshness, "get_collection", lambda name: _FakeColl(counts[name]))
+    # Patch _SOURCE_COLLECTIONS directly since it's a module-level dict that captures
+    # the original function references at import time.
+    monkeypatch.setattr(
+        freshness,
+        "_SOURCE_COLLECTIONS",
+        {
+            "jira": lambda: _FakeColl(jira_n),
+            "github": lambda: _FakeColl(github_n),
+            "slack": lambda: _FakeColl(slack_n),
+        },
+    )
     monkeypatch.setattr(cc, "list_configs", lambda: configs)
 
 

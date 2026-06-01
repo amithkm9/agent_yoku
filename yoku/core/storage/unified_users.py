@@ -22,10 +22,10 @@ import time
 from collections import Counter
 from datetime import UTC, datetime
 
-from yoku.core.config import (
-    github_users_collection,
-    unified_users_collection,
-    users_collection,
+from yoku.core.storage.mongo import (
+    dc_github_users_collection,
+    dc_jira_users_collection,
+    ds_unified_users_collection,
 )
 from yoku.core.logging import get_logger
 
@@ -67,13 +67,13 @@ def main() -> None:
     t0 = time.monotonic()
 
     jira_users = list(
-        users_collection().find(
+        dc_jira_users_collection().find(
             {},
             {"_id": 0, "accountId": 1, "displayName": 1, "emailAddress": 1, "active": 1},
         )
     )
     gh_users = list(
-        github_users_collection().find(
+        dc_github_users_collection().find(
             {},
             {"_id": 0, "login": 1, "id": 1, "name": 1, "email": 1, "is_bot": 1},
         )
@@ -188,7 +188,7 @@ def main() -> None:
     for u in unified:
         u["_synced_at"] = now
 
-    coll = unified_users_collection()
+    coll = ds_unified_users_collection()
     coll.delete_many({})
     if unified:
         coll.insert_many(unified, ordered=False)

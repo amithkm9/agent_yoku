@@ -14,7 +14,7 @@ from pymongo import UpdateOne
 
 from yoku.core.constants import INGEST_BATCH_SIZE
 from yoku.core.logging import get_logger
-from yoku.core.storage.mongo import github_prs_collection
+from yoku.core.storage.mongo import dc_github_collection
 from yoku.pipeline.connectors._runtime import current_github_config
 from yoku.pipeline.connectors.github.client import (
     is_bot,
@@ -45,7 +45,7 @@ def main(filter_names: list[str] | None = None) -> None:
     )
     t0 = time.monotonic()
 
-    coll = github_prs_collection()
+    coll = dc_github_collection()
     repos = _repos_to_scan(filters)
     log.info("scanning %d repos", len(repos))
 

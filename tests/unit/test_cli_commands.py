@@ -61,7 +61,7 @@ def test_embed_command_delegates(runner, monkeypatch):
 
     monkeypatch.setattr(embed_mod, "main", lambda: None)
 
-    result = runner.invoke(cli, ["embed", "--coll", "jira_tickets"])
+    result = runner.invoke(cli, ["embed", "--coll", "dc-jira"])
     assert result.exit_code == 0, result.output
 
 

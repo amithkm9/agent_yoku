@@ -20,7 +20,7 @@ EMBED_MAX_CHARS = 8_000
 EMBED_COST_PER_M_TOKENS = 0.02
 
 #: Collections that carry an `embedding` vector and need periodic embedding runs.
-EMBEDDABLE_COLLECTIONS = ("jira_tickets", "github_prs", "slack_messages")
+EMBEDDABLE_COLLECTIONS = ("dc-jira", "dc-github", "dc-slack")
 
 # ---------------------------------------------------------------------------
 # Ingest / linking

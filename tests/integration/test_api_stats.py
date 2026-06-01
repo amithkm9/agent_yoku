@@ -70,7 +70,7 @@ def test_counts_returns_expected_keys(client):
             "unified_users",
             "chat_sessions",
             "chat_messages",
-        }
+        }  # Field names on CountsResponse model (unchanged for API backwards compat)
         assert expected_keys == set(data.keys())
     finally:
         _drop(tenant)

@@ -9,27 +9,27 @@ from yoku.agent import schema_registry as sr
 
 @pytest.mark.unit
 def test_description_comes_from_model_docstring():
-    assert sr.collection_description("jira_tickets").startswith("Asato JIRA tickets")
+    assert sr.collection_description("dc-jira").startswith("Asato JIRA tickets")
     # slack previously had no description; now sourced from the model.
-    assert sr.collection_description("slack_messages")
+    assert sr.collection_description("dc-slack")
     assert sr.collection_description("unknown_collection") == ""
 
 
 @pytest.mark.unit
 def test_display_fields_drive_projection():
-    proj = sr.projection("jira_tickets")
+    proj = sr.projection("dc-jira")
     assert proj["key"] == 1 and proj["status"] == 1
     assert "description" not in proj  # not a display field
 
 
 @pytest.mark.unit
 def test_filter_fields_carry_kind_identity_and_normalize():
-    by_arg = {f.arg: f for f in sr.filter_fields("jira_tickets")}
+    by_arg = {f.arg: f for f in sr.filter_fields("dc-jira")}
     assert by_arg["assignee"].kind == sr.USER
     assert by_arg["assignee"].identity == "jira.displayName"
     assert by_arg["label"].mongo_field == "labels"  # arg != field
 
-    gh = {f.arg: f for f in sr.filter_fields("github_prs")}
+    gh = {f.arg: f for f in sr.filter_fields("dc-github")}
     assert gh["has_jira_link"].kind == sr.HAS_REFS
     assert gh["repo"].normalize is not None
     assert gh["repo"].normalize("agent-svc") == "AsatoCorp/agent-svc"
@@ -37,7 +37,7 @@ def test_filter_fields_carry_kind_identity_and_normalize():
 
 @pytest.mark.unit
 def test_field_specs_report_type_and_flags():
-    specs = {s.name: s for s in sr.field_specs("github_prs")}
+    specs = {s.name: s for s in sr.field_specs("dc-github")}
     assert specs["jira_keys"].type == "array[string]"
     assert specs["status"].filterable is True
     assert specs["description"].display is False
@@ -45,7 +45,7 @@ def test_field_specs_report_type_and_flags():
 
 @pytest.mark.unit
 def test_field_specs_carry_filter_semantics_and_enum():
-    specs = {s.name: s for s in sr.field_specs("github_prs")}
+    specs = {s.name: s for s in sr.field_specs("dc-github")}
     # person field exposes its arg, kind, and the identity it resolves to
     assert specs["author"].filter_arg == "author"
     assert specs["author"].filter_kind == sr.USER
@@ -58,7 +58,7 @@ def test_field_specs_carry_filter_semantics_and_enum():
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("collection", ["jira_tickets", "github_prs", "slack_messages"])
+@pytest.mark.parametrize("collection", ["dc-jira", "dc-github", "dc-slack"])
 def test_every_source_projection_includes_key(collection):
     # key must be a display field or cards/links come back without an identifier.
     assert "key" in sr.display_fields(collection)

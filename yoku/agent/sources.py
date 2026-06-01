@@ -33,42 +33,67 @@ class SourceSpec:
 
 _JIRA = SourceSpec(
     name="jira",
-    collection="jira_tickets",
+    collection="dc-jira",
     label="JIRA ticket",
     key_pattern=r"^[A-Z][A-Z0-9]+-\d+$",  # AS-4163, ENG-12
     key_example="AS-4163",
 )
 _GITHUB = SourceSpec(
     name="github",
-    collection="github_prs",
+    collection="dc-github",
     label="GitHub PR",
     key_pattern=r"#\d+$",  # org/repo#123
     key_example="AsatoCorp/agent-svc#173",
 )
 _SLACK = SourceSpec(
     name="slack",
-    collection="slack_messages",
+    collection="dc-slack",
     label="Slack message",
     key_pattern=r"^[^#]+/\d+\.\d+$",  # channel_id/ts
     key_example="C0AB123/1700000000.123456",
 )
 
-#: The canonical cross-source collection (Way B). Its keys are namespaced
-#: `provider/native_key`, which overlaps the per-source key shapes above, so it
-#: is registered for discovery/filtering but marked non-routable to keep
+#: Canonical ds-* collections — split by primitive domain. Keys are namespaced
+#: `provider/native_key`, which overlaps the per-source key shapes above, so they
+#: are registered for discovery/filtering but marked non-routable to keep
 #: `source_for_key` unambiguous.
-_DOCUMENTS = SourceSpec(
-    name="documents",
-    collection="documents",
-    label="Canonical document",
-    key_pattern=r"^[a-z]+/",  # provider/native_key — informational; not routed
+_DS_WORK_ITEM = SourceSpec(
+    name="ds-work-item",
+    collection="ds-work-item",
+    label="Canonical work item",
+    key_pattern=r"^jira/",
+    key_example="jira/AS-4163",
+    embeddable=False,
+    routable=False,
+)
+_DS_PULL_REQUEST = SourceSpec(
+    name="ds-pull-request",
+    collection="ds-pull-request",
+    label="Canonical pull request",
+    key_pattern=r"^github/",
     key_example="github/AsatoCorp/agent-svc#173",
+    embeddable=False,
+    routable=False,
+)
+_DS_CONVERSATION = SourceSpec(
+    name="ds-conversation",
+    collection="ds-conversation",
+    label="Canonical conversation",
+    key_pattern=r"^slack/",
+    key_example="slack/C0AB123/1700000000.123456",
     embeddable=False,
     routable=False,
 )
 
 #: The registry. Append a SourceSpec here to onboard a new queryable source.
-SOURCES: tuple[SourceSpec, ...] = (_JIRA, _GITHUB, _SLACK, _DOCUMENTS)
+SOURCES: tuple[SourceSpec, ...] = (
+    _JIRA,
+    _GITHUB,
+    _SLACK,
+    _DS_WORK_ITEM,
+    _DS_PULL_REQUEST,
+    _DS_CONVERSATION,
+)
 
 _BY_NAME: dict[str, SourceSpec] = {s.name: s for s in SOURCES}
 _BY_COLLECTION: dict[str, SourceSpec] = {s.collection: s for s in SOURCES}

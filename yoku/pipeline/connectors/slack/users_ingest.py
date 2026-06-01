@@ -16,7 +16,7 @@ from datetime import UTC, datetime
 from pymongo import UpdateOne
 
 from yoku.core.logging import get_logger
-from yoku.core.storage.mongo import slack_users_collection
+from yoku.core.storage.mongo import dc_slack_users_collection
 from yoku.pipeline.connectors.slack.client import list_users
 
 log = get_logger("ingest_slack_users")
@@ -26,7 +26,7 @@ def main() -> None:
     log.info("slack users ingest start")
     t0 = time.monotonic()
 
-    coll = slack_users_collection()
+    coll = dc_slack_users_collection()
     now = datetime.now(UTC)
     ops: list[UpdateOne] = []
 

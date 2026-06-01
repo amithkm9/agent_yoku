@@ -105,7 +105,7 @@ def ingest_slack_export(export_path: str, workspace: str) -> None:
 @cli.command()
 @click.option(
     "--coll",
-    type=click.Choice(["jira_tickets", "github_prs", "slack_messages"]),
+    type=click.Choice(["dc-jira", "dc-github", "dc-slack"]),
     default=None,
     help="Single collection to embed; omit to embed all.",
 )
@@ -156,7 +156,7 @@ def unify_cmd() -> None:
 
     counts = unify_all()
     for source, n in counts.items():
-        click.echo(f"  {source:18s} -> documents  {n:>8d}")
+        click.echo(f"  {source:18s} -> ds-*  {n:>8d}")
 
 
 @cli.command("backfill-pr-emails")
@@ -331,19 +331,19 @@ def status() -> None:
     from yoku.core.storage.mongo import (
         chat_messages_collection,
         chat_sessions_collection,
-        github_prs_collection,
-        github_users_collection,
-        tickets_collection,
-        unified_users_collection,
-        users_collection,
+        dc_github_collection,
+        dc_github_users_collection,
+        dc_jira_collection,
+        dc_jira_users_collection,
+        ds_unified_users_collection,
     )
 
     pairs = [
-        ("jira_tickets", tickets_collection),
-        ("jira users", users_collection),
-        ("github_prs", github_prs_collection),
-        ("github_users", github_users_collection),
-        ("unified_users", unified_users_collection),
+        ("dc-jira", dc_jira_collection),
+        ("dc-jira-users", dc_jira_users_collection),
+        ("dc-github", dc_github_collection),
+        ("dc-github-users", dc_github_users_collection),
+        ("ds-unified-users", ds_unified_users_collection),
         ("chat_sessions", chat_sessions_collection),
         ("chat_messages", chat_messages_collection),
     ]

@@ -10,6 +10,8 @@ links with a `mongo_query` `$lookup` on the `links_to` join key that
 `describe_collection` reports. Use `semantic_search(source=…)` for one source or
 `source="both"` for all at once.
 
+Available collections: `ds-work-item`, `ds-pull-request`, `ds-conversation`, `ds-entity-links`, `ds-unified-users`.
+
 ## How to work
 
 1. Classify: **point** (one item), **broad** (candidates), **structural**

@@ -11,7 +11,7 @@ with the in-memory collection doubles; this is a report, not a hot path.
 from __future__ import annotations
 
 from yoku.core.constants import DEFAULT_DONE_STATUSES
-from yoku.core.storage.mongo import github_prs_collection, tickets_collection
+from yoku.core.storage.mongo import dc_github_collection, dc_jira_collection
 
 
 def consistency_report(
@@ -20,12 +20,12 @@ def consistency_report(
     """Return counts + sample keys for each cross-source inconsistency."""
     done_without_pr = [
         d["key"]
-        for d in tickets_collection().find({}, {"_id": 0, "key": 1, "status": 1, "linked_prs": 1})
+        for d in dc_jira_collection().find({}, {"_id": 0, "key": 1, "status": 1, "linked_prs": 1})
         if d.get("status") in done_statuses and not d.get("linked_prs")
     ]
     merged_without_ticket = [
         d["key"]
-        for d in github_prs_collection().find({}, {"_id": 0, "key": 1, "status": 1, "jira_keys": 1})
+        for d in dc_github_collection().find({}, {"_id": 0, "key": 1, "status": 1, "jira_keys": 1})
         if d.get("status") == "merged" and not d.get("jira_keys")
     ]
     return {

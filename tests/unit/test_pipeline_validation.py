@@ -43,9 +43,9 @@ def test_allows_lookup_into_whitelisted_collection():
         [
             {
                 "$lookup": {
-                    "from": "github_prs",
+                    "from": "ds-pull-request",
                     "localField": "key",
-                    "foreignField": "jira_keys",
+                    "foreignField": "refs",
                     "as": "prs",
                 }
             }
@@ -90,5 +90,5 @@ def test_blocks_graphlookup_into_non_whitelisted_collection():
 def test_blocks_blocked_stage_smuggled_in_nested_pipeline():
     with pytest.raises(ValueError, match="blocked"):
         _validate_pipeline(
-            [{"$lookup": {"from": "github_prs", "as": "x", "pipeline": [{"$out": "evil"}]}}]
+            [{"$lookup": {"from": "ds-pull-request", "as": "x", "pipeline": [{"$out": "evil"}]}}]
         )

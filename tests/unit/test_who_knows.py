@@ -23,8 +23,8 @@ def test_merges_jira_and_github_identities(fake_collections, monkeypatch):
             {"key": "AsatoCorp/r#1", "source": "github"},
         ],
     )
-    fake_collections["github_prs"].docs = [{"key": "AsatoCorp/r#1", "author": "internet-zero"}]
-    fake_collections["unified_users"].docs = [
+    fake_collections["dc-github"].docs = [{"key": "AsatoCorp/r#1", "author": "internet-zero"}]
+    fake_collections["ds-unified-users"].docs = [
         {
             "email": "akshay@asato.ai",
             "jira": {"displayName": "Akshay Reddy"},
@@ -54,7 +54,7 @@ def test_ranks_by_total_contributions(fake_collections, monkeypatch):
             {"key": "AS-3", "source": "jira", "assignee": "Quiet Person"},
         ],
     )
-    fake_collections["unified_users"].docs = []  # no unified match -> raw fallback
+    fake_collections["ds-unified-users"].docs = []  # no unified match -> raw fallback
 
     people = tools.who_knows.invoke({"topic": "x", "limit": 5})
 
@@ -68,8 +68,8 @@ def test_excludes_bots(fake_collections, monkeypatch):
         monkeypatch,
         cards=[{"key": "AsatoCorp/r#1", "source": "github"}],
     )
-    fake_collections["github_prs"].docs = [{"key": "AsatoCorp/r#1", "author": "dependabot"}]
-    fake_collections["unified_users"].docs = [
+    fake_collections["dc-github"].docs = [{"key": "AsatoCorp/r#1", "author": "dependabot"}]
+    fake_collections["ds-unified-users"].docs = [
         {"email": None, "github": {"login": "dependabot"}, "is_bot": True}
     ]
 
@@ -87,6 +87,8 @@ def test_empty_topic_raises(fake_collections, monkeypatch):
 def test_recency_weighting_demotes_stale_contributor(fake_collections, monkeypatch):
     from datetime import UTC, datetime
 
+    import sys
+
     recent = datetime.now(UTC).isoformat()
     old = "2021-01-01T00:00:00+00:00"
     _stub_search(
@@ -98,13 +100,22 @@ def test_recency_weighting_demotes_stale_contributor(fake_collections, monkeypat
             {"key": "AS-9", "source": "jira", "assignee": "Fresh Fran"},
         ],
     )
-    fake_collections["jira_tickets"].docs = [
-        {"key": "AS-1", "updated": old},
-        {"key": "AS-2", "updated": old},
-        {"key": "AS-3", "updated": old},
-        {"key": "AS-9", "updated": recent},
-    ]
-    fake_collections["unified_users"].docs = []
+
+    # Stub dc_jira_collection in the who_knows module's namespace
+    class _FakeColl:
+        docs = [
+            {"key": "AS-1", "updated": old},
+            {"key": "AS-2", "updated": old},
+            {"key": "AS-3", "updated": old},
+            {"key": "AS-9", "updated": recent},
+        ]
+
+        def find(self, *a, **k):
+            return iter(self.docs)
+
+    who_knows_mod = sys.modules["yoku.agent.tools.who_knows"]
+    monkeypatch.setattr(who_knows_mod, "dc_jira_collection", lambda: _FakeColl())
+    fake_collections["ds-unified-users"].docs = []
 
     people = tools.who_knows.invoke({"topic": "okta", "limit": 5})
 
@@ -120,5 +131,5 @@ def test_limit_is_respected(fake_collections, monkeypatch):
         monkeypatch,
         cards=[{"key": f"AS-{i}", "source": "jira", "assignee": f"Person {i}"} for i in range(10)],
     )
-    fake_collections["unified_users"].docs = []
+    fake_collections["ds-unified-users"].docs = []
     assert len(tools.who_knows.invoke({"topic": "x", "limit": 3})) == 3

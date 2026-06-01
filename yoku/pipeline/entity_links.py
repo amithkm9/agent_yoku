@@ -19,7 +19,12 @@ from pymongo import UpdateOne
 
 from yoku.core.constants import LINK_BATCH_SIZE
 from yoku.core.logging import get_logger
-from yoku.core.storage.mongo import documents_collection, entity_links_collection
+from yoku.core.storage.mongo import (
+    ds_conversation_collection,
+    ds_entity_links_collection,
+    ds_pull_request_collection,
+    ds_work_item_collection,
+)
 
 log = get_logger("entity_links")
 
@@ -66,29 +71,36 @@ def links_from_doc(doc: dict) -> list[dict]:
 
 
 def build_entity_links() -> int:
-    """Materialise `entity_links` from every canonical doc's `refs`. Idempotent.
+    """Materialise `ds-entity-links` from every canonical doc's `refs`. Idempotent.
 
+    Reads from all three ds-* content collections and writes typed edges.
     Returns the number of edges upserted.
     """
-    target = entity_links_collection()
+    target = ds_entity_links_collection()
     now = datetime.now(UTC)
     batch: list[UpdateOne] = []
     total = 0
 
-    for doc in documents_collection().find({"refs": {"$ne": []}}, {"_id": 0}):
-        for row in links_from_doc(doc):
-            row["_built_at"] = now
-            batch.append(
-                UpdateOne(
-                    {"from_key": row["from_key"], "to_key": row["to_key"]},
-                    {"$set": row},
-                    upsert=True,
+    source_collections = [
+        ds_work_item_collection(),
+        ds_pull_request_collection(),
+        ds_conversation_collection(),
+    ]
+    for source_coll in source_collections:
+        for doc in source_coll.find({"refs": {"$ne": []}}, {"_id": 0}):
+            for row in links_from_doc(doc):
+                row["_built_at"] = now
+                batch.append(
+                    UpdateOne(
+                        {"from_key": row["from_key"], "to_key": row["to_key"]},
+                        {"$set": row},
+                        upsert=True,
+                    )
                 )
-            )
-            if len(batch) >= LINK_BATCH_SIZE:
-                target.bulk_write(batch, ordered=False)
-                total += len(batch)
-                batch = []
+                if len(batch) >= LINK_BATCH_SIZE:
+                    target.bulk_write(batch, ordered=False)
+                    total += len(batch)
+                    batch = []
     if batch:
         target.bulk_write(batch, ordered=False)
         total += len(batch)

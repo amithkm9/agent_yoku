@@ -54,12 +54,11 @@ from yoku.agent.tools._ranking import (
 from yoku.core.config import (
     ALLOWED_COLLECTIONS,
     EMBED_MODEL,
+    dc_github_collection,
+    ds_unified_users_collection,
     get_collection,
-    github_prs_collection,
     openai_client,
     settings,
-    tickets_collection,
-    unified_users_collection,
 )
 from yoku.core.logging import get_logger
 from yoku.core.storage.tenancy import current_tenant
@@ -76,12 +75,11 @@ __all__ = [
     "_recency_factor",
     "_tokenize",
     "bson_safe",
+    "dc_github_collection",
+    "ds_unified_users_collection",
     "get_all_tools",
     "get_collection",
-    "github_prs_collection",
     "invalidate_index",
-    "tickets_collection",
-    "unified_users_collection",
 ]
 
 log = get_logger("tools")
@@ -320,7 +318,7 @@ def _resolve_user_doc(query: str) -> dict | None:
         return None
     q = query.strip()
     q_lower = q.lower()
-    coll = unified_users_collection()
+    coll = ds_unified_users_collection()
 
     if "@" in q_lower:
         d = coll.find_one({"email": q_lower}, {"_id": 0})

@@ -17,7 +17,7 @@ from datetime import UTC, datetime
 from pymongo import UpdateOne
 
 from yoku.core.logging import get_logger
-from yoku.core.storage.mongo import tickets_collection
+from yoku.core.storage.mongo import dc_jira_collection
 from yoku.pipeline.connectors._runtime import current_jira_config
 from yoku.pipeline.connectors.jira.client import issue_to_doc, search_issues
 
@@ -37,7 +37,7 @@ def main(extra: str | None = None) -> None:
     log.info("starting ingest jql=%s", jql)
     t0 = time.monotonic()
 
-    coll = tickets_collection()
+    coll = dc_jira_collection()
     batch: list[UpdateOne] = []
     seen_keys: set[str] = set()
     count = 0

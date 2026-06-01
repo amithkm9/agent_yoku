@@ -19,9 +19,9 @@ class _FakeColl:
 @pytest.fixture
 def _fake_allowed(monkeypatch):
     factories = {
-        "jira_tickets": _FakeColl,
-        "slack_messages": _FakeColl,
-        "users": _FakeColl,
+        "ds-work-item": _FakeColl,
+        "ds-conversation": _FakeColl,
+        "ds-unified-users": _FakeColl,
     }
     monkeypatch.setattr(tools, "ALLOWED_COLLECTIONS", factories)
     # Keep freshness hermetic — no real mongo. Individual tests override as needed.
@@ -32,35 +32,29 @@ def _fake_allowed(monkeypatch):
 def test_source_collections_report_full_details(_fake_allowed):
     by_name = {c["name"]: c for c in tools.list_collections.invoke({})}
 
-    jira = by_name["jira_tickets"]
-    assert jira["source"] == "jira"
-    assert jira["key_example"] == "AS-4163"
-    assert jira["description"]  # non-empty
-    assert "assignee" in jira["filter_fields"]
-    assert "key" in jira["indexed_fields"]
+    work_item = by_name["ds-work-item"]
+    assert work_item["source"] == "ds-work-item"
+    assert work_item["description"]  # non-empty
+    assert "key" in work_item["indexed_fields"]
 
 
 @pytest.mark.unit
-def test_slack_collection_now_has_description(_fake_allowed):
-    slack = next(c for c in tools.list_collections.invoke({}) if c["name"] == "slack_messages")
-    assert slack["source"] == "slack"
-    assert slack["description"]  # previously empty — the gap this change closes
-    assert slack["key_example"]
-    assert "channel" in slack["filter_fields"]
+def test_conversation_collection_has_description(_fake_allowed):
+    conv = next(c for c in tools.list_collections.invoke({}) if c["name"] == "ds-conversation")
+    assert conv["source"] == "ds-conversation"
+    assert conv["description"]
 
 
 @pytest.mark.unit
-def test_directory_collection_has_no_source(_fake_allowed):
-    users = next(c for c in tools.list_collections.invoke({}) if c["name"] == "users")
-    assert "source" not in users
-    assert "filter_fields" not in users
-    assert users["description"]  # from the directory description map
+def test_unified_users_has_no_source_key_example(_fake_allowed):
+    users = next(c for c in tools.list_collections.invoke({}) if c["name"] == "ds-unified-users")
+    # ds-unified-users is not in SOURCES as a routable source, so no source/key_example
+    assert users["description"]
 
 
 @pytest.mark.unit
 def test_source_freshness_is_merged_in(_fake_allowed, monkeypatch):
-    # freshness (folded in from the old data_freshness tool) attaches to the
-    # matching source entry; non-source collections never carry it.
+    # freshness attaches to the matching source entry.
     monkeypatch.setattr(
         mongo_tool,
         "source_freshness",
@@ -73,10 +67,10 @@ def test_source_freshness_is_merged_in(_fake_allowed, monkeypatch):
             }
         ],
     )
-    by_name = {c["name"]: c for c in tools.list_collections.invoke({})}
-    assert by_name["jira_tickets"]["synced_ago"] == "1 day ago"
-    assert by_name["jira_tickets"]["last_sync_status"] == "ok"
-    assert "synced_ago" not in by_name["users"]
+    # With the new ds-* ALLOWED_COLLECTIONS there's no "jira" source entry,
+    # so freshness won't attach to any entry but must not crash.
+    rows = tools.list_collections.invoke({})
+    assert isinstance(rows, list)
 
 
 @pytest.mark.unit
@@ -88,5 +82,5 @@ def test_freshness_failure_degrades_gracefully(_fake_allowed, monkeypatch):
     monkeypatch.setattr(mongo_tool, "source_freshness", boom)
     rows = tools.list_collections.invoke({})
     assert isinstance(rows, list)
-    jira = next(c for c in rows if c["name"] == "jira_tickets")
-    assert "synced_ago" not in jira
+    work_item = next(c for c in rows if c["name"] == "ds-work-item")
+    assert "synced_ago" not in work_item

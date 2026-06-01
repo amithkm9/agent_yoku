@@ -26,7 +26,7 @@ from pymongo import UpdateOne
 
 from yoku.core.constants import INGEST_BATCH_SIZE
 from yoku.core.logging import get_logger
-from yoku.core.storage.mongo import slack_messages_collection, slack_users_collection
+from yoku.core.storage.mongo import dc_slack_collection, dc_slack_users_collection
 from yoku.core.utils import extract_jira_keys
 
 log = get_logger("slack_export_ingest")
@@ -155,7 +155,7 @@ def _message_to_doc(
 
 
 def _ingest_users(users_data: list[dict]) -> int:
-    coll = slack_users_collection()
+    coll = dc_slack_users_collection()
     now = datetime.now(UTC)
     ops: list[UpdateOne] = []
     for u in users_data:
@@ -237,7 +237,7 @@ def main(export_path: str, workspace: str, tenant: str | None = None) -> None:
     log.info("upserted %d slack users", n_users)
     log.info("found %d channels in export", len(channel_map))
 
-    coll = slack_messages_collection()
+    coll = dc_slack_collection()
     now = datetime.now(UTC)
     total = 0
     new_or_changed = 0

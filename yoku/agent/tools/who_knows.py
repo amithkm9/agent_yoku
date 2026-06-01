@@ -8,13 +8,14 @@ from langchain_core.tools import tool
 
 from yoku.agent import tools as _t
 from yoku.agent.tools._ranking import _WHO_KNOWS_RECENCY_FLOOR, _recency_factor, _to_epoch
+from yoku.core.storage.mongo import dc_jira_collection
 
 
 def _identity_maps() -> tuple[dict[str, dict], dict[str, dict]]:
     """Lookup tables {jira displayName -> unified user} and {gh login -> unified}."""
     by_jira: dict[str, dict] = {}
     by_gh: dict[str, dict] = {}
-    for u in _t.unified_users_collection().find({}, {"_id": 0, "embedding": 0}):
+    for u in _t.ds_unified_users_collection().find({}, {"_id": 0, "embedding": 0}):
         jname = (u.get("jira") or {}).get("displayName")
         glogin = (u.get("github") or {}).get("login")
         if jname:
@@ -51,7 +52,7 @@ def who_knows(topic: str, limit: int = 5) -> list[dict]:
     if jira_card_keys:
         jira_ts = {
             d["key"]: _to_epoch(d.get("updated"))
-            for d in _t.tickets_collection().find(
+            for d in dc_jira_collection().find(
                 {"key": {"$in": jira_card_keys}}, {"_id": 0, "key": 1, "updated": 1}
             )
         }
@@ -61,7 +62,7 @@ def who_knows(topic: str, limit: int = 5) -> list[dict]:
         if c["source"] == "jira" and c.get("assignee")
     ]
     if gh_keys:
-        for d in _t.github_prs_collection().find(
+        for d in _t.dc_github_collection().find(
             {"key": {"$in": gh_keys}}, {"_id": 0, "key": 1, "author": 1, "updated": 1}
         ):
             if d.get("author"):

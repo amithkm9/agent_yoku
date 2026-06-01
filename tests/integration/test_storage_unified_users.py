@@ -34,19 +34,19 @@ def _build(tenant):
     from yoku.core.storage import unified_users as uu
 
     uu.main()
-    from yoku.core.storage.mongo import unified_users_collection
+    from yoku.core.storage.mongo import ds_unified_users_collection
 
-    return list(unified_users_collection().find({}, {"_id": 0}))
+    return list(ds_unified_users_collection().find({}, {"_id": 0}))
 
 
 @pytest.mark.integration
 def test_email_match_collapses_identities(tenant):
     from yoku.core.storage.mongo import (
-        github_users_collection,
-        users_collection,
+        dc_github_users_collection,
+        dc_jira_users_collection,
     )
 
-    users_collection().insert_one(
+    dc_jira_users_collection().insert_one(
         {
             "accountId": "j1",
             "displayName": "Akshay Reddy",
@@ -54,7 +54,7 @@ def test_email_match_collapses_identities(tenant):
             "active": True,
         }
     )
-    github_users_collection().insert_one(
+    dc_github_users_collection().insert_one(
         {"login": "internet-zero", "id": 1, "name": "Akshay", "email": "akshay@asato.ai"}
     )
 
@@ -68,9 +68,9 @@ def test_email_match_collapses_identities(tenant):
 
 @pytest.mark.integration
 def test_github_only_user_becomes_its_own_row(tenant):
-    from yoku.core.storage.mongo import github_users_collection
+    from yoku.core.storage.mongo import dc_github_users_collection
 
-    github_users_collection().insert_one(
+    dc_github_users_collection().insert_one(
         {"login": "orphan", "id": 9, "name": "Orphan", "email": "orphan@x.io"}
     )
 
@@ -84,12 +84,12 @@ def test_github_only_user_becomes_its_own_row(tenant):
 @pytest.mark.integration
 def test_manual_alias_links_known_handle(tenant):
     from yoku.core.storage.mongo import (
-        github_users_collection,
-        users_collection,
+        dc_github_users_collection,
+        dc_jira_users_collection,
     )
 
     # internet-zero is in MANUAL_ALIASES -> akshay.reddy@asato.ai.
-    users_collection().insert_one(
+    dc_jira_users_collection().insert_one(
         {
             "accountId": "j2",
             "displayName": "Totally Different Name",
@@ -97,7 +97,7 @@ def test_manual_alias_links_known_handle(tenant):
             "active": True,
         }
     )
-    github_users_collection().insert_one(
+    dc_github_users_collection().insert_one(
         {"login": "internet-zero", "id": 2, "name": "AR", "email": None}
     )
 
@@ -109,9 +109,9 @@ def test_manual_alias_links_known_handle(tenant):
 
 @pytest.mark.integration
 def test_bot_flag_propagates(tenant):
-    from yoku.core.storage.mongo import github_users_collection
+    from yoku.core.storage.mongo import dc_github_users_collection
 
-    github_users_collection().insert_one(
+    dc_github_users_collection().insert_one(
         {"login": "dependabot", "id": 3, "name": "bot", "email": None, "is_bot": True}
     )
     rows = _build(tenant)
@@ -120,9 +120,9 @@ def test_bot_flag_propagates(tenant):
 
 @pytest.mark.integration
 def test_rebuild_is_idempotent(tenant):
-    from yoku.core.storage.mongo import users_collection
+    from yoku.core.storage.mongo import dc_jira_users_collection
 
-    users_collection().insert_one(
+    dc_jira_users_collection().insert_one(
         {"accountId": "j1", "displayName": "Solo", "emailAddress": "solo@x.io", "active": True}
     )
     first = _build(tenant)

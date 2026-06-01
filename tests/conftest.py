@@ -142,13 +142,12 @@ def fake_collections(monkeypatch):
     from yoku.agent import tools
 
     colls = {
-        "jira_tickets": FakeCollection(),
-        "github_prs": FakeCollection(),
-        "unified_users": FakeCollection(),
+        "dc-jira": FakeCollection(),
+        "dc-github": FakeCollection(),
+        "ds-unified-users": FakeCollection(),
     }
-    monkeypatch.setattr(tools, "tickets_collection", lambda: colls["jira_tickets"])
-    monkeypatch.setattr(tools, "github_prs_collection", lambda: colls["github_prs"])
-    monkeypatch.setattr(tools, "unified_users_collection", lambda: colls["unified_users"])
+    monkeypatch.setattr(tools, "dc_github_collection", lambda: colls["dc-github"])
+    monkeypatch.setattr(tools, "ds_unified_users_collection", lambda: colls["ds-unified-users"])
     monkeypatch.setattr(
         tools,
         "get_collection",
@@ -157,4 +156,10 @@ def fake_collections(monkeypatch):
             ValueError(f"Unknown collection {name!r}. Allowed: {sorted(colls)}")
         ),
     )
+    # Also patch the who_knows module's dc_jira_collection so recency lookups work.
+    import sys
+
+    who_knows_mod = sys.modules.get("yoku.agent.tools.who_knows")
+    if who_knows_mod is not None:
+        monkeypatch.setattr(who_knows_mod, "dc_jira_collection", lambda: colls["dc-jira"])
     yield colls

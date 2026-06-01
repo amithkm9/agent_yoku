@@ -23,7 +23,7 @@ def test_jira_main_ignores_process_argv(monkeypatch):
         seen["page_size"] = str(page_size)
         return iter(())
 
-    monkeypatch.setattr(jira_ingest, "tickets_collection", lambda: _FakeCollection())
+    monkeypatch.setattr(jira_ingest, "dc_jira_collection", lambda: _FakeCollection())
     monkeypatch.setattr(jira_ingest, "search_issues", fake_search_issues)
 
     cfg = JiraConfig(
@@ -48,7 +48,7 @@ def test_github_main_ignores_process_argv(monkeypatch):
         seen["filters"] = filter_names
         return []
 
-    monkeypatch.setattr(gh_ingest, "github_prs_collection", lambda: _FakeCollection())
+    monkeypatch.setattr(gh_ingest, "dc_github_collection", lambda: _FakeCollection())
     monkeypatch.setattr(gh_ingest, "lookback_cutoff", fake_lookback_cutoff)
     monkeypatch.setattr(gh_ingest, "_repos_to_scan", fake_repos_to_scan)
 

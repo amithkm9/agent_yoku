@@ -17,15 +17,17 @@ from typing import Any
 from pydantic import BaseModel
 
 from yoku.core.models import (
+    Conversation,
     EntityLink,
     GitHubPR,
     GitHubUser,
     JiraTicket,
     JiraUser,
+    PullRequest,
     SlackMessage,
     SlackUser,
-    UnifiedDoc,
     UnifiedUser,
+    WorkItem,
 )
 
 # filter kinds (mirror the json_schema_extra `filter_kind` values)
@@ -35,15 +37,19 @@ HAS_REFS = "has_refs"
 
 #: collection name -> the model that defines its document shape.
 COLLECTION_MODELS: dict[str, type[BaseModel]] = {
-    "jira_tickets": JiraTicket,
-    "users": JiraUser,
-    "github_prs": GitHubPR,
-    "github_users": GitHubUser,
-    "unified_users": UnifiedUser,
-    "slack_messages": SlackMessage,
-    "slack_users": SlackUser,
-    "documents": UnifiedDoc,
-    "entity_links": EntityLink,
+    # dc-* raw connector collections
+    "dc-jira": JiraTicket,
+    "dc-jira-users": JiraUser,
+    "dc-github": GitHubPR,
+    "dc-github-users": GitHubUser,
+    "dc-slack": SlackMessage,
+    "dc-slack-users": SlackUser,
+    # ds-* canonical collections
+    "ds-work-item": WorkItem,
+    "ds-pull-request": PullRequest,
+    "ds-conversation": Conversation,
+    "ds-entity-links": EntityLink,
+    "ds-unified-users": UnifiedUser,
 }
 
 

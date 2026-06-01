@@ -16,7 +16,7 @@ import requests
 from pymongo import UpdateOne
 
 from yoku.core.logging import get_logger
-from yoku.core.storage.mongo import github_users_collection
+from yoku.core.storage.mongo import dc_github_users_collection
 from yoku.pipeline.connectors._runtime import current_github_config
 from yoku.pipeline.connectors.github.client import BOT_AUTHORS, _get, _paginate
 
@@ -36,7 +36,7 @@ def main() -> None:
     members = list(_paginate(members_url, {"per_page": 100, "filter": "all"}))
     log.info("found %d members", len(members))
 
-    coll = github_users_collection()
+    coll = dc_github_users_collection()
     now = datetime.now(UTC)
     t0 = time.monotonic()
 

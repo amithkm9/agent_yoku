@@ -6,6 +6,10 @@ One mongo cluster, one db per tenant — no cross-tenant queries.
 
 Indexes are ensured once per (db, collection) per process via `_ensure`, not on
 every accessor call.
+
+Naming convention:
+  dc-*  raw connector collections (internal, not exposed to the agent)
+  ds-*  canonical / derived collections (exposed via ALLOWED_COLLECTIONS)
 """
 
 from __future__ import annotations
@@ -41,9 +45,14 @@ def _ensure(coll: Collection, specs: list[IndexModel]) -> Collection:
     return coll
 
 
-def tickets_collection() -> Collection:
+# ---------------------------------------------------------------------------
+# dc-* raw connector collections (internal — not exposed to the agent)
+# ---------------------------------------------------------------------------
+
+
+def dc_jira_collection() -> Collection:
     return _ensure(
-        _db()["jira_tickets"],
+        _db()["dc-jira"],
         [
             IndexModel("key", unique=True),
             IndexModel("status"),
@@ -53,13 +62,13 @@ def tickets_collection() -> Collection:
     )
 
 
-def users_collection() -> Collection:
-    return _ensure(_db()["users"], [IndexModel("accountId", unique=True)])
+def dc_jira_users_collection() -> Collection:
+    return _ensure(_db()["dc-jira-users"], [IndexModel("accountId", unique=True)])
 
 
-def github_prs_collection() -> Collection:
+def dc_github_collection() -> Collection:
     return _ensure(
-        _db()["github_prs"],
+        _db()["dc-github"],
         [
             IndexModel("key", unique=True),
             IndexModel("jira_keys"),
@@ -70,16 +79,81 @@ def github_prs_collection() -> Collection:
     )
 
 
-def github_users_collection() -> Collection:
+def dc_github_users_collection() -> Collection:
     return _ensure(
-        _db()["github_users"],
+        _db()["dc-github-users"],
         [IndexModel("login", unique=True), IndexModel("email")],
     )
 
 
-def unified_users_collection() -> Collection:
+def dc_slack_collection() -> Collection:
     return _ensure(
-        _db()["unified_users"],
+        _db()["dc-slack"],
+        [
+            IndexModel("key", unique=True),
+            IndexModel("channel_name"),
+            IndexModel("author_name"),
+            IndexModel("jira_keys"),
+            IndexModel([("updated", DESCENDING)]),
+        ],
+    )
+
+
+def dc_slack_users_collection() -> Collection:
+    return _ensure(
+        _db()["dc-slack-users"],
+        [IndexModel("user_id", unique=True), IndexModel("email", sparse=True)],
+    )
+
+
+# ---------------------------------------------------------------------------
+# ds-* canonical / derived collections (exposed to the agent)
+# ---------------------------------------------------------------------------
+
+_UNIFIED_DOC_INDEXES = [
+    IndexModel("key", unique=True),
+    IndexModel("domain"),
+    IndexModel("provider"),
+    IndexModel("refs"),
+    IndexModel([("updated", DESCENDING)]),
+]
+
+
+def ds_work_item_collection() -> Collection:
+    """Canonical work-item documents (domain=work_item); populated by `pipeline.unify`."""
+    return _ensure(_db()["ds-work-item"], _UNIFIED_DOC_INDEXES)
+
+
+def ds_pull_request_collection() -> Collection:
+    """Canonical pull-request documents (domain=pull_request); populated by `pipeline.unify`."""
+    return _ensure(_db()["ds-pull-request"], _UNIFIED_DOC_INDEXES)
+
+
+def ds_conversation_collection() -> Collection:
+    """Canonical conversation documents (domain=conversation); populated by `pipeline.unify`."""
+    return _ensure(_db()["ds-conversation"], _UNIFIED_DOC_INDEXES)
+
+
+def ds_entity_links_collection() -> Collection:
+    """Typed cross-source edges (Way B); derived from canonical doc `refs`.
+
+    One row per (from_key, to_key) edge, deduped by that pair so re-runs are
+    idempotent. Populated by `pipeline.entity_links`.
+    """
+    return _ensure(
+        _db()["ds-entity-links"],
+        [
+            IndexModel([("from_key", ASCENDING), ("to_key", ASCENDING)], unique=True),
+            IndexModel("from_key"),
+            IndexModel("to_key"),
+            IndexModel("link_type"),
+        ],
+    )
+
+
+def ds_unified_users_collection() -> Collection:
+    return _ensure(
+        _db()["ds-unified-users"],
         [
             IndexModel("user_id", unique=True),
             IndexModel("email"),
@@ -88,6 +162,11 @@ def unified_users_collection() -> Collection:
             IndexModel("jira.displayName", sparse=True),
         ],
     )
+
+
+# ---------------------------------------------------------------------------
+# Non-data collections (sessions, auth — not renamed)
+# ---------------------------------------------------------------------------
 
 
 def chat_sessions_collection() -> Collection:
@@ -117,67 +196,16 @@ def auth_users_collection() -> Collection:
     return _ensure(_db()["auth_users"], [IndexModel("email", unique=True)])
 
 
-def slack_messages_collection() -> Collection:
-    return _ensure(
-        _db()["slack_messages"],
-        [
-            IndexModel("key", unique=True),
-            IndexModel("channel_name"),
-            IndexModel("author_name"),
-            IndexModel("jira_keys"),
-            IndexModel([("updated", DESCENDING)]),
-        ],
-    )
-
-
-def slack_users_collection() -> Collection:
-    return _ensure(
-        _db()["slack_users"],
-        [IndexModel("user_id", unique=True), IndexModel("email", sparse=True)],
-    )
-
-
-def documents_collection() -> Collection:
-    """The unified canonical collection (Way B); populated by `pipeline.unify`."""
-    return _ensure(
-        _db()["documents"],
-        [
-            IndexModel("key", unique=True),
-            IndexModel("domain"),
-            IndexModel("provider"),
-            IndexModel("refs"),
-            IndexModel([("updated", DESCENDING)]),
-        ],
-    )
-
-
-def entity_links_collection() -> Collection:
-    """Typed cross-source edges (Way B); derived from canonical doc `refs`.
-
-    One row per (from_key, to_key) edge, deduped by that pair so re-runs are
-    idempotent. Populated by `pipeline.entity_links`.
-    """
-    return _ensure(
-        _db()["entity_links"],
-        [
-            IndexModel([("from_key", ASCENDING), ("to_key", ASCENDING)], unique=True),
-            IndexModel("from_key"),
-            IndexModel("to_key"),
-            IndexModel("link_type"),
-        ],
-    )
-
+# ---------------------------------------------------------------------------
+# Agent read whitelist — only ds-* collections
+# ---------------------------------------------------------------------------
 
 ALLOWED_COLLECTIONS = {
-    "jira_tickets": tickets_collection,
-    "users": users_collection,
-    "github_prs": github_prs_collection,
-    "github_users": github_users_collection,
-    "unified_users": unified_users_collection,
-    "slack_messages": slack_messages_collection,
-    "slack_users": slack_users_collection,
-    "documents": documents_collection,
-    "entity_links": entity_links_collection,
+    "ds-work-item": ds_work_item_collection,
+    "ds-pull-request": ds_pull_request_collection,
+    "ds-conversation": ds_conversation_collection,
+    "ds-entity-links": ds_entity_links_collection,
+    "ds-unified-users": ds_unified_users_collection,
 }
 
 

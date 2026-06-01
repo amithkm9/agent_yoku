@@ -138,17 +138,24 @@ EMBED_MODEL = settings.openai_embed_model
 AGENT_MODEL_ID = settings.agent_model_id
 
 # Storage re-exports — lazy via PEP 562 to avoid `config <-> storage.mongo`
-# circular import. Legacy callers can still do
-# `from yoku.core.config import tickets_collection`. New code should prefer
-# `from yoku.core.storage.mongo import ...`.
+# circular import. New code should prefer `from yoku.core.storage.mongo import ...`.
 _LAZY_STORAGE_EXPORTS = {
     "ALLOWED_COLLECTIONS",
     "get_collection",
-    "tickets_collection",
-    "users_collection",
-    "github_prs_collection",
-    "github_users_collection",
-    "unified_users_collection",
+    # dc-* raw connector accessors
+    "dc_jira_collection",
+    "dc_jira_users_collection",
+    "dc_github_collection",
+    "dc_github_users_collection",
+    "dc_slack_collection",
+    "dc_slack_users_collection",
+    # ds-* canonical accessors
+    "ds_work_item_collection",
+    "ds_pull_request_collection",
+    "ds_conversation_collection",
+    "ds_entity_links_collection",
+    "ds_unified_users_collection",
+    # session / auth (unchanged)
     "chat_sessions_collection",
     "chat_messages_collection",
 }
