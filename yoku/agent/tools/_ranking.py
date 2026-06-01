@@ -28,6 +28,7 @@ _W_ADJ = 0.15
 _W_RECENCY = 0.03
 _RECENCY_HALFLIFE_DAYS = 180.0
 _WHO_KNOWS_RECENCY_FLOOR = 0.2
+_TITLE_PHRASE_BOOST = 1.25
 
 
 def _to_epoch(value: str | datetime | None) -> float | None:
@@ -110,6 +111,27 @@ def _recency_factor(updated_ts: float | None, now: float) -> float:
     return 0.5 ** (age_days / _RECENCY_HALFLIFE_DAYS)
 
 
+def _title_phrase_boost(query: str, summary: str) -> float:
+    """1.25x if the query appears verbatim in the summary or all query tokens are in it.
+
+    Applied in the feature reranker path only. ZeroEntropy reads the full document
+    text (falling back to summary), so it already incorporates title signal — adding
+    this boost on top would let a weak title match override a clear cross-encoder lead.
+    """
+    if not query or not summary:
+        return 1.0
+    q = query.strip().lower()
+    if not q:
+        return 1.0
+    s = summary.lower()
+    if q in s:
+        return _TITLE_PHRASE_BOOST
+    qtoks = _tokenize(q)
+    if qtoks and qtoks.issubset(_tokenize(s)):
+        return _TITLE_PHRASE_BOOST
+    return 1.0
+
+
 def _adjacency_scores(fused: dict[int, float], idx: dict[str, Any]) -> dict[int, float]:
     """For each fused candidate, how relevant its strongest linked counterpart is.
 
@@ -163,7 +185,8 @@ def _feature_rerank(
         corr = 1.0 if d.get("has_links") else 0.0
         adj = adjacency.get(i, 0.0)
         rec = _recency_factor(d.get("updated_ts"), now)
-        boost = 1.0 + _W_LEX * lex + _W_CORR * corr + _W_ADJ * adj + _W_RECENCY * rec
+        title = _title_phrase_boost(query, d.get("summary") or "")
+        boost = (1.0 + _W_LEX * lex + _W_CORR * corr + _W_ADJ * adj + _W_RECENCY * rec) * title
         scored.append((i, base * boost))
     scored.sort(key=lambda x: -x[1])
     return [i for i, _ in scored]

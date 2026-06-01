@@ -556,6 +556,50 @@ def test_rerank_order_negative_ze_index_does_not_produce_duplicates(isolated_ind
 
 
 @pytest.mark.unit
+def test_title_phrase_boost_exact_phrase():
+    assert tools._title_phrase_boost("payment gateway", "new payment gateway service") == 1.25
+    assert tools._title_phrase_boost("payment gateway", "unrelated thing") == 1.0
+    assert tools._title_phrase_boost("", "anything") == 1.0
+    assert tools._title_phrase_boost("auth flow", "") == 1.0
+    assert tools._title_phrase_boost("  ", "anything") == 1.0
+
+
+@pytest.mark.unit
+def test_title_phrase_boost_all_tokens_match():
+    # All query tokens present in summary (different order / extra words) → boost
+    assert tools._title_phrase_boost("okta auth", "auth service for okta users") == 1.25
+
+
+@pytest.mark.unit
+def test_title_phrase_boost_applied_in_feature_reranker(isolated_index, monkeypatch):
+    # Two docs with equal fusion score; only one has the query phrase in its summary.
+    # The title boost (1.25x) must lift it above the other.
+    jira = [
+        {"key": "AS-1", "summary": "unrelated thing", "embedding": [1.0, 0.0, 0.0]},
+        {"key": "AS-2", "summary": "payment gateway integration", "embedding": [1.0, 0.0, 0.0]},
+    ]
+    _seed_index(monkeypatch, jira=jira, query_vec=(1.0, 0.0, 0.0))
+    monkeypatch.setattr(tools, "rerank", lambda *a, **k: None)  # force feature reranker
+
+    out = tools.semantic_search.invoke({"query": "payment gateway", "k": 5})
+    assert out[0]["key"] == "AS-2", "title phrase boost must promote matching summary"
+
+
+@pytest.mark.unit
+def test_title_phrase_boost_does_not_overturn_clear_leader():
+    # The gap between the two fusion scores (0.05 vs 0.01) must not be overcome
+    # by a 1.25x title boost on the weaker candidate. Multiplicative keeps it proportional.
+    idx = {
+        "docs": [
+            {"key": "LEADER", "summary": "no phrase here", "source": "jira", "has_links": False},
+            {"key": "PHRASE", "summary": "payment gateway", "source": "jira", "has_links": False},
+        ]
+    }
+    order = tools._feature_rerank("payment gateway", [(0, 0.05), (1, 0.01)], idx, {})
+    assert order[0] == 0, "5x fusion lead must withstand 1.25x title boost"
+
+
+@pytest.mark.unit
 def test_rerank_order_empty_ze_response_falls_back_to_feature_reranker(isolated_index, monkeypatch):
     # ZeroEntropy returning [] (not None) should fall back to the feature reranker,
     # not produce all-zero scores that collapse the ordering.

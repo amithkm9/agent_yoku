@@ -47,6 +47,7 @@ from yoku.agent.tools._ranking import (
     _feature_rerank,
     _lexical_overlap,
     _recency_factor,
+    _title_phrase_boost,
     _to_epoch,
     _tokenize,
 )
