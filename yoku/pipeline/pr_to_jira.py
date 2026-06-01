@@ -15,9 +15,9 @@ import time
 
 from pymongo import UpdateOne
 
-from yoku.core.storage.mongo import dc_github_collection, dc_jira_collection
-from yoku.core.constants import LINK_BATCH_SIZE
-from yoku.core.logging import get_logger
+from yoku.constants import LINK_BATCH_SIZE
+from yoku.db.mongo import dc_github_collection, dc_jira_collection
+from yoku.logging import get_logger
 
 log = get_logger("link_prs")
 

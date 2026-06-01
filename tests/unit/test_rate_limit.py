@@ -6,7 +6,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from yoku.core.middleware import RateLimit
+from yoku.middleware import RateLimit
 
 
 def _app(limit: int, exempt=(), trust_forwarded_for=False):

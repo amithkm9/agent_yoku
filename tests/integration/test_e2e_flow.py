@@ -18,7 +18,7 @@ pytestmark = pytest.mark.integration
 
 @pytest.fixture
 def client(scratch_db):
-    from yoku.api.main import app
+    from yoku.main import app
 
     return TestClient(app)
 
@@ -30,7 +30,7 @@ def _tenant() -> str:
 def _drop(tenant: str) -> None:
     from pymongo import MongoClient
 
-    from yoku.core.config import settings
+    from yoku.config import settings
 
     MongoClient(settings.mongo_uri).drop_database(f"{settings.mongo_db}_{tenant}")
 
@@ -67,7 +67,7 @@ class _FakeAgent:
 
 @pytest.mark.integration
 def test_full_flow_signup_session_chat_stats(client, monkeypatch):
-    from yoku.api.routers import chat as chat_route
+    from yoku.routers import chat as chat_route
 
     monkeypatch.setattr(chat_route, "_AGENT", _FakeAgent())
 
@@ -106,7 +106,7 @@ def test_full_flow_signup_session_chat_stats(client, monkeypatch):
 
 @pytest.mark.integration
 def test_tenant_isolation_end_to_end(client, monkeypatch):
-    from yoku.api.routers import chat as chat_route
+    from yoku.routers import chat as chat_route
 
     monkeypatch.setattr(chat_route, "_AGENT", _FakeAgent())
 
@@ -133,7 +133,7 @@ def test_tenant_isolation_end_to_end(client, monkeypatch):
 def test_chat_unknown_session_404(client, monkeypatch):
     """Posting to a session that was never created must 404, not silently
     auto-create it. Sessions are created explicitly via POST /api/sessions."""
-    from yoku.api.routers import chat as chat_route
+    from yoku.routers import chat as chat_route
 
     monkeypatch.setattr(chat_route, "_AGENT", _FakeAgent())
 

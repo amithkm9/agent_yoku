@@ -17,14 +17,14 @@ from datetime import UTC, datetime
 
 from pymongo import UpdateOne
 
-from yoku.core.constants import LINK_BATCH_SIZE
-from yoku.core.logging import get_logger
-from yoku.core.storage.mongo import (
+from yoku.constants import LINK_BATCH_SIZE
+from yoku.db.mongo import (
     ds_conversation_collection,
     ds_entity_links_collection,
     ds_pull_request_collection,
     ds_work_item_collection,
 )
+from yoku.logging import get_logger
 
 log = get_logger("entity_links")
 

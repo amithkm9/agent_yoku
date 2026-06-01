@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from yoku.agent import schema_registry as sr
-from yoku.core.storage import mongo
+from yoku.db import mongo
 
 
 @pytest.mark.unit

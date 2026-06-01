@@ -46,7 +46,7 @@ def test_chat_command_delegates(runner, monkeypatch):
 @pytest.mark.unit
 def test_ingest_jira_delegates(runner, monkeypatch):
     called = {}
-    from yoku.pipeline.connectors.jira import ingest as jira_ingest
+    from yoku.connectors.jira import ingest as jira_ingest
 
     monkeypatch.setattr(jira_ingest, "main", lambda extra=None: called.setdefault("extra", extra))
 
@@ -77,7 +77,7 @@ def test_link_command_delegates(runner, monkeypatch):
 
 @pytest.mark.unit
 def test_unify_users_delegates(runner, monkeypatch):
-    from yoku.core.storage import unified_users
+    from yoku.db import unified_users
 
     monkeypatch.setattr(unified_users, "main", lambda: None)
 
@@ -87,7 +87,7 @@ def test_unify_users_delegates(runner, monkeypatch):
 
 @pytest.mark.unit
 def test_list_connectors_delegates(runner, monkeypatch):
-    from yoku.pipeline.connectors import base
+    from yoku.connectors import base
 
     monkeypatch.setattr(
         base,

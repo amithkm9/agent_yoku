@@ -17,9 +17,8 @@ from datetime import UTC, datetime
 from pymongo import UpdateOne
 from pymongo.collection import Collection
 
-from yoku.core.constants import INGEST_BATCH_SIZE
-from yoku.core.logging import get_logger
-from yoku.core.storage.mongo import (
+from yoku.constants import INGEST_BATCH_SIZE
+from yoku.db.mongo import (
     dc_github_collection,
     dc_jira_collection,
     dc_slack_collection,
@@ -27,7 +26,8 @@ from yoku.core.storage.mongo import (
     ds_pull_request_collection,
     ds_work_item_collection,
 )
-from yoku.pipeline.mappers import SOURCE_MAPPERS
+from yoku.logging import get_logger
+from yoku.mappers import SOURCE_MAPPERS
 
 log = get_logger("unify")
 

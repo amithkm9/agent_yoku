@@ -34,7 +34,6 @@ from typing import Any
 import numpy as np
 from langchain_core.tools import BaseTool
 
-from yoku.agent.relationships import outbound_relationships
 from yoku.agent.rerank import rerank
 from yoku.agent.sources import embeddable_sources, get_source, source_for_key
 from yoku.agent.tools._ranking import (
@@ -51,7 +50,7 @@ from yoku.agent.tools._ranking import (
     _to_epoch,
     _tokenize,
 )
-from yoku.core.config import (
+from yoku.config import (
     ALLOWED_COLLECTIONS,
     EMBED_MODEL,
     dc_github_collection,
@@ -60,10 +59,11 @@ from yoku.core.config import (
     openai_client,
     settings,
 )
-from yoku.core.storage.mongo import DC_COLLECTIONS
-from yoku.core.logging import get_logger
-from yoku.core.storage.tenancy import current_tenant
-from yoku.core.utils import bson_safe
+from yoku.db.mongo import DC_COLLECTIONS
+from yoku.db.tenancy import current_tenant
+from yoku.logging import get_logger
+from yoku.schemas.relationships import outbound_relationships
+from yoku.utils import bson_safe
 
 __all__ = [
     "ALLOWED_COLLECTIONS",
@@ -121,11 +121,7 @@ def _load_index() -> dict[str, Any]:
     counts: dict[str, int] = {}
     for spec in embeddable_sources():
         coll = DC_COLLECTIONS[spec.collection]()
-        rows = list(
-            coll.find(
-                {"embedding": {"$ne": None, "$exists": True}}, proj
-            )
-        )
+        rows = list(coll.find({"embedding": {"$ne": None, "$exists": True}}, proj))
         for d in rows:
             d["source"] = spec.name
         counts[spec.name] = len(rows)
@@ -259,9 +255,7 @@ def _fetch_texts(keys: list[str]) -> dict[str, str]:
         accessor = DC_COLLECTIONS.get(collection) or ALLOWED_COLLECTIONS.get(collection)
         if not accessor:
             continue
-        for d in accessor().find(
-            {"key": {"$in": group}}, {"_id": 0, "key": 1, "text": 1}
-        ):
+        for d in accessor().find({"key": {"$in": group}}, {"_id": 0, "key": 1, "text": 1}):
             out[d["key"]] = d.get("text") or ""
     return out
 

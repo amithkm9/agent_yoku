@@ -12,9 +12,7 @@ def test_flags_done_tickets_without_prs_and_merged_prs_without_tickets(
     fake_collections, monkeypatch
 ):
     monkeypatch.setattr(consistency, "dc_jira_collection", lambda: fake_collections["dc-jira"])
-    monkeypatch.setattr(
-        consistency, "dc_github_collection", lambda: fake_collections["dc-github"]
-    )
+    monkeypatch.setattr(consistency, "dc_github_collection", lambda: fake_collections["dc-github"])
 
     fake_collections["dc-jira"].docs = [
         {"key": "AS-1", "status": "Done", "linked_prs": []},  # flagged
@@ -39,9 +37,7 @@ def test_flags_done_tickets_without_prs_and_merged_prs_without_tickets(
 @pytest.mark.unit
 def test_sample_is_capped(fake_collections, monkeypatch):
     monkeypatch.setattr(consistency, "dc_jira_collection", lambda: fake_collections["dc-jira"])
-    monkeypatch.setattr(
-        consistency, "dc_github_collection", lambda: fake_collections["dc-github"]
-    )
+    monkeypatch.setattr(consistency, "dc_github_collection", lambda: fake_collections["dc-github"])
     fake_collections["dc-jira"].docs = [
         {"key": f"AS-{i}", "status": "Done", "linked_prs": []} for i in range(20)
     ]

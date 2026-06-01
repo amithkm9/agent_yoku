@@ -14,9 +14,9 @@ from typing import Any
 
 from deepagents import create_deep_agent
 
-from yoku.agent.prompts import load_prompt
+from yoku.agent.prompts import SYSTEM_PROMPT
 from yoku.agent.tools import get_all_tools
-from yoku.core.config import settings
+from yoku.config import settings
 
 
 def build_agent(model: str | None = None) -> Any:
@@ -28,5 +28,5 @@ def build_agent(model: str | None = None) -> Any:
     return create_deep_agent(
         model=model or settings.agent_model_id,
         tools=get_all_tools(),
-        system_prompt=load_prompt("main"),
+        system_prompt=SYSTEM_PROMPT,
     )

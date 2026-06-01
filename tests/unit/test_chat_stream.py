@@ -7,7 +7,7 @@ import json
 import pytest
 from langchain_core.messages import AIMessage, ToolMessage
 
-from yoku.api.routers import chat as chat_mod
+from yoku.routers import chat as chat_mod
 
 
 class _FakeAgent:

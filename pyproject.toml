@@ -6,8 +6,7 @@ authors = ["Akshay Reddy <akshay.reddy@asato.ai>"]
 readme = "README.md"
 packages = [{include = "yoku"}]
 include = [
-    { path = "yoku/agent/relationships.yaml", format = ["sdist", "wheel"] },
-    { path = "yoku/agent/prompts/*.md", format = ["sdist", "wheel"] },
+    { path = "yoku/schemas/relationships.yaml", format = ["sdist", "wheel"] },
 ]
 
 [tool.poetry.dependencies]

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from yoku.agent import relationships as rel
+from yoku.schemas import relationships as rel
 
 
 @pytest.mark.unit

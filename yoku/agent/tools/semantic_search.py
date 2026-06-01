@@ -6,7 +6,6 @@ import numpy as np
 from langchain_core.tools import tool
 
 from yoku.agent import tools as _t
-from yoku.agent.relationships import outbound_relationships
 from yoku.agent.sources import embeddable_sources, get_source
 from yoku.agent.tools._ranking import (
     _KEYWORD_WEIGHT,
@@ -15,6 +14,7 @@ from yoku.agent.tools._ranking import (
     _keyword_scores,
     _rrf_fuse,
 )
+from yoku.schemas.relationships import outbound_relationships
 
 
 @tool

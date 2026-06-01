@@ -9,7 +9,7 @@ import pytest
 from fastapi import FastAPI
 from starlette.testclient import TestClient
 
-from yoku.core.logging import (
+from yoku.logging import (
     SERVICE_NAME,
     _AgentYokuFormatter,
     _ContextFilter,
@@ -18,7 +18,7 @@ from yoku.core.logging import (
     safe_log_str,
     set_session,
 )
-from yoku.core.middleware import (
+from yoku.middleware import (
     RequestContext,
     correlation_id_context,
     request_id_context,

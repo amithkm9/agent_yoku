@@ -10,8 +10,8 @@ with the in-memory collection doubles; this is a report, not a hot path.
 
 from __future__ import annotations
 
-from yoku.core.constants import DEFAULT_DONE_STATUSES
-from yoku.core.storage.mongo import dc_github_collection, dc_jira_collection
+from yoku.constants import DEFAULT_DONE_STATUSES
+from yoku.db.mongo import dc_github_collection, dc_jira_collection
 
 
 def consistency_report(

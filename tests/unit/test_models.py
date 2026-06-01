@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from yoku.core.models import (
+from yoku.schemas import (
     ChatMessage,
     ChatSession,
     GitHubPR,
@@ -12,7 +12,7 @@ from yoku.core.models import (
     PRStatus,
     UnifiedUser,
 )
-from yoku.core.models.user import JiraUserBlock
+from yoku.schemas.user import JiraUserBlock
 
 
 def test_jira_ticket_minimal():

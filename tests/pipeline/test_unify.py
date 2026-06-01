@@ -12,9 +12,7 @@ def _seed(store):
     store["sources"]["dc-github"].insert_one(
         {"key": "o/r#1", "repo": "o/r", "number": 1, "status": "merged", "jira_keys": ["AS-1"]}
     )
-    store["sources"]["dc-slack"].insert_one(
-        {"key": "C/1.2", "text": "hi", "jira_keys": ["AS-1"]}
-    )
+    store["sources"]["dc-slack"].insert_one({"key": "C/1.2", "text": "hi", "jira_keys": ["AS-1"]})
 
 
 def test_unify_projects_every_source(fake_store):

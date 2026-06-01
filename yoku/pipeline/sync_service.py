@@ -22,11 +22,8 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 
 from yoku.agent.tools import invalidate_index
-from yoku.core.config import settings
-from yoku.core.logging import get_logger
-from yoku.core.storage import connector_configs as cc
-from yoku.core.storage import tenancy
-from yoku.pipeline.connectors._runtime import (
+from yoku.config import settings
+from yoku.connectors._runtime import (
     github_config_from_dict,
     jira_config_from_dict,
     slack_config_from_dict,
@@ -34,6 +31,9 @@ from yoku.pipeline.connectors._runtime import (
     use_jira,
     use_slack,
 )
+from yoku.db import connector_configs as cc
+from yoku.db import tenancy
+from yoku.logging import get_logger
 
 log = get_logger("sync_service")
 
@@ -62,8 +62,8 @@ def _fmt_error(e: Exception) -> str:
 
 def _ingest_jira(decrypted: dict) -> None:
     with use_jira(jira_config_from_dict(decrypted)):
-        from yoku.pipeline.connectors.jira import ingest as ingest_mod
-        from yoku.pipeline.connectors.jira import users_ingest as users_mod
+        from yoku.connectors.jira import ingest as ingest_mod
+        from yoku.connectors.jira import users_ingest as users_mod
 
         ingest_mod.main()
         users_mod.main()
@@ -71,8 +71,8 @@ def _ingest_jira(decrypted: dict) -> None:
 
 def _ingest_github(decrypted: dict) -> None:
     with use_github(github_config_from_dict(decrypted)):
-        from yoku.pipeline.connectors.github import ingest as ingest_mod
-        from yoku.pipeline.connectors.github import users_ingest as users_mod
+        from yoku.connectors.github import ingest as ingest_mod
+        from yoku.connectors.github import users_ingest as users_mod
 
         ingest_mod.main()
         users_mod.main()
@@ -80,8 +80,8 @@ def _ingest_github(decrypted: dict) -> None:
 
 def _ingest_slack(decrypted: dict) -> None:
     with use_slack(slack_config_from_dict(decrypted)):
-        from yoku.pipeline.connectors.slack import ingest as ingest_mod
-        from yoku.pipeline.connectors.slack import users_ingest as users_mod
+        from yoku.connectors.slack import ingest as ingest_mod
+        from yoku.connectors.slack import users_ingest as users_mod
 
         ingest_mod.main()
         users_mod.main()
@@ -130,7 +130,7 @@ def _run_post_ingest_pipeline() -> None:
     Operates on whichever tenant is currently bound. Same order as the
     `refresh-all` CLI.
     """
-    from yoku.core.storage import backfill, unified_users
+    from yoku.db import backfill, unified_users
     from yoku.pipeline import embed as embed_mod
     from yoku.pipeline import pr_to_jira
     from yoku.pipeline.entity_links import build_entity_links
@@ -156,7 +156,7 @@ def list_tenant_ids() -> list[str]:
     the suffix round-trips back to the tenant id unchanged. Mongo's own
     `admin`/`config`/`local` dbs and the unsuffixed base db are excluded.
     """
-    from yoku.core.storage.mongo import _client
+    from yoku.db.mongo import _client
 
     prefix = f"{settings.mongo_db}_"
     names = _client().list_database_names()

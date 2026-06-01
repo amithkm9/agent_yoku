@@ -49,15 +49,9 @@ def fake_store(monkeypatch):
     ds_pull_request = FakeColl()
     ds_conversation = FakeColl()
 
-    monkeypatch.setattr(
-        unify_mod, "dc_jira_collection", lambda: sources["dc-jira"]
-    )
-    monkeypatch.setattr(
-        unify_mod, "dc_github_collection", lambda: sources["dc-github"]
-    )
-    monkeypatch.setattr(
-        unify_mod, "dc_slack_collection", lambda: sources["dc-slack"]
-    )
+    monkeypatch.setattr(unify_mod, "dc_jira_collection", lambda: sources["dc-jira"])
+    monkeypatch.setattr(unify_mod, "dc_github_collection", lambda: sources["dc-github"])
+    monkeypatch.setattr(unify_mod, "dc_slack_collection", lambda: sources["dc-slack"])
     monkeypatch.setattr(unify_mod, "ds_work_item_collection", lambda: ds_work_item)
     monkeypatch.setattr(unify_mod, "ds_pull_request_collection", lambda: ds_pull_request)
     monkeypatch.setattr(unify_mod, "ds_conversation_collection", lambda: ds_conversation)
@@ -97,11 +91,7 @@ def fake_store(monkeypatch):
                 ds_conversation.insert_one(doc)
 
         def find(self, *a, **k):
-            return (
-                ds_work_item.find()
-                + ds_pull_request.find()
-                + ds_conversation.find()
-            )
+            return ds_work_item.find() + ds_pull_request.find() + ds_conversation.find()
 
         def find_one(self, flt: dict, *a, **k):
             for store in (ds_work_item, ds_pull_request, ds_conversation):

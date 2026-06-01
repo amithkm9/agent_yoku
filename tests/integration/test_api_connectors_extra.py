@@ -16,7 +16,7 @@ pytestmark = pytest.mark.integration
 
 @pytest.fixture
 def client(scratch_db):
-    from yoku.api.main import app
+    from yoku.main import app
 
     return TestClient(app)
 
@@ -28,7 +28,7 @@ def _tenant() -> str:
 def _drop(tenant: str) -> None:
     from pymongo import MongoClient
 
-    from yoku.core.config import settings
+    from yoku.config import settings
 
     MongoClient(settings.mongo_uri).drop_database(f"{settings.mongo_db}_{tenant}")
 
@@ -190,7 +190,7 @@ def test_sync_unknown_connector_404(client):
 @pytest.mark.integration
 def test_sync_started_when_configured(client, monkeypatch):
     # Stub the runner so the background ingest never touches the network.
-    from yoku.api.routers import connectors as conn_route
+    from yoku.routers import connectors as conn_route
 
     ran = {}
 

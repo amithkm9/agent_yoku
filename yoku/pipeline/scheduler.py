@@ -15,8 +15,8 @@ from __future__ import annotations
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
-from yoku.core.config import settings
-from yoku.core.logging import get_logger
+from yoku.config import settings
+from yoku.logging import get_logger
 from yoku.pipeline import sync_service
 
 log = get_logger("scheduler")

@@ -17,7 +17,7 @@ from langchain_core.messages import HumanMessage
 
 from yoku.agent.agent import build_agent
 from yoku.agent.usage import UsageCallback
-from yoku.core.logging import get_logger
+from yoku.logging import get_logger
 
 log = get_logger("chat")
 

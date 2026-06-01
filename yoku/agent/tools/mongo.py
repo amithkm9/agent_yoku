@@ -12,11 +12,11 @@ from typing import Any
 from langchain_core.tools import tool
 
 from yoku.agent import tools as _t
-from yoku.agent.relationships import relationships_for
 from yoku.agent.schema_registry import collection_description, field_specs
 from yoku.agent.schema_registry import filter_fields as schema_filter_fields
 from yoku.agent.sources import source_for_collection
-from yoku.core.storage.freshness import source_freshness
+from yoku.db.freshness import source_freshness
+from yoku.schemas.relationships import relationships_for
 
 _BLOCKED_STAGES = {"$out", "$merge", "$function", "$accumulator", "$where"}
 

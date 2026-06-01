@@ -14,8 +14,8 @@ pytestmark = pytest.mark.integration
 @pytest.fixture
 def temp_session(scratch_db, monkeypatch):
     """Patch the session collection helpers to point at the scratch db."""
-    from yoku.core.storage import mongo as mongo_mod
-    from yoku.core.storage import sessions as sess_mod
+    from yoku.db import mongo as mongo_mod
+    from yoku.db import sessions as sess_mod
 
     def _msgs():
         coll = scratch_db["chat_messages"]
@@ -35,7 +35,7 @@ def temp_session(scratch_db, monkeypatch):
 
 
 def test_save_then_load_history(temp_session):
-    from yoku.core.storage.sessions import (
+    from yoku.db.sessions import (
         load_agent_history,
         load_all_messages,
         new_turn_id,

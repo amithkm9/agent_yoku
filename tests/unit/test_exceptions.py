@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from yoku.core.exceptions import (
+from yoku.exceptions import (
     ConfigError,
     IndexEmpty,
     NotFoundError,

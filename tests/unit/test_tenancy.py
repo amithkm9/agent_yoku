@@ -1,4 +1,4 @@
-from yoku.core.storage import tenancy
+from yoku.db import tenancy
 
 
 def test_current_tenant_requires_explicit_binding():

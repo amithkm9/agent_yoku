@@ -1,0 +1,38 @@
+"""Session CRUD + history endpoints."""
+
+from __future__ import annotations
+
+from fastapi import APIRouter, HTTPException, status
+
+from yoku.auth import CurrentUser
+from yoku.db import sessions as sess_mod
+from yoku.schemas.api import CreateSessionResponse, SessionDetail, SessionSummary
+from yoku.utils import bson_safe
+
+router = APIRouter(prefix="/sessions", tags=["sessions"])
+
+
+@router.get("", response_model=list[SessionSummary])
+async def list_sessions(_user: CurrentUser, limit: int = 25) -> list[SessionSummary]:
+    rows = sess_mod.list_sessions(limit=limit)
+    return [SessionSummary(**r) for r in rows]
+
+
+@router.post("", response_model=CreateSessionResponse, status_code=status.HTTP_201_CREATED)
+async def create_session(_user: CurrentUser) -> CreateSessionResponse:
+    sid = sess_mod.start_session()
+    return CreateSessionResponse(session_id=sid)
+
+
+@router.get("/{session_id}", response_model=SessionDetail)
+async def get_session(session_id: str, _user: CurrentUser) -> SessionDetail:
+    meta = sess_mod.get_session(session_id)
+    if not meta:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "session not found")
+    msgs = sess_mod.load_all_messages(session_id)
+    return SessionDetail(**meta, messages=[bson_safe(m) for m in msgs])
+
+
+@router.delete("/{session_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
+async def delete_session(session_id: str, _user: CurrentUser) -> None:
+    sess_mod.delete_session(session_id)

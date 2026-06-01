@@ -16,7 +16,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from yoku.core.models import (
+from yoku.schemas import (
     Conversation,
     EntityLink,
     GitHubPR,

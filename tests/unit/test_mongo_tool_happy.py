@@ -21,9 +21,7 @@ def test_mongo_query_returns_rows(fake_collections):
 
 @pytest.mark.unit
 def test_mongo_query_strips_hidden_fields(fake_collections):
-    fake_collections["dc-jira"].docs = [
-        {"key": "A-1", "embedding": [1.0], "text": "secret blob"}
-    ]
+    fake_collections["dc-jira"].docs = [{"key": "A-1", "embedding": [1.0], "text": "secret blob"}]
     out = tools.mongo_query.invoke({"collection": "dc-jira", "pipeline": [{"$match": {}}]})
     row = out["results"][0]
     assert "embedding" not in row

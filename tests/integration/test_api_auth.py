@@ -17,7 +17,7 @@ def client(scratch_db):
     Uses the existing scratch_db fixture's name as the tenant_id so collections
     land in `yoku_<scratch_db_name>` and get cleaned up by that fixture.
     """
-    from yoku.api.main import app
+    from yoku.main import app
 
     return TestClient(app)
 
@@ -42,7 +42,7 @@ def _signup(
 def _drop(tenant: str) -> None:
     from pymongo import MongoClient
 
-    from yoku.core.config import settings
+    from yoku.config import settings
 
     MongoClient(settings.mongo_uri).drop_database(f"{settings.mongo_db}_{tenant}")
 

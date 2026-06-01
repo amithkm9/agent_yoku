@@ -16,32 +16,32 @@ pytestmark = pytest.mark.integration
 
 @pytest.fixture
 def tenant(scratch_db):
-    from yoku.core.storage import tenancy
+    from yoku.db import tenancy
 
     tid = f"uu_{uuid.uuid4().hex[:8]}"
     tenancy.set_tenant(tid)
     yield tid
     from pymongo import MongoClient
 
-    from yoku.core.config import settings
-    from yoku.core.storage.tenancy import tenant_db_name
+    from yoku.config import settings
+    from yoku.db.tenancy import tenant_db_name
 
     MongoClient(settings.mongo_uri).drop_database(tenant_db_name(tid))
     tenancy.set_tenant(None)
 
 
 def _build(tenant):
-    from yoku.core.storage import unified_users as uu
+    from yoku.db import unified_users as uu
 
     uu.main()
-    from yoku.core.storage.mongo import ds_unified_users_collection
+    from yoku.db.mongo import ds_unified_users_collection
 
     return list(ds_unified_users_collection().find({}, {"_id": 0}))
 
 
 @pytest.mark.integration
 def test_email_match_collapses_identities(tenant):
-    from yoku.core.storage.mongo import (
+    from yoku.db.mongo import (
         dc_github_users_collection,
         dc_jira_users_collection,
     )
@@ -68,7 +68,7 @@ def test_email_match_collapses_identities(tenant):
 
 @pytest.mark.integration
 def test_github_only_user_becomes_its_own_row(tenant):
-    from yoku.core.storage.mongo import dc_github_users_collection
+    from yoku.db.mongo import dc_github_users_collection
 
     dc_github_users_collection().insert_one(
         {"login": "orphan", "id": 9, "name": "Orphan", "email": "orphan@x.io"}
@@ -83,7 +83,7 @@ def test_github_only_user_becomes_its_own_row(tenant):
 
 @pytest.mark.integration
 def test_manual_alias_links_known_handle(tenant):
-    from yoku.core.storage.mongo import (
+    from yoku.db.mongo import (
         dc_github_users_collection,
         dc_jira_users_collection,
     )
@@ -109,7 +109,7 @@ def test_manual_alias_links_known_handle(tenant):
 
 @pytest.mark.integration
 def test_bot_flag_propagates(tenant):
-    from yoku.core.storage.mongo import dc_github_users_collection
+    from yoku.db.mongo import dc_github_users_collection
 
     dc_github_users_collection().insert_one(
         {"login": "dependabot", "id": 3, "name": "bot", "email": None, "is_bot": True}
@@ -120,7 +120,7 @@ def test_bot_flag_propagates(tenant):
 
 @pytest.mark.integration
 def test_rebuild_is_idempotent(tenant):
-    from yoku.core.storage.mongo import dc_jira_users_collection
+    from yoku.db.mongo import dc_jira_users_collection
 
     dc_jira_users_collection().insert_one(
         {"accountId": "j1", "displayName": "Solo", "emailAddress": "solo@x.io", "active": True}

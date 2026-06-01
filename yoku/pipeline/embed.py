@@ -16,19 +16,19 @@ from openai import OpenAI
 from pymongo import UpdateOne
 from pymongo.collection import Collection
 
-from yoku.core.config import EMBED_MODEL, openai_client
-from yoku.core.constants import (
+from yoku.config import EMBED_MODEL, openai_client
+from yoku.constants import (
     EMBED_BATCH_SIZE,
     EMBED_COST_PER_M_TOKENS,
     EMBED_MAX_CHARS,
     EMBEDDABLE_COLLECTIONS,
 )
-from yoku.core.logging import get_logger
-from yoku.core.storage.mongo import (
+from yoku.db.mongo import (
     dc_github_collection,
     dc_jira_collection,
     dc_slack_collection,
 )
+from yoku.logging import get_logger
 
 log = get_logger("embed")
 

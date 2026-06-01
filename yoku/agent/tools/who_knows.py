@@ -8,7 +8,7 @@ from langchain_core.tools import tool
 
 from yoku.agent import tools as _t
 from yoku.agent.tools._ranking import _WHO_KNOWS_RECENCY_FLOOR, _recency_factor, _to_epoch
-from yoku.core.storage.mongo import dc_jira_collection
+from yoku.db.mongo import dc_jira_collection
 
 
 def _identity_maps() -> tuple[dict[str, dict], dict[str, dict]]:

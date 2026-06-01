@@ -6,8 +6,8 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from yoku.core.storage import connector_configs as cc
-from yoku.core.storage import freshness
+from yoku.db import connector_configs as cc
+from yoku.db import freshness
 
 
 class _FakeColl:

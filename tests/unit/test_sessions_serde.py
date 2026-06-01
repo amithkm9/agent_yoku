@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
-from yoku.core.storage.sessions import _deserialize_msg, _serialize_msg
+from yoku.db.sessions import _deserialize_msg, _serialize_msg
 
 
 def test_human_roundtrip():

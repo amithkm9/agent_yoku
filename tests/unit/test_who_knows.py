@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import types
+import typing
 
 import pytest
 
@@ -85,9 +86,8 @@ def test_empty_topic_raises(fake_collections, monkeypatch):
 
 @pytest.mark.unit
 def test_recency_weighting_demotes_stale_contributor(fake_collections, monkeypatch):
-    from datetime import UTC, datetime
-
     import sys
+    from datetime import UTC, datetime
 
     recent = datetime.now(UTC).isoformat()
     old = "2021-01-01T00:00:00+00:00"
@@ -103,7 +103,7 @@ def test_recency_weighting_demotes_stale_contributor(fake_collections, monkeypat
 
     # Stub dc_jira_collection in the who_knows module's namespace
     class _FakeColl:
-        docs = [
+        docs: typing.ClassVar[list] = [
             {"key": "AS-1", "updated": old},
             {"key": "AS-2", "updated": old},
             {"key": "AS-3", "updated": old},

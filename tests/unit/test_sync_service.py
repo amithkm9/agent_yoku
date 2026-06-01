@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import pytest
 
-from yoku.core.storage import connector_configs as cc
-from yoku.core.storage import mongo, tenancy
+from yoku.db import connector_configs as cc
+from yoku.db import mongo, tenancy
 from yoku.pipeline import sync_service
 
 
@@ -127,7 +127,7 @@ def test_pipeline_runs_post_steps_and_reindexes(monkeypatch, reset_tenant):
 
 def test_post_ingest_pipeline_runs_unify_then_entity_links(monkeypatch):
     """Every post-ingest step runs; unify then entity_links close out the pipeline."""
-    from yoku.core.storage import backfill, unified_users
+    from yoku.db import backfill, unified_users
     from yoku.pipeline import embed as embed_mod
     from yoku.pipeline import entity_links, pr_to_jira, unify
 
@@ -147,7 +147,7 @@ def test_post_ingest_pipeline_runs_unify_then_entity_links(monkeypatch):
 def test_post_ingest_projection_failure_is_best_effort(monkeypatch, reset_tenant):
     """A failing canonical-projection step is logged, not raised, and the next runs."""
     tenancy.set_tenant("acme")
-    from yoku.core.storage import backfill, unified_users
+    from yoku.db import backfill, unified_users
     from yoku.pipeline import embed as embed_mod
     from yoku.pipeline import entity_links, pr_to_jira, unify
 

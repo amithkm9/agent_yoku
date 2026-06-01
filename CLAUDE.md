@@ -10,12 +10,12 @@ This codebase is **schema-driven**. Three registries are the single source of
 truth — the agent tools read everything from them, nothing about a collection is
 hardcoded in the tool layer:
 
-- **Pydantic models** (`yoku/models/`) — each collection's description
+- **Pydantic models** (`yoku/schemas/`) — each collection's description
   (the model docstring) + its fields (`description` + `display`/`filterable`).
 - **Source registry** (`yoku/agent/sources.py`) — one `SourceSpec` per
   source, key-routing facts only: `name`, `collection`, `label`, `key_pattern` +
   `key_example`, `sort_field` (recency), and `embeddable` (in the semantic index).
-- **Relationship registry** (`yoku/agent/relationships.yaml`) —
+- **Relationship registry** (`yoku/schemas/relationships.yaml`) —
   cross-collection joins.
 
 So: **to add or change a data source, edit the registries — never the tools or
@@ -29,10 +29,10 @@ To add a connector, follow the recipe: `docs/adding-a-connector.md`.
 ## Layout (the parts you'll touch)
 
 - `yoku/connectors/<source>/` — one folder per external source (auto-discovered)
-- `yoku/models/` — Pydantic DTOs = collection schemas
+- `yoku/schemas/` — Pydantic DTOs = collection schemas
 - `yoku/agent/` — the deepagent: `tools.py`, `sources.py`,
-  `schema_registry.py`, `relationships.yaml`, `agent.py`
-- `yoku/routers/` — FastAPI routes  ·  `yoku/storage/mongo.py` — tenant-aware accessors
+  `schema_registry.py`, `agent.py`
+- `yoku/routers/` — FastAPI routes  ·  `yoku/db/mongo.py` — tenant-aware accessors
 - `yoku/cli.py` — Click CLI (`yoku …`)
 - `web/` — React (Vite + TS) frontend
 - `tests/` — pytest

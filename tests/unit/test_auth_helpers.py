@@ -8,13 +8,13 @@ import pytest
 from fastapi import HTTPException
 from jose import jwt
 
-from yoku.core.auth import (
+from yoku.auth import (
     _decode,
     hash_password,
     make_token,
     verify_password,
 )
-from yoku.core.config import settings
+from yoku.config import settings
 
 
 @pytest.mark.unit

@@ -58,8 +58,8 @@ def _reset_rate_limiter():
     API tests deterministic regardless of how many run before them.
     """
     try:
-        from yoku.api.main import app
-        from yoku.core.middleware.rate_limit import RateLimit
+        from yoku.main import app
+        from yoku.middleware.rate_limit import RateLimit
     except Exception:
         yield
         return
@@ -81,7 +81,7 @@ def isolated_index(monkeypatch):
     exercise the rerank path stub `tools.rerank` themselves.
     """
     from yoku.agent import tools
-    from yoku.core.storage import tenancy
+    from yoku.db import tenancy
 
     monkeypatch.setattr(tools, "_INDEXES", {})
     monkeypatch.setattr(tools, "rerank", lambda *a, **k: None)
