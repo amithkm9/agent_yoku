@@ -358,6 +358,7 @@ from yoku.agent.tools._registry import discover_tools  # noqa: E402
 from yoku.agent.tools.mongo import (  # noqa: E402,F401
     _validate_pipeline,
     describe_collection,
+    describe_collections,
     list_collections,
     mongo_count,
     mongo_query,
@@ -371,9 +372,10 @@ def get_all_tools() -> list[BaseTool]:
     """The agent's full toolkit, assembled by auto-discovery.
 
     Source-agnostic: the generic mongo tools (`list_collections`,
-    `describe_collection`, `mongo_count`, `mongo_query`) plus `semantic_search`
-    all work across every registered source, so adding a connector needs no
-    change here — and adding a tool file is picked up without editing any list.
+    `describe_collection`, `describe_collections`, `mongo_count`, `mongo_query`)
+    plus `semantic_search` all work across every registered source, so adding a
+    connector needs no change here — and adding a tool file is picked up without
+    editing any list.
     """
     return discover_tools()
 

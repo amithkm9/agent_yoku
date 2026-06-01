@@ -264,20 +264,22 @@ def describe_collection(collection: str, sample_size: int = 20) -> dict:
          "filter_arg"?, "filter_kind"?, "identity"?, "enum"?, "links_to"?,
          "examples": [...]}}} or {"error": str}.
     """
+    return _describe_one(collection, sample_size)
+
+
+def _describe_one(collection: str, sample_size: int) -> dict:
+    """Core of describe_collection, callable without the @tool wrapper."""
     try:
         coll = _t.get_collection(collection)
     except ValueError as e:
         return {"error": str(e), "allowed": sorted(_t.ALLOWED_COLLECTIONS)}
     n = max(1, min(int(sample_size), 100))
-
     specs = field_specs(collection)
     if not specs:
         return _describe_by_sampling(coll, collection, n)
-
     examples = _sample_examples(coll, n, {s.name for s in specs})
     links = _field_links(collection)
     fields = {s.name: _field_entry(s, links, examples) for s in specs}
-
     out: dict[str, Any] = {
         "collection": collection,
         "description": collection_description(collection),
@@ -289,6 +291,29 @@ def describe_collection(collection: str, sample_size: int = 20) -> dict:
         out["source"] = spec.name
         out["key_example"] = spec.key_example
     return out
+
+
+@tool
+def describe_collections(collections: list[str], sample_size: int = 20) -> dict:
+    """Return the schema for one or more collections in a single call.
+
+    Pass a list of collection names; each is described in the same detail as
+    `describe_collection`. Call this with all collections you need before
+    composing queries — the LLM can batch them here instead of round-tripping
+    one at a time.
+
+    Args:
+        collections: one or more names from the known collection list
+            (e.g. ["jira_tickets", "github_prs"]).
+        sample_size: docs sampled per collection for example values (default 20,
+            max 100).
+
+    Returns:
+        {"results": {collection_name: schema_dict, ...}} where each schema_dict
+        matches the shape of describe_collection, or has an "error" key on
+        failure for that collection.
+    """
+    return {"results": {name: _describe_one(name, sample_size) for name in collections}}
 
 
 @tool
