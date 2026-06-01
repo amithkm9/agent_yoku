@@ -28,6 +28,7 @@ class SourceSpec:
     key_example: str  # human-friendly example key, e.g. "AS-4163"
     sort_field: str = "updated"  # recency field for sort / since_days
     embeddable: bool = True  # appears in the semantic index
+    routable: bool = True  # key shape is matched by source_for_key
 
 
 _JIRA = SourceSpec(
@@ -52,8 +53,22 @@ _SLACK = SourceSpec(
     key_example="C0AB123/1700000000.123456",
 )
 
+#: The canonical cross-source collection (Way B). Its keys are namespaced
+#: `provider/native_key`, which overlaps the per-source key shapes above, so it
+#: is registered for discovery/filtering but marked non-routable to keep
+#: `source_for_key` unambiguous.
+_DOCUMENTS = SourceSpec(
+    name="documents",
+    collection="documents",
+    label="Canonical document",
+    key_pattern=r"^[a-z]+/",  # provider/native_key — informational; not routed
+    key_example="github/AsatoCorp/agent-svc#173",
+    embeddable=False,
+    routable=False,
+)
+
 #: The registry. Append a SourceSpec here to onboard a new queryable source.
-SOURCES: tuple[SourceSpec, ...] = (_JIRA, _GITHUB, _SLACK)
+SOURCES: tuple[SourceSpec, ...] = (_JIRA, _GITHUB, _SLACK, _DOCUMENTS)
 
 _BY_NAME: dict[str, SourceSpec] = {s.name: s for s in SOURCES}
 _BY_COLLECTION: dict[str, SourceSpec] = {s.collection: s for s in SOURCES}
@@ -80,13 +95,29 @@ def _compiled(pattern: str) -> re.Pattern[str]:
     return re.compile(pattern)
 
 
-def source_for_key(key: str) -> SourceSpec | None:
-    """Identify which source a key belongs to by its shape (first match wins).
+def _is_canonical_prefix(key: str) -> bool:
+    """True if `key` is a canonical `provider/native_key` (documents) key.
 
-    Patterns are mutually exclusive: a '#' marks a PR, a 'channel/ts' marks a
-    Slack message, a 'AS-123' marks a ticket.
+    Such keys overlap the per-source shapes (e.g. `github/owner/repo#1` matches
+    GitHub's `#\\d+$`), so they must be excluded from per-source routing.
     """
+    head, sep, _ = key.partition("/")
+    return bool(sep) and head in _BY_NAME
+
+
+def source_for_key(key: str) -> SourceSpec | None:
+    """Identify which per-source collection a key belongs to by its shape.
+
+    Per-source patterns are mutually exclusive: a '#' marks a PR, a
+    'channel/ts' marks a Slack message, an 'AS-123' marks a ticket. Canonical
+    `provider/native_key` keys (the `documents` collection) are not routed —
+    they overlap the per-source shapes — so they return None here.
+    """
+    if _is_canonical_prefix(key):
+        return None
     for spec in SOURCES:
+        if not spec.routable:
+            continue
         if _compiled(spec.key_pattern).search(key):
             return spec
     return None

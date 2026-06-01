@@ -64,6 +64,11 @@ web-lint:
 web-build:
 	cd web && npm run build
 
+models:
+	$(PY) scripts/generate_models.py
+	$(PY) -m ruff check --fix yoku/core/models/_generated >/dev/null 2>&1 || true
+	$(PY) -m black yoku/core/models/_generated
+
 schemas:
 	$(PY) scripts/dump_schemas.py
 

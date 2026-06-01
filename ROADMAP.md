@@ -458,10 +458,16 @@ The core intelligence infrastructure is correct today and does not change:
 
 ## Migration Path (No Big Bang)
 
-1. Unified `documents` collection + `UnifiedDoc` contract
-2. JIRA + GitHub + Slack connectors write to both existing collections AND `documents`
+1. ✅ Unified `documents` collection + `UnifiedDoc` contract
+2. ✅ JIRA + GitHub + Slack projected into `documents` via per-source mappers and the
+   `unify` pass (run from `refresh-all` and the background scheduler). Done as a
+   separate projection step rather than dual-writing from each connector's ingest, so
+   the change stays additive and reversible; canonical docs reuse the per-source
+   embedding (no re-embedding).
 3. REST ingest API — external pipelines can push immediately
-4. Generic domain tools alongside existing source-specific tools
+4. ◻ Generic domain tools alongside existing source-specific tools — `documents` is
+   registered (queryable + filterable by `domain`/`type`/`provider`) and held out of
+   per-source key routing; wiring it into the semantic index is the next step.
 5. Tier-1 connectors (CI/CD + deploy, incidents, errors, docs) — driven by first tenant needs
 6. `entity_links` collection + `extract_links` pipeline
 7. Connector **write path** + `actions_taken` ledger (idempotency)

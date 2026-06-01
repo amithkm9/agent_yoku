@@ -115,8 +115,17 @@ def _ingest_connector(name: str) -> bool:
     return True
 
 
+def _best_effort(step: str, fn: Callable[[], object]) -> None:
+    """Run a post-ingest projection step, logging (not raising) on failure."""
+    try:
+        fn()
+    except Exception:
+        log.exception("post-ingest step %r failed for tenant=%s", step, tenancy.current_tenant())
+
+
 def _run_post_ingest_pipeline() -> None:
-    """Embed deltas, unify users, link PRs to JIRA, backfill author emails.
+    """Embed deltas, unify users, link PRs to JIRA, backfill author emails,
+    then project everything into the canonical `documents` collection.
 
     Operates on whichever tenant is currently bound. Same order as the
     `refresh-all` CLI.
@@ -124,6 +133,8 @@ def _run_post_ingest_pipeline() -> None:
     from yoku.core.storage import backfill, unified_users
     from yoku.pipeline import embed as embed_mod
     from yoku.pipeline import pr_to_jira
+    from yoku.pipeline.entity_links import build_entity_links
+    from yoku.pipeline.unify import unify_all
 
     with _clean_argv("embed"):
         embed_mod.main()
@@ -131,6 +142,10 @@ def _run_post_ingest_pipeline() -> None:
     with _clean_argv("link"):
         pr_to_jira.main()
     backfill.main()
+    # Canonical projection (Way B) is best-effort: a failure here must not
+    # discard the core refresh that already succeeded above.
+    _best_effort("unify", unify_all)
+    _best_effort("entity_links", build_entity_links)
 
 
 def list_tenant_ids() -> list[str]:

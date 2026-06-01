@@ -137,6 +137,37 @@ def slack_users_collection() -> Collection:
     )
 
 
+def documents_collection() -> Collection:
+    """The unified canonical collection (Way B); populated by `pipeline.unify`."""
+    return _ensure(
+        _db()["documents"],
+        [
+            IndexModel("key", unique=True),
+            IndexModel("domain"),
+            IndexModel("provider"),
+            IndexModel("refs"),
+            IndexModel([("updated", DESCENDING)]),
+        ],
+    )
+
+
+def entity_links_collection() -> Collection:
+    """Typed cross-source edges (Way B); derived from canonical doc `refs`.
+
+    One row per (from_key, to_key) edge, deduped by that pair so re-runs are
+    idempotent. Populated by `pipeline.entity_links`.
+    """
+    return _ensure(
+        _db()["entity_links"],
+        [
+            IndexModel([("from_key", ASCENDING), ("to_key", ASCENDING)], unique=True),
+            IndexModel("from_key"),
+            IndexModel("to_key"),
+            IndexModel("link_type"),
+        ],
+    )
+
+
 ALLOWED_COLLECTIONS = {
     "jira_tickets": tickets_collection,
     "users": users_collection,
@@ -145,6 +176,8 @@ ALLOWED_COLLECTIONS = {
     "unified_users": unified_users_collection,
     "slack_messages": slack_messages_collection,
     "slack_users": slack_users_collection,
+    "documents": documents_collection,
+    "entity_links": entity_links_collection,
 }
 
 

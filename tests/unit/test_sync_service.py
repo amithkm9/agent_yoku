@@ -122,6 +122,53 @@ def test_pipeline_runs_post_steps_and_reindexes(monkeypatch, reset_tenant):
     assert order == ["post", ("index", "acme")]
 
 
+# ---------- _run_post_ingest_pipeline ----------
+
+
+def test_post_ingest_pipeline_runs_unify_then_entity_links(monkeypatch):
+    """Every post-ingest step runs; unify then entity_links close out the pipeline."""
+    from yoku.core.storage import backfill, unified_users
+    from yoku.pipeline import embed as embed_mod
+    from yoku.pipeline import entity_links, pr_to_jira, unify
+
+    order: list[str] = []
+    monkeypatch.setattr(embed_mod, "main", lambda: order.append("embed"))
+    monkeypatch.setattr(unified_users, "main", lambda: order.append("unify_users"))
+    monkeypatch.setattr(pr_to_jira, "main", lambda: order.append("link"))
+    monkeypatch.setattr(backfill, "main", lambda: order.append("backfill"))
+    monkeypatch.setattr(unify, "unify_all", lambda: order.append("unify_docs"))
+    monkeypatch.setattr(entity_links, "build_entity_links", lambda: order.append("entity_links"))
+
+    sync_service._run_post_ingest_pipeline()
+
+    assert order == ["embed", "unify_users", "link", "backfill", "unify_docs", "entity_links"]
+
+
+def test_post_ingest_projection_failure_is_best_effort(monkeypatch, reset_tenant):
+    """A failing canonical-projection step is logged, not raised, and the next runs."""
+    tenancy.set_tenant("acme")
+    from yoku.core.storage import backfill, unified_users
+    from yoku.pipeline import embed as embed_mod
+    from yoku.pipeline import entity_links, pr_to_jira, unify
+
+    ran: list[str] = []
+    monkeypatch.setattr(embed_mod, "main", lambda: ran.append("embed"))
+    monkeypatch.setattr(unified_users, "main", lambda: ran.append("unify_users"))
+    monkeypatch.setattr(pr_to_jira, "main", lambda: ran.append("link"))
+    monkeypatch.setattr(backfill, "main", lambda: ran.append("backfill"))
+
+    def boom():
+        raise RuntimeError("mongo down")
+
+    monkeypatch.setattr(unify, "unify_all", boom)
+    monkeypatch.setattr(entity_links, "build_entity_links", lambda: ran.append("entity_links"))
+
+    # Must not raise even though unify blew up; entity_links still runs.
+    sync_service._run_post_ingest_pipeline()
+
+    assert ran == ["embed", "unify_users", "link", "backfill", "entity_links"]
+
+
 # ---------- run_all_tenants ----------
 
 

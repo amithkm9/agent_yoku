@@ -7,15 +7,27 @@ hardcoded in the tool layer. They are *not* used to validate every mongo read
 """
 
 from yoku.core.models.directory import GitHubUser, JiraUser, SlackUser
+from yoku.core.models.entity_link import EntityLink
 from yoku.core.models.github import GitHubPR, PRStatus
 from yoku.core.models.jira import JiraTicket, LinkedPR
 from yoku.core.models.session import ChatMessage, ChatSession
 from yoku.core.models.slack import SlackMessage
+from yoku.core.models.unified import (
+    BaseDoc,
+    Conversation,
+    Primitive,
+    PullRequest,
+    UnifiedDoc,
+    WorkItem,
+)
 from yoku.core.models.user import GitHubUserBlock, JiraUserBlock, UnifiedUser
 
 __all__ = [
+    "BaseDoc",
     "ChatMessage",
     "ChatSession",
+    "Conversation",
+    "EntityLink",
     "GitHubPR",
     "GitHubUser",
     "GitHubUserBlock",
@@ -24,7 +36,11 @@ __all__ = [
     "JiraUserBlock",
     "LinkedPR",
     "PRStatus",
+    "Primitive",
+    "PullRequest",
     "SlackMessage",
     "SlackUser",
+    "UnifiedDoc",
     "UnifiedUser",
+    "WorkItem",
 ]

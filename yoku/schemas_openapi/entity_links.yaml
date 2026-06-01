@@ -1,0 +1,54 @@
+openapi: 3.1.0
+info:
+  title: Entity Links (Way B chain graph)
+  version: 1.0.0
+  description: >-
+    Typed cross-source edges between canonical documents. One row per directed
+    (from_key, to_key) edge, derived from each canonical document's `refs`. Join
+    from_key/to_key against documents.key to walk the delivery chain.
+
+components:
+  schemas:
+
+    EntityLink:
+      type: object
+      x-config: {extra: allow}
+      description: >-
+        Typed cross-source edges between canonical documents — the chain graph.
+        One row per directed (from_key, to_key) edge, derived from each canonical
+        document's `refs`. Join from_key/to_key against documents.key to walk the
+        delivery chain (a PR implements a ticket, a Slack message discusses one).
+      required: [from_key, to_key]
+      properties:
+        from_key:
+          type: string
+          description: "Canonical key of the referring document, e.g. 'github/AsatoCorp/agent-svc#173'."
+          x-display: true
+          x-filter-arg: from_key
+        to_key:
+          type: string
+          description: "Canonical key of the referenced document, e.g. 'jira/AS-1234'."
+          x-display: true
+          x-filter-arg: to_key
+        link_type:
+          type: string
+          default: references
+          description: >-
+            Edge type: 'implements' | 'discusses' | 'tracks' | 'documents' |
+            'relates_to' | 'references'.
+          x-display: true
+          x-filter-arg: link_type
+        context:
+          type: string
+          description: Short human-readable reason the edge exists.
+        confidence:
+          type: number
+          default: 1.0
+          description: Extractor confidence in [0, 1].
+          x-display: true
+        extractor:
+          type: string
+          default: refs
+          description: "How the edge was derived: 'refs' | 'regex' | 'metadata' | 'llm'."
+          x-display: true
+          x-filter-arg: extractor

@@ -17,12 +17,14 @@ from typing import Any
 from pydantic import BaseModel
 
 from yoku.core.models import (
+    EntityLink,
     GitHubPR,
     GitHubUser,
     JiraTicket,
     JiraUser,
     SlackMessage,
     SlackUser,
+    UnifiedDoc,
     UnifiedUser,
 )
 
@@ -40,6 +42,8 @@ COLLECTION_MODELS: dict[str, type[BaseModel]] = {
     "unified_users": UnifiedUser,
     "slack_messages": SlackMessage,
     "slack_users": SlackUser,
+    "documents": UnifiedDoc,
+    "entity_links": EntityLink,
 }
 
 

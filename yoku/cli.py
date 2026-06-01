@@ -140,6 +140,25 @@ def unify_users() -> None:
     mod.main()
 
 
+@cli.command("entity-links")
+def entity_links_cmd() -> None:
+    """Derive cross-source entity_links from canonical document refs."""
+    from yoku.pipeline.entity_links import build_entity_links
+
+    total = build_entity_links()
+    click.echo(f"built {total} entity links")
+
+
+@cli.command("unify")
+def unify_cmd() -> None:
+    """Project all source collections into the unified `documents` collection (Way B)."""
+    from yoku.pipeline.unify import unify_all
+
+    counts = unify_all()
+    for source, n in counts.items():
+        click.echo(f"  {source:18s} -> documents  {n:>8d}")
+
+
 @cli.command("backfill-pr-emails")
 def backfill_pr_emails() -> None:
     """Backfill author_email / assignee_email on PR docs from unified_users."""
@@ -189,6 +208,14 @@ def refresh_all(skip_jira: bool, skip_github: bool) -> None:
     from yoku.core.storage import backfill
 
     backfill.main()
+    click.secho("→ unify (canonical documents)", fg="cyan")
+    from yoku.pipeline.unify import unify_all
+
+    unify_all()
+    click.secho("→ entity-links (cross-source edges)", fg="cyan")
+    from yoku.pipeline.entity_links import build_entity_links
+
+    build_entity_links()
     click.secho("✓ refresh-all done", fg="green")
 
 
