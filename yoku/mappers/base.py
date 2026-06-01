@@ -1,8 +1,9 @@
-"""Mapper contract — project a source's stored doc into a `UnifiedDoc`.
+"""Mapper contract — project a source's stored doc into a typed canonical primitive.
 
 A mapper is the Way B equivalent of asato's `dm-*` step, but in-process: a pure
-function `stored source doc (dict) -> UnifiedDoc`. It does no I/O — it only
-restamps an already-ingested document into the canonical shape and primitive.
+function `stored source doc (dict) -> WorkItem | PullRequest | Conversation`. It
+does no I/O — it only restamps an already-ingested document into the canonical
+shape and primitive.
 
 Keys live in one namespace, `provider/native_key`, so a `refs` entry on one doc
 points at another doc's `key` regardless of which source either came from.
@@ -12,11 +13,10 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from yoku.schemas import BaseDoc
+from yoku.schemas import Conversation, PullRequest, WorkItem
 
-#: A mapper turns one stored source document into one typed canonical primitive
-#: (a `BaseDoc` subclass: WorkItem / PullRequest / Conversation).
-Mapper = Callable[[dict], BaseDoc]
+#: A mapper turns one stored source document into one typed canonical primitive.
+Mapper = Callable[[dict], WorkItem | PullRequest | Conversation]
 
 
 def canonical_key(provider: str, native_key: str) -> str:

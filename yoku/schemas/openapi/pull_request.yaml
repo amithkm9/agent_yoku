@@ -10,45 +10,102 @@ components:
     PullRequest:
       description: Code that does the work — GitHub PR, GitLab MR, Bitbucket PR.
       x-config: {extra: allow}
-      allOf:
-        - $ref: './base.yaml#/components/schemas/BaseDoc'
-        - type: object
-          properties:
-            repo:
-              type: string
-              description: "Full repo name, e.g. 'AsatoCorp/agent-svc'."
-              x-display: true
-              x-filter-arg: repo
-              x-normalize: gh_repo
-            number:
-              type: integer
-              description: PR number within the repo.
-            merged:
-              type: boolean
-              default: false
-              description: Whether the PR was merged.
-              x-display: true
-              x-filter-arg: merged
-            is_draft:
-              type: boolean
-              default: false
-              description: Whether the PR is a draft.
-              x-filter-arg: is_draft
-            base:
-              type: string
-              description: Base branch.
-            head:
-              type: string
-              description: Head branch.
-            merged_at:
-              type: string
-              description: ISO-8601 merge timestamp.
-            comments_count:
-              type: integer
-              default: 0
-              description: Number of review/issue comments.
-            labels:
-              type: array
-              items: {type: string}
-              description: PR labels.
-              x-filter-arg: label
+      required: [key, provider, domain]
+      properties:
+        key:
+          type: string
+          description: "Canonical key 'provider/native_key', e.g. 'github/AsatoCorp/agent-svc#173'."
+          x-display: true
+        provider:
+          type: string
+          description: "Source system that produced this doc, e.g. 'github'."
+          x-display: true
+          x-filter-arg: provider
+        domain:
+          type: string
+          description: The primitive / kind this doc belongs to.
+          x-display: true
+          x-filter-arg: domain
+          x-enum-values: [work_item, pull_request, conversation, document, event, person]
+        type:
+          type: string
+          description: "Variant within the primitive, e.g. 'pr'."
+          x-display: true
+          x-filter-arg: type
+        title:
+          type: string
+          description: Short title / summary.
+          x-display: true
+        body:
+          type: string
+          description: Full text body.
+        author:
+          type: string
+          description: Author / owner — canonical email or login (auto-resolved).
+          x-display: true
+          x-filter-arg: author
+          x-filter-kind: user
+        status:
+          type: string
+          description: "Domain-normalized status, e.g. 'merged' | 'open'."
+          x-display: true
+          x-filter-arg: status
+        url:
+          type: string
+          description: Browser URL for the item.
+          x-display: true
+        created:
+          type: string
+          description: ISO-8601 (or source-native) creation timestamp.
+        updated:
+          type: string
+          description: ISO-8601 (or source-native) last-updated timestamp.
+          x-display: true
+        refs:
+          type: array
+          items: {type: string}
+          description: Canonical keys of linked items across sources.
+          x-display: true
+          x-filter-arg: has_refs
+          x-filter-kind: has_refs
+        text:
+          type: string
+          description: Embed-ready blob (title + body).
+        repo:
+          type: string
+          description: "Full repo name, e.g. 'AsatoCorp/agent-svc'."
+          x-display: true
+          x-filter-arg: repo
+          x-normalize: gh_repo
+        number:
+          type: integer
+          description: PR number within the repo.
+        merged:
+          type: boolean
+          default: false
+          description: Whether the PR was merged.
+          x-display: true
+          x-filter-arg: merged
+        is_draft:
+          type: boolean
+          default: false
+          description: Whether the PR is a draft.
+          x-filter-arg: is_draft
+        base:
+          type: string
+          description: Base branch.
+        head:
+          type: string
+          description: Head branch.
+        merged_at:
+          type: string
+          description: ISO-8601 merge timestamp.
+        comments_count:
+          type: integer
+          default: 0
+          description: Number of review/issue comments.
+        labels:
+          type: array
+          items: {type: string}
+          description: PR labels.
+          x-filter-arg: label

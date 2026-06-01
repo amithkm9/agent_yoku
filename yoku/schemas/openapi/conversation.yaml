@@ -10,27 +10,84 @@ components:
     Conversation:
       description: People exchanging text over time — Slack/Teams message, email, transcript.
       x-config: {extra: allow}
-      allOf:
-        - $ref: './base.yaml#/components/schemas/BaseDoc'
-        - type: object
-          properties:
-            channel:
-              type: string
-              description: "Channel name without '#', e.g. 'engineering'."
-              x-display: true
-              x-filter-arg: channel
-            channel_id:
-              type: string
-              description: Native channel id.
-            channel_type:
-              type: string
-              description: "Conversation medium: 'channel' | 'dm' | 'email' | 'meeting'."
-              x-filter-arg: channel_type
-            thread_ts:
-              type: string
-              description: Parent thread timestamp, if a reply.
-              x-display: true
-            reply_count:
-              type: integer
-              default: 0
-              description: Number of thread replies.
+      required: [key, provider, domain]
+      properties:
+        key:
+          type: string
+          description: "Canonical key 'provider/native_key', e.g. 'slack/C123/1234567890.123456'."
+          x-display: true
+        provider:
+          type: string
+          description: "Source system that produced this doc, e.g. 'slack'."
+          x-display: true
+          x-filter-arg: provider
+        domain:
+          type: string
+          description: The primitive / kind this doc belongs to.
+          x-display: true
+          x-filter-arg: domain
+          x-enum-values: [work_item, pull_request, conversation, document, event, person]
+        type:
+          type: string
+          description: "Variant within the primitive, e.g. 'message'."
+          x-display: true
+          x-filter-arg: type
+        title:
+          type: string
+          description: Short title / summary.
+          x-display: true
+        body:
+          type: string
+          description: Full text body.
+        author:
+          type: string
+          description: Author / owner — canonical email or login (auto-resolved).
+          x-display: true
+          x-filter-arg: author
+          x-filter-kind: user
+        status:
+          type: string
+          description: "Domain-normalized status."
+          x-display: true
+          x-filter-arg: status
+        url:
+          type: string
+          description: Browser URL for the item.
+          x-display: true
+        created:
+          type: string
+          description: ISO-8601 (or source-native) creation timestamp.
+        updated:
+          type: string
+          description: ISO-8601 (or source-native) last-updated timestamp.
+          x-display: true
+        refs:
+          type: array
+          items: {type: string}
+          description: Canonical keys of linked items across sources.
+          x-display: true
+          x-filter-arg: has_refs
+          x-filter-kind: has_refs
+        text:
+          type: string
+          description: Embed-ready blob (title + body).
+        channel:
+          type: string
+          description: "Channel name without '#', e.g. 'engineering'."
+          x-display: true
+          x-filter-arg: channel
+        channel_id:
+          type: string
+          description: Native channel id.
+        channel_type:
+          type: string
+          description: "Conversation medium: 'channel' | 'dm' | 'email' | 'meeting'."
+          x-filter-arg: channel_type
+        thread_ts:
+          type: string
+          description: Parent thread timestamp, if a reply.
+          x-display: true
+        reply_count:
+          type: integer
+          default: 0
+          description: Number of thread replies.

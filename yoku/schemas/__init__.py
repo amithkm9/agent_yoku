@@ -13,17 +13,14 @@ from yoku.schemas.jira import JiraTicket, LinkedPR
 from yoku.schemas.session import ChatMessage, ChatSession
 from yoku.schemas.slack import SlackMessage
 from yoku.schemas.unified import (
-    BaseDoc,
     Conversation,
     Primitive,
     PullRequest,
-    UnifiedDoc,
     WorkItem,
 )
 from yoku.schemas.user import GitHubUserBlock, JiraUserBlock, UnifiedUser
 
 __all__ = [
-    "BaseDoc",
     "ChatMessage",
     "ChatSession",
     "Conversation",
@@ -40,7 +37,6 @@ __all__ = [
     "PullRequest",
     "SlackMessage",
     "SlackUser",
-    "UnifiedDoc",
     "UnifiedUser",
     "WorkItem",
 ]

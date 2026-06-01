@@ -1,4 +1,4 @@
-"""Mappers — project stored source docs into the canonical `UnifiedDoc`.
+"""Mappers — project stored source docs into typed canonical primitives.
 
 Add a vendor of an existing kind by writing one mapper and registering it here;
 nothing else changes. `SOURCE_MAPPERS` keys are source collection names.
@@ -11,7 +11,7 @@ from yoku.mappers.github import map_github_pr
 from yoku.mappers.jira import map_jira_ticket
 from yoku.mappers.slack import map_slack_message
 
-#: source collection -> mapper that projects its docs into a UnifiedDoc.
+#: source collection -> mapper that projects its docs into a typed canonical primitive.
 SOURCE_MAPPERS: dict[str, Mapper] = {
     "dc-jira": map_jira_ticket,
     "dc-github": map_github_pr,

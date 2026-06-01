@@ -6,17 +6,61 @@
 
 from __future__ import annotations
 
-from pydantic import ConfigDict
+from pydantic import BaseModel, ConfigDict
 
 from yoku.schemas._fields import doc_field
-from yoku.schemas._generated.base import BaseDoc
 
 
-class PullRequest(BaseDoc):
+class PullRequest(BaseModel):
     """Code that does the work — GitHub PR, GitLab MR, Bitbucket PR."""
 
     model_config = ConfigDict(extra="allow")
 
+    key: str = doc_field(
+        "Canonical key 'provider/native_key', e.g. 'github/AsatoCorp/agent-svc#173'.",
+        default=...,
+        display=True,
+    )
+    provider: str = doc_field(
+        "Source system that produced this doc, e.g. 'github'.",
+        default=...,
+        display=True,
+        filter_arg="provider",
+    )
+    domain: str = doc_field(
+        "The primitive / kind this doc belongs to.",
+        default=...,
+        display=True,
+        enum=["work_item", "pull_request", "conversation", "document", "event", "person"],
+        filter_arg="domain",
+    )
+    type: str | None = doc_field(
+        "Variant within the primitive, e.g. 'pr'.", display=True, filter_arg="type"
+    )
+    title: str | None = doc_field("Short title / summary.", display=True)
+    body: str | None = doc_field("Full text body.")
+    author: str | None = doc_field(
+        "Author / owner — canonical email or login (auto-resolved).",
+        display=True,
+        filter_arg="author",
+        filter_kind="user",
+    )
+    status: str | None = doc_field(
+        "Domain-normalized status, e.g. 'merged' | 'open'.", display=True, filter_arg="status"
+    )
+    url: str | None = doc_field("Browser URL for the item.", display=True)
+    created: str | None = doc_field("ISO-8601 (or source-native) creation timestamp.")
+    updated: str | None = doc_field(
+        "ISO-8601 (or source-native) last-updated timestamp.", display=True
+    )
+    refs: list[str] = doc_field(
+        "Canonical keys of linked items across sources.",
+        default_factory=list,
+        display=True,
+        filter_arg="has_refs",
+        filter_kind="has_refs",
+    )
+    text: str | None = doc_field("Embed-ready blob (title + body).")
     repo: str | None = doc_field(
         "Full repo name, e.g. 'AsatoCorp/agent-svc'.",
         display=True,

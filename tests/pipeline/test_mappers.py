@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+from yoku.constants import Primitive
 from yoku.mappers import (
     map_github_pr,
     map_jira_ticket,
     map_slack_message,
 )
-from yoku.schemas import Conversation, Primitive, PullRequest, WorkItem
+from yoku.schemas import Conversation, PullRequest, WorkItem
 
 
 def test_github_pr_maps_to_typed_pull_request():

@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from yoku.constants import Primitive
 from yoku.mappers.base import canonical_key, embed_text, ref
-from yoku.schemas import Primitive, PullRequest
+from yoku.schemas import PullRequest
 
 PROVIDER = "github"
 

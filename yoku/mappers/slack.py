@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from yoku.constants import Primitive
 from yoku.mappers.base import canonical_key, ref
-from yoku.schemas import Conversation, Primitive
+from yoku.schemas import Conversation
 
 PROVIDER = "slack"
 

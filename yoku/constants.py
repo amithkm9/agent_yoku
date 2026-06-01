@@ -6,6 +6,8 @@ referenced across multiple modules or are likely to need tuning.
 
 from __future__ import annotations
 
+from enum import StrEnum
+
 # ---------------------------------------------------------------------------
 # Embedding
 # ---------------------------------------------------------------------------
@@ -55,3 +57,14 @@ DEFAULT_DONE_STATUSES: frozenset[str] = frozenset(
         "Moved to UAT",
     }
 )
+
+
+class Primitive(StrEnum):
+    """The canonical primitive kinds the agent reasons over (the `domain` field)."""
+
+    WORK_ITEM = "work_item"
+    PULL_REQUEST = "pull_request"
+    CONVERSATION = "conversation"
+    DOCUMENT = "document"
+    EVENT = "event"
+    PERSON = "person"

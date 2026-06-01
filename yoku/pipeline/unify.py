@@ -1,9 +1,9 @@
 """Project source collections into the canonical ds-* collections.
 
 This is the Way B projection step. It reads each already-ingested dc-* source
-collection, runs its mapper, and upserts canonical UnifiedDocs into the
-appropriate ds-* collection based on `domain` — keyed by canonical key, so
-re-runs are idempotent.
+collection, runs its mapper, and upserts canonical primitives (WorkItem /
+PullRequest / Conversation) into the appropriate ds-* collection based on
+`domain` — keyed by canonical key, so re-runs are idempotent.
 
 It is deliberately a separate pass (not wired into each connector's ingest hot
 path) so adopting Way B is additive and reversible: the source collections,

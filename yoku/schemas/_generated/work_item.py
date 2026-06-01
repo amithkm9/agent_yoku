@@ -6,17 +6,59 @@
 
 from __future__ import annotations
 
-from pydantic import ConfigDict
+from pydantic import BaseModel, ConfigDict
 
 from yoku.schemas._fields import doc_field
-from yoku.schemas._generated.base import BaseDoc
 
 
-class WorkItem(BaseDoc):
+class WorkItem(BaseModel):
     """A unit of tracked work — Jira/Linear ticket, GitHub issue, incident, epic."""
 
     model_config = ConfigDict(extra="allow")
 
+    key: str = doc_field(
+        "Canonical key 'provider/native_key', e.g. 'jira/AS-1234'.", default=..., display=True
+    )
+    provider: str = doc_field(
+        "Source system that produced this doc, e.g. 'jira'.",
+        default=...,
+        display=True,
+        filter_arg="provider",
+    )
+    domain: str = doc_field(
+        "The primitive / kind this doc belongs to.",
+        default=...,
+        display=True,
+        enum=["work_item", "pull_request", "conversation", "document", "event", "person"],
+        filter_arg="domain",
+    )
+    type: str | None = doc_field(
+        "Variant within the primitive, e.g. 'ticket' | 'incident'.", display=True, filter_arg="type"
+    )
+    title: str | None = doc_field("Short title / summary.", display=True)
+    body: str | None = doc_field("Full text body.")
+    author: str | None = doc_field(
+        "Author / owner — canonical email or login (auto-resolved).",
+        display=True,
+        filter_arg="author",
+        filter_kind="user",
+    )
+    status: str | None = doc_field(
+        "Domain-normalized status, e.g. 'Done' | 'open'.", display=True, filter_arg="status"
+    )
+    url: str | None = doc_field("Browser URL for the item.", display=True)
+    created: str | None = doc_field("ISO-8601 (or source-native) creation timestamp.")
+    updated: str | None = doc_field(
+        "ISO-8601 (or source-native) last-updated timestamp.", display=True
+    )
+    refs: list[str] = doc_field(
+        "Canonical keys of linked items across sources.",
+        default_factory=list,
+        display=True,
+        filter_arg="has_refs",
+        filter_kind="has_refs",
+    )
+    text: str | None = doc_field("Embed-ready blob (title + body).")
     priority: str | None = doc_field("Priority, e.g. 'High'.", display=True, filter_arg="priority")
     issue_type: str | None = doc_field(
         "Issue type, e.g. 'Task' | 'Story' | 'Bug' | 'Epic' | 'Incident'.",

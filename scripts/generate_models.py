@@ -11,9 +11,8 @@ Run via `make models` (or `python scripts/generate_models.py`).
 Supported OpenAPI subset (enough for the canonical models, kept deliberately
 small): object schemas with `properties`, `required`, scalar/array types, and
 `allOf` with local `$ref`s — which become Python class inheritance. The custom
-`x-` field extensions map onto `doc_field` kwargs; `x-enums` renders StrEnums.
-Cross-file `$ref`s (e.g. `./base.yaml#/components/schemas/BaseDoc`) are resolved
-as Python imports from the corresponding generated module.
+`x-` field extensions map onto `doc_field` kwargs; `x-enum-values` emits a
+closed enum list on a field.
 """
 
 from __future__ import annotations
@@ -50,22 +49,6 @@ def _py_type(prop: dict[str, Any]) -> str:
 def _ref_name(ref: str) -> str:
     """'#/components/schemas/BaseDoc' -> 'BaseDoc'."""
     return ref.rsplit("/", 1)[-1]
-
-
-def _cross_file_imports(schemas: dict[str, Any]) -> dict[str, list[str]]:
-    """Returns {module_name: [ClassName, ...]} for cross-file $refs."""
-    by_module: dict[str, list[str]] = {}
-    for schema in schemas.values():
-        for part in schema.get("allOf", []):
-            ref = part.get("$ref", "")
-            if "#" in ref and not ref.startswith("#"):
-                file_part, fragment = ref.split("#", 1)
-                module = Path(file_part).stem
-                class_name = fragment.rsplit("/", 1)[-1]
-                by_module.setdefault(module, [])
-                if class_name not in by_module[module]:
-                    by_module[module].append(class_name)
-    return by_module
 
 
 def _local_props(node: dict[str, Any]) -> dict[str, Any]:
@@ -115,6 +98,8 @@ def _field_call(name: str, prop: dict[str, Any], required: bool, enum_ref: str |
         args.append("display=True")
     if enum_ref:
         args.append("enum=_PRIMITIVES")
+    if "x-enum-values" in prop:
+        args.append(f"enum={prop['x-enum-values']!r}")
     if "x-filter-arg" in prop:
         args.append(f"filter_arg={prop['x-filter-arg']!r}")
         if prop.get("x-filter-kind"):
@@ -123,15 +108,6 @@ def _field_call(name: str, prop: dict[str, Any], required: bool, enum_ref: str |
         args.append(f"normalize={prop['x-normalize']!r}")
 
     return f"    {name}: {ann} = doc_field({', '.join(args)})"
-
-
-def _render_enum(name: str, spec: dict[str, Any]) -> str:
-    lines = [f"class {name}(StrEnum):", f'    """{spec.get("description", name)}"""', ""]
-    for member, value in spec["values"].items():
-        lines.append(f'    {member} = "{value}"')
-    lines.append("")
-    lines.append(f"_PRIMITIVES = [p.value for p in {name}]")
-    return "\n".join(lines)
 
 
 def _render_class(name: str, node: dict[str, Any]) -> str:
@@ -177,25 +153,15 @@ def _topo_order(schemas: dict[str, Any]) -> list[str]:
 def _generate(spec_path: Path) -> Path:
     spec = yaml.safe_load(spec_path.read_text())
     schemas = spec["components"]["schemas"]
-    enums = spec.get("x-enums", {})
 
     parts: list[str] = [_BANNER, "", "from __future__ import annotations", ""]
-    if enums:
-        parts += ["from enum import StrEnum", ""]
     parts += [
         "from pydantic import BaseModel, ConfigDict",
         "",
         "from yoku.schemas._fields import doc_field",
         "",
+        "",
     ]
-    cross = _cross_file_imports(schemas)
-    for mod, classes in sorted(cross.items()):
-        parts.append(f"from yoku.schemas._generated.{mod} import {', '.join(sorted(classes))}")
-    if cross:
-        parts.append("")
-    parts.append("")
-    for ename, espec in enums.items():
-        parts += [_render_enum(ename, espec), "", ""]
     for cname in _topo_order(schemas):
         parts += [_render_class(cname, schemas[cname]), "", ""]
 
