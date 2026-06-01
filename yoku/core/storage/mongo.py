@@ -197,6 +197,16 @@ def auth_users_collection() -> Collection:
 
 
 # ---------------------------------------------------------------------------
+# Internal dc-* accessor map — for pipeline/embed code that reads raw collections
+DC_COLLECTIONS = {
+    "dc-jira": dc_jira_collection,
+    "dc-github": dc_github_collection,
+    "dc-slack": dc_slack_collection,
+    "dc-jira-users": dc_jira_users_collection,
+    "dc-github-users": dc_github_users_collection,
+    "dc-slack-users": dc_slack_users_collection,
+}
+
 # Agent read whitelist — only ds-* collections
 # ---------------------------------------------------------------------------
 

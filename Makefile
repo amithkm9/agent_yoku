@@ -73,7 +73,7 @@ schemas:
 	$(PY) scripts/dump_schemas.py
 
 agent-smoke:
-	$(PY) scripts/agent_smoke.py
+	$(PY) scripts/agent_smoke.py --tenant $(or $(TENANT),asato)
 
 retrieval-eval:
 	$(PY) scripts/retrieval_eval.py --tenant $(TENANT)

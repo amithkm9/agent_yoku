@@ -60,6 +60,7 @@ from yoku.core.config import (
     openai_client,
     settings,
 )
+from yoku.core.storage.mongo import DC_COLLECTIONS
 from yoku.core.logging import get_logger
 from yoku.core.storage.tenancy import current_tenant
 from yoku.core.utils import bson_safe
@@ -119,8 +120,9 @@ def _load_index() -> dict[str, Any]:
     docs: list[dict] = []
     counts: dict[str, int] = {}
     for spec in embeddable_sources():
+        coll = DC_COLLECTIONS[spec.collection]()
         rows = list(
-            get_collection(spec.collection).find(
+            coll.find(
                 {"embedding": {"$ne": None, "$exists": True}}, proj
             )
         )
@@ -254,7 +256,10 @@ def _fetch_texts(keys: list[str]) -> dict[str, str]:
             by_collection.setdefault(spec.collection, []).append(k)
     out: dict[str, str] = {}
     for collection, group in by_collection.items():
-        for d in get_collection(collection).find(
+        accessor = DC_COLLECTIONS.get(collection) or ALLOWED_COLLECTIONS.get(collection)
+        if not accessor:
+            continue
+        for d in accessor().find(
             {"key": {"$in": group}}, {"_id": 0, "key": 1, "text": 1}
         ):
             out[d["key"]] = d.get("text") or ""
