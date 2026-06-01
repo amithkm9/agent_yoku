@@ -1,0 +1,36 @@
+openapi: 3.1.0
+info:
+  title: Conversation
+  version: 1.0.0
+  description: People exchanging text over time — Slack/Teams message, email, transcript.
+
+components:
+  schemas:
+
+    Conversation:
+      description: People exchanging text over time — Slack/Teams message, email, transcript.
+      x-config: {extra: allow}
+      allOf:
+        - $ref: './base.yaml#/components/schemas/BaseDoc'
+        - type: object
+          properties:
+            channel:
+              type: string
+              description: "Channel name without '#', e.g. 'engineering'."
+              x-display: true
+              x-filter-arg: channel
+            channel_id:
+              type: string
+              description: Native channel id.
+            channel_type:
+              type: string
+              description: "Conversation medium: 'channel' | 'dm' | 'email' | 'meeting'."
+              x-filter-arg: channel_type
+            thread_ts:
+              type: string
+              description: Parent thread timestamp, if a reply.
+              x-display: true
+            reply_count:
+              type: integer
+              default: 0
+              description: Number of thread replies.

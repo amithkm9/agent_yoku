@@ -1,0 +1,48 @@
+openapi: 3.1.0
+info:
+  title: Work Item
+  version: 1.0.0
+  description: A unit of tracked work — Jira/Linear ticket, GitHub issue, incident, epic.
+
+components:
+  schemas:
+
+    WorkItem:
+      description: A unit of tracked work — Jira/Linear ticket, GitHub issue, incident, epic.
+      x-config: {extra: allow}
+      allOf:
+        - $ref: './base.yaml#/components/schemas/BaseDoc'
+        - type: object
+          properties:
+            priority:
+              type: string
+              description: "Priority, e.g. 'High'."
+              x-display: true
+              x-filter-arg: priority
+            issue_type:
+              type: string
+              description: "Issue type, e.g. 'Task' | 'Story' | 'Bug' | 'Epic' | 'Incident'."
+              x-display: true
+              x-filter-arg: issue_type
+            epic_key:
+              type: string
+              description: Parent epic native key.
+              x-filter-arg: epic_key
+            parent_key:
+              type: string
+              description: Parent issue native key (for sub-tasks).
+            reporter:
+              type: string
+              description: Reporter display name.
+            labels:
+              type: array
+              items: {type: string}
+              description: Labels.
+              x-filter-arg: label
+            severity:
+              type: string
+              description: "Severity for incidents, e.g. 'P1'."
+              x-filter-arg: severity
+            resolved:
+              type: string
+              description: ISO-8601 resolution timestamp, if resolved.

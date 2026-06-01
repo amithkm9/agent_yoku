@@ -7,6 +7,6 @@ re-exported here so existing imports keep working. Edit the YAML and run
 
 from __future__ import annotations
 
-from yoku.schemas._generated.entity_links import EntityLink
+from yoku.schemas._generated.entity_link import EntityLink
 
 __all__ = ["EntityLink"]
