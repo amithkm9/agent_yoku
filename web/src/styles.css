@@ -781,6 +781,48 @@ button.link {
   white-space: nowrap;
 }
 
+.hero-count-footer {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 2px;
+}
+.hero-count-freshness {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+.hero-count-freshness.stale {
+  color: var(--warning);
+}
+.hero-sync-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 3px;
+  transition: color 0.15s;
+}
+.hero-sync-btn svg {
+  width: 12px;
+  height: 12px;
+}
+.hero-sync-btn:hover {
+  color: var(--text);
+}
+.hero-sync-btn.spinning svg {
+  animation: spin 0.8s linear infinite;
+  opacity: 1;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 /* ---------- Settings page ---------- */
 .settings-shell {
   display: flex;

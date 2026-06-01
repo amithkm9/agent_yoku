@@ -331,6 +331,7 @@ export function Chat() {
   const [history, setHistory] = useState<ChatTurn[]>([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  const [syncing, setSyncing] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -377,6 +378,29 @@ export function Chat() {
     await refresh();
     selectSession(r.session_id);
     setHistory([]);
+  }
+
+  async function triggerSync(source: string) {
+    setSyncing((s) => new Set(s).add(source));
+    const preSyncAt = freshness.find((x) => x.source === source)?.last_synced_at ?? null;
+    try {
+      await api.syncConnector(source);
+      // Poll until last_synced_at changes (success) or status flips to error
+      for (let i = 0; i < 60; i++) {
+        await new Promise((res) => setTimeout(res, 2000));
+        const f = await api.freshness();
+        setFreshness(f);
+        const updated = f.find((x) => x.source === source);
+        const done =
+          updated?.last_synced_at !== preSyncAt ||
+          (updated?.last_sync_status === "error" && updated?.last_synced_at === null && preSyncAt !== null);
+        if (done) break;
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSyncing((s) => { const n = new Set(s); n.delete(source); return n; });
+    }
   }
 
   async function deleteSession(id: string) {
@@ -444,20 +468,6 @@ export function Chat() {
         <button className="primary block" onClick={() => void newSession()}>
           + New chat
         </button>
-        {freshness.length > 0 && (
-          <div className="freshness">
-            {freshness.map((f) => (
-              <span
-                key={f.source}
-                className={`fresh-badge${f.last_sync_status === "error" ? " stale" : ""}`}
-                title={f.last_synced_at ? `last synced ${f.last_synced_at}` : "never synced"}
-              >
-                {f.source === "jira" ? "JIRA" : f.source === "github" ? "GitHub" : "Slack"}{" "}
-                {f.synced_ago === "never" ? "not synced" : `· ${f.synced_ago}`}
-              </span>
-            ))}
-          </div>
-        )}
         <div className="section-title">Recents</div>
         <ul className="session-list">
           {sessions.map((s) => (
@@ -577,42 +587,78 @@ export function Chat() {
 
               {counts && (
                 <div className="hero-counts">
-                  <div className="hero-count-item">
-                    <span className="hero-count-icon hero-count-icon--jira" aria-hidden="true">
-                      <svg viewBox="0 0 24 24" fill="none">
-                        <path d="M4 9.2 11.2 2H22l-7.2 7.2H4Z" fill="currentColor" />
-                        <path d="M8.2 13.4 15.4 6.2h4.2L12.4 13.4H8.2Z" fill="currentColor" opacity="0.75" />
-                        <path d="M2 11.6h10.8L20 18.8H9.2L2 11.6Z" fill="currentColor" opacity="0.55" />
-                      </svg>
-                    </span>
-                    <strong>{counts.jira_tickets.toLocaleString()}</strong>
-                    <span>JIRA tickets</span>
-                  </div>
-                  <div className="hero-count-item">
-                    <span className="hero-count-icon hero-count-icon--github" aria-hidden="true">
-                      <svg viewBox="0 0 24 24" fill="none">
-                        <path d="M12 3.2a8.8 8.8 0 0 0-2.78 17.15c.44.08.6-.19.6-.43v-1.52c-2.43.53-2.94-1.03-2.94-1.03-.4-1-.97-1.28-.97-1.28-.79-.55.06-.54.06-.54.88.06 1.35.91 1.35.91.78 1.33 2.05.94 2.55.72.08-.57.31-.94.56-1.16-1.94-.22-3.98-.97-3.98-4.3 0-.95.34-1.73.9-2.34-.1-.22-.39-1.11.08-2.32 0 0 .73-.24 2.4.89a8.3 8.3 0 0 1 4.38 0c1.67-1.13 2.4-.89 2.4-.89.47 1.21.18 2.1.09 2.32.56.61.9 1.39.9 2.34 0 3.34-2.05 4.07-4 4.29.31.26.59.78.59 1.58v2.34c0 .24.16.52.6.43A8.8 8.8 0 0 0 12 3.2Z" fill="currentColor" />
-                      </svg>
-                    </span>
-                    <strong>{counts.github_prs.toLocaleString()}</strong>
-                    <span>pull requests</span>
-                  </div>
-                  <div className="hero-count-item">
-                    <span className="hero-count-icon hero-count-icon--slack" aria-hidden="true">
-                      <svg viewBox="0 0 24 24" fill="none">
-                        <path d="M9 3a2 2 0 1 0 0 4h2V3H9Z" fill="currentColor" opacity="0.9"/>
-                        <path d="M3 9a2 2 0 1 0 4 0V7H3v2Z" fill="currentColor" opacity="0.7"/>
-                        <path d="M15 21a2 2 0 1 0 0-4h-2v4h2Z" fill="currentColor" opacity="0.9"/>
-                        <path d="M21 15a2 2 0 1 0-4 0v2h4v-2Z" fill="currentColor" opacity="0.7"/>
-                        <path d="M3 15a2 2 0 1 0 4 0v-2H3v2Z" fill="currentColor" opacity="0.6"/>
-                        <path d="M9 21a2 2 0 1 0 0-4H7v4h2Z" fill="currentColor" opacity="0.8"/>
-                        <path d="M21 9a2 2 0 1 0-4 0v2h4V9Z" fill="currentColor" opacity="0.6"/>
-                        <path d="M15 3a2 2 0 1 0 0 4h2V3h-2Z" fill="currentColor" opacity="0.8"/>
-                      </svg>
-                    </span>
-                    <strong>{counts.slack_messages.toLocaleString()}</strong>
-                    <span>Slack messages</span>
-                  </div>
+                  {(
+                    [
+                      {
+                        key: "jira",
+                        count: counts.jira_tickets,
+                        label: "JIRA tickets",
+                        icon: (
+                          <svg viewBox="0 0 24 24" fill="none">
+                            <path d="M4 9.2 11.2 2H22l-7.2 7.2H4Z" fill="currentColor" />
+                            <path d="M8.2 13.4 15.4 6.2h4.2L12.4 13.4H8.2Z" fill="currentColor" opacity="0.75" />
+                            <path d="M2 11.6h10.8L20 18.8H9.2L2 11.6Z" fill="currentColor" opacity="0.55" />
+                          </svg>
+                        ),
+                      },
+                      {
+                        key: "github",
+                        count: counts.github_prs,
+                        label: "pull requests",
+                        icon: (
+                          <svg viewBox="0 0 24 24" fill="none">
+                            <path d="M12 3.2a8.8 8.8 0 0 0-2.78 17.15c.44.08.6-.19.6-.43v-1.52c-2.43.53-2.94-1.03-2.94-1.03-.4-1-.97-1.28-.97-1.28-.79-.55.06-.54.06-.54.88.06 1.35.91 1.35.91.78 1.33 2.05.94 2.55.72.08-.57.31-.94.56-1.16-1.94-.22-3.98-.97-3.98-4.3 0-.95.34-1.73.9-2.34-.1-.22-.39-1.11.08-2.32 0 0 .73-.24 2.4.89a8.3 8.3 0 0 1 4.38 0c1.67-1.13 2.4-.89 2.4-.89.47 1.21.18 2.1.09 2.32.56.61.9 1.39.9 2.34 0 3.34-2.05 4.07-4 4.29.31.26.59.78.59 1.58v2.34c0 .24.16.52.6.43A8.8 8.8 0 0 0 12 3.2Z" fill="currentColor" />
+                          </svg>
+                        ),
+                      },
+                      {
+                        key: "slack",
+                        count: counts.slack_messages,
+                        label: "Slack messages",
+                        icon: (
+                          <svg viewBox="0 0 24 24" fill="none">
+                            <path d="M9 3a2 2 0 1 0 0 4h2V3H9Z" fill="currentColor" opacity="0.9"/>
+                            <path d="M3 9a2 2 0 1 0 4 0V7H3v2Z" fill="currentColor" opacity="0.7"/>
+                            <path d="M15 21a2 2 0 1 0 0-4h-2v4h2Z" fill="currentColor" opacity="0.9"/>
+                            <path d="M21 15a2 2 0 1 0-4 0v2h4v-2Z" fill="currentColor" opacity="0.7"/>
+                            <path d="M3 15a2 2 0 1 0 4 0v-2H3v2Z" fill="currentColor" opacity="0.6"/>
+                            <path d="M9 21a2 2 0 1 0 0-4H7v4h2Z" fill="currentColor" opacity="0.8"/>
+                            <path d="M21 9a2 2 0 1 0-4 0v2h4V9Z" fill="currentColor" opacity="0.6"/>
+                            <path d="M15 3a2 2 0 1 0 0 4h2V3h-2Z" fill="currentColor" opacity="0.8"/>
+                          </svg>
+                        ),
+                      },
+                    ] as const
+                  ).map(({ key, count, label, icon }) => {
+                    const f = freshness.find((x) => x.source === key);
+                    return (
+                      <div key={key} className={`hero-count-item hero-count-item--${key}`}>
+                        <span className={`hero-count-icon hero-count-icon--${key}`} aria-hidden="true">
+                          {icon}
+                        </span>
+                        <strong>{count.toLocaleString()}</strong>
+                        <span>{label}</span>
+                        <div className="hero-count-footer">
+                          {f && (
+                            <span className={`hero-count-freshness${f.last_sync_status === "error" ? " stale" : ""}`}>
+                              {f.synced_ago === "never" ? "never synced" : f.synced_ago}
+                            </span>
+                          )}
+                          <button
+                            className={`hero-sync-btn${syncing.has(key) ? " spinning" : ""}`}
+                            onClick={() => void triggerSync(key)}
+                            disabled={syncing.has(key)}
+                            aria-label={`Sync ${key}`}
+                            title="Sync now"
+                          >
+                            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                              <path d="M4 12a8 8 0 0 1 14.93-4H16v2h6V4h-2v2.1A10 10 0 1 0 22 12h-2a8 8 0 0 1-16 0Z" fill="currentColor"/>
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
