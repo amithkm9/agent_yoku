@@ -72,6 +72,29 @@ export interface SourceFreshness {
   last_sync_status: string | null;
 }
 
+export interface Signal {
+  signal_id: string;
+  detector: string;
+  kind: string;
+  item_key: string;
+  title: string | null;
+  person_name: string | null;
+  evidence: Record<string, unknown>;
+  confidence: number;
+  url: string | null;
+  status: string;
+  label: string | null;
+  first_seen_at: string | null;
+  matured_at: string | null;
+  last_seen_at: string | null;
+}
+
+export interface InboxResponse {
+  signals: Signal[];
+  total_open: number;
+  total_matured: number;
+}
+
 export interface PersistedMessage {
   role: "human" | "ai" | "tool" | "system";
   content: unknown;
@@ -203,6 +226,12 @@ export const api = {
 
   counts: () => request<Counts>("/api/stats/counts"),
   freshness: () => request<SourceFreshness[]>("/api/stats/freshness"),
+
+  listInbox: () => request<InboxResponse>("/api/inbox"),
+  confirmSignal: (id: string) =>
+    request<Signal>(`/api/inbox/${id}/confirm`, { method: "POST" }),
+  dismissSignal: (id: string) =>
+    request<Signal>(`/api/inbox/${id}/dismiss`, { method: "POST" }),
 
   listConnectors: () => request<ConnectorStatus[]>("/api/connectors"),
   saveJiraConfig: (cfg: JiraConfigIn) =>

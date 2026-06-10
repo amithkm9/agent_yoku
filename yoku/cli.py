@@ -220,6 +220,10 @@ def refresh_all(skip_jira: bool, skip_github: bool) -> None:
     from yoku.pipeline.entity_links import build_entity_links
 
     build_entity_links()
+    click.secho("→ proactive detectors", fg="cyan")
+    from yoku.proactive.signals import run_detectors
+
+    run_detectors()
     click.secho("✓ refresh-all done", fg="green")
 
 

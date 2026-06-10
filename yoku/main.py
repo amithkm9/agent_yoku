@@ -15,7 +15,7 @@ from yoku.logging import get_logger
 from yoku.middleware import RateLimit, RequestContext
 from yoku.middleware.exception_handler import register_exception_handlers
 from yoku.middleware.request_logger import RequestLogger
-from yoku.routers import auth, chat, connectors, sessions, stats
+from yoku.routers import auth, chat, connectors, inbox, sessions, stats
 
 log = get_logger("api.main")
 
@@ -83,6 +83,7 @@ def create_app() -> FastAPI:
     app.include_router(chat.router, prefix="/api")
     app.include_router(stats.router, prefix="/api")
     app.include_router(connectors.router, prefix="/api")
+    app.include_router(inbox.router, prefix="/api")
 
     @app.get("/healthz", tags=["health"])
     async def healthz() -> dict[str, str]:

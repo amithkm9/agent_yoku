@@ -215,6 +215,22 @@ def events_collection() -> Collection:
     )
 
 
+def signals_collection() -> Collection:
+    """Candidate gaps emitted by proactive detectors (docs/yoku_agent.md Phase 2).
+
+    Engine-internal like `events`. One row per (detector, item_key) — re-detection
+    refreshes the row, never duplicates it.
+    """
+    return _ensure(
+        _db()["signals"],
+        [
+            IndexModel([("detector", ASCENDING), ("item_key", ASCENDING)], unique=True),
+            IndexModel("signal_id", unique=True),
+            IndexModel([("status", ASCENDING), ("matured_at", DESCENDING)]),
+        ],
+    )
+
+
 # ---------------------------------------------------------------------------
 # Internal dc-* accessor map — for pipeline/embed code that reads raw collections
 DC_COLLECTIONS = {

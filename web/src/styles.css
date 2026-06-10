@@ -1108,3 +1108,111 @@ button.danger:hover {
     text-align: left;
   }
 }
+
+/* ---- Proactive Inbox ---------------------------------------------------- */
+
+.inbox-intro h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 4px;
+}
+
+.inbox-intro {
+  margin-bottom: 20px;
+}
+
+.signal-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.signal-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--border, #e4e1ee);
+  border-radius: 12px;
+  background: var(--surface, #fff);
+}
+
+.signal-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.signal-top a {
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.signal-top a:hover {
+  text-decoration: underline;
+}
+
+.signal-chip {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #f3f0fb;
+  color: #5b4ea8;
+}
+
+.signal-chip--merged_no_ticket {
+  background: #eef6f0;
+  color: #2f7a4d;
+}
+
+.signal-chip--confirmed {
+  background: #fff4e0;
+  color: #9a6b00;
+}
+
+.signal-title {
+  font-size: 14px;
+}
+
+.signal-meta {
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.signal-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.signal-btn {
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #e4e1ee);
+  background: transparent;
+  cursor: pointer;
+}
+
+.signal-btn.confirm:hover:not(:disabled) {
+  border-color: #2f7a4d;
+  color: #2f7a4d;
+}
+
+.signal-btn.dismiss:hover:not(:disabled) {
+  border-color: #b3543e;
+  color: #b3543e;
+}
+
+.signal-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

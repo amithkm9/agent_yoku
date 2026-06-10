@@ -145,10 +145,15 @@ def _run_post_ingest_pipeline() -> None:
     with _clean_argv("link"):
         pr_to_jira.main()
     backfill.main()
+    from yoku.proactive.signals import run_detectors
+
     # Canonical projection (Way B) is best-effort: a failure here must not
     # discard the core refresh that already succeeded above.
     _best_effort("unify", unify_all)
     _best_effort("entity_links", build_entity_links)
+    # Proactive detectors close the pipeline — they read what everything
+    # above just wrote.
+    _best_effort("detectors", run_detectors)
 
 
 def list_tenant_ids() -> list[str]:

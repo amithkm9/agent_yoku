@@ -411,10 +411,14 @@ Breadth, not architecture. That is the payoff of building the spine right.
 ## 8. We are here
 
 ```
-[Phase 1 ✓]   [2] Inbox ← NEXT   [3] Judge+Memory   [4a Slack identity ✓ | 4b bot]   [5] Speak   [6] Act
+[Phase 1 ✓]   [2 Inbox ✓]   [3] Judge+Memory ← NEXT   [4a Slack identity ✓ | 4b bot]   [5] Speak   [6] Act
 ```
 
 Phase 1 shipped (build-plan M2): diff-on-upsert events in all four ingest
 paths + `linked` events from `pr_to_jira`, into a per-tenant `events`
-collection (`yoku/proactive/events.py`). Slack identity (Phase 4a) shipped
-earlier as build-plan M0a. Next: Phase 2 — detectors → signals → Inbox.
+collection (`yoku/proactive/events.py`). Phase 2 shipped (build-plan M3):
+auto-discovered detectors (`yoku/proactive/detectors/`) with recency windows
++ maturation, the `signals` lifecycle (sticky dismissal, self-heal
+auto-resolution, confirm/dismiss labels) in `yoku/proactive/signals.py`,
+`GET /api/inbox`, and the React Proactive tab. Slack identity (Phase 4a)
+shipped earlier as build-plan M0a. Next: Phase 3 — judgment + memory.

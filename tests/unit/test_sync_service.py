@@ -130,6 +130,7 @@ def test_post_ingest_pipeline_runs_unify_then_entity_links(monkeypatch):
     from yoku.db import backfill, unified_users
     from yoku.pipeline import embed as embed_mod
     from yoku.pipeline import entity_links, pr_to_jira, slack_threads, unify
+    from yoku.proactive import signals as signals_mod
 
     order: list[str] = []
     monkeypatch.setattr(slack_threads, "rollup_threads", lambda: order.append("slack_threads"))
@@ -139,10 +140,12 @@ def test_post_ingest_pipeline_runs_unify_then_entity_links(monkeypatch):
     monkeypatch.setattr(backfill, "main", lambda: order.append("backfill"))
     monkeypatch.setattr(unify, "unify_all", lambda: order.append("unify_docs"))
     monkeypatch.setattr(entity_links, "build_entity_links", lambda: order.append("entity_links"))
+    monkeypatch.setattr(signals_mod, "run_detectors", lambda: order.append("detectors"))
 
     sync_service._run_post_ingest_pipeline()
 
-    # Thread rollup precedes embed so re-rolled parents re-embed in this pass.
+    # Thread rollup precedes embed so re-rolled parents re-embed in this pass;
+    # detectors close the pipeline — they read what everything above wrote.
     assert order == [
         "slack_threads",
         "embed",
@@ -151,6 +154,7 @@ def test_post_ingest_pipeline_runs_unify_then_entity_links(monkeypatch):
         "backfill",
         "unify_docs",
         "entity_links",
+        "detectors",
     ]
 
 
@@ -160,6 +164,7 @@ def test_post_ingest_projection_failure_is_best_effort(monkeypatch, reset_tenant
     from yoku.db import backfill, unified_users
     from yoku.pipeline import embed as embed_mod
     from yoku.pipeline import entity_links, pr_to_jira, slack_threads, unify
+    from yoku.proactive import signals as signals_mod
 
     ran: list[str] = []
     monkeypatch.setattr(slack_threads, "rollup_threads", lambda: ran.append("slack_threads"))
@@ -167,6 +172,7 @@ def test_post_ingest_projection_failure_is_best_effort(monkeypatch, reset_tenant
     monkeypatch.setattr(unified_users, "main", lambda: ran.append("unify_users"))
     monkeypatch.setattr(pr_to_jira, "main", lambda: ran.append("link"))
     monkeypatch.setattr(backfill, "main", lambda: ran.append("backfill"))
+    monkeypatch.setattr(signals_mod, "run_detectors", lambda: ran.append("detectors"))
 
     def boom():
         raise RuntimeError("mongo down")
@@ -177,7 +183,15 @@ def test_post_ingest_projection_failure_is_best_effort(monkeypatch, reset_tenant
     # Must not raise even though unify blew up; entity_links still runs.
     sync_service._run_post_ingest_pipeline()
 
-    assert ran == ["slack_threads", "embed", "unify_users", "link", "backfill", "entity_links"]
+    assert ran == [
+        "slack_threads",
+        "embed",
+        "unify_users",
+        "link",
+        "backfill",
+        "entity_links",
+        "detectors",
+    ]
 
 
 # ---------- run_all_tenants ----------

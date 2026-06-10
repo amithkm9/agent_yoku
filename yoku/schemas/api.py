@@ -61,6 +61,31 @@ class UserOut(BaseModel):
     jira_base_url: str | None = None
 
 
+class SignalOut(BaseModel):
+    """A matured proactive gap, as shown in the Inbox."""
+
+    signal_id: str
+    detector: str
+    kind: str
+    item_key: str
+    title: str | None = None
+    person_name: str | None = None
+    evidence: dict = {}
+    confidence: float = 0.5
+    url: str | None = None
+    status: str
+    label: str | None = None
+    first_seen_at: datetime | None = None
+    matured_at: datetime | None = None
+    last_seen_at: datetime | None = None
+
+
+class InboxResponse(BaseModel):
+    signals: list[SignalOut]
+    total_open: int
+    total_matured: int
+
+
 class SessionSummary(BaseModel):
     session_id: str
     title: str | None

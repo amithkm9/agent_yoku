@@ -503,6 +503,10 @@ export function Chat() {
               <div className="account-email">{user.email}</div>
               <div className="user-tenant">tenant: {user.tenant_id}</div>
               <div className="account-actions">
+                <Link to="/inbox" className="account-button" aria-label="Open proactive inbox">
+                  <SparkleIcon />
+                  <span>Proactive</span>
+                </Link>
                 <Link to="/settings" className="account-button" aria-label="Open settings">
                   <SettingsIcon />
                   <span>Settings</span>

@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { Login } from "./pages/Login";
 import { Chat } from "./pages/Chat";
+import { Inbox } from "./pages/Inbox";
 import { Settings } from "./pages/Settings";
 import { getToken } from "./lib/api";
 
@@ -25,6 +26,14 @@ export function App() {
         element={
           <RequireAuth>
             <Settings />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/inbox"
+        element={
+          <RequireAuth>
+            <Inbox />
           </RequireAuth>
         }
       />
