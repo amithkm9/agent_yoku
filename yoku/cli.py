@@ -190,6 +190,10 @@ def refresh_all(skip_jira: bool, skip_github: bool) -> None:
         from yoku.connectors.github import users_ingest as gh_users
 
         gh_users.main()
+    click.secho("→ slack thread rollup", fg="cyan")
+    from yoku.pipeline.slack_threads import rollup_threads
+
+    rollup_threads()
     click.secho("→ embed (deltas only)", fg="cyan")
     sys.argv = ["embed"]
     from yoku.pipeline import embed as _embed

@@ -160,6 +160,7 @@ def ds_unified_users_collection() -> Collection:
             IndexModel("jira.accountId", sparse=True),
             IndexModel("github.login", sparse=True),
             IndexModel("jira.displayName", sparse=True),
+            IndexModel("slack.user_id", sparse=True),
         ],
     )
 

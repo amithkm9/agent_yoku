@@ -42,3 +42,12 @@ relationships:
       local_field: login
       foreign_field: github.login
     description: A GitHub user maps to a unified person record.
+
+  - name: slack_user_to_unified
+    entity1: dc-slack-users
+    entity2: ds-unified-users
+    relationship_type: one-to-one
+    join:
+      local_field: user_id
+      foreign_field: slack.user_id
+    description: A Slack user maps to a unified person record.

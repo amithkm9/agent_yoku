@@ -57,6 +57,8 @@ class UserOut(BaseModel):
     name: str | None = None
     tenant_id: str
     is_admin: bool = False
+    # Tenant's JIRA site, for citation links in the UI. Only populated by /me.
+    jira_base_url: str | None = None
 
 
 class SessionSummary(BaseModel):

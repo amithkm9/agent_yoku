@@ -75,6 +75,7 @@ __all__ = [
     "_feature_rerank",
     "_lexical_overlap",
     "_recency_factor",
+    "_title_phrase_boost",
     "_tokenize",
     "bson_safe",
     "dc_github_collection",
@@ -310,9 +311,9 @@ def _rerank_order(
 
 
 def _resolve_user_doc(query: str) -> dict | None:
-    """Resolve a free-form identifier (name, login, email, JIRA displayName)
-    to a single unified_users record. Returns None if no match. Backs
-    `resolve_user`.
+    """Resolve a free-form identifier (name, login, email, JIRA displayName,
+    Slack handle/id) to a single unified_users record. Returns None if no
+    match. Backs `resolve_user`.
     """
     if not query:
         return None
@@ -321,11 +322,11 @@ def _resolve_user_doc(query: str) -> dict | None:
     coll = ds_unified_users_collection()
 
     if "@" in q_lower:
-        d = coll.find_one({"email": q_lower}, {"_id": 0})
+        d = coll.find_one({"$or": [{"email": q_lower}, {"slack.email": q_lower}]}, {"_id": 0})
         if d:
             return d
 
-    d = coll.find_one({"github.login": q}, {"_id": 0})
+    d = coll.find_one({"$or": [{"github.login": q}, {"slack.user_id": q}]}, {"_id": 0})
     if d:
         return d
 
@@ -345,6 +346,9 @@ def _resolve_user_doc(query: str) -> dict | None:
                 {"jira.displayName": rx},
                 {"github.name": rx},
                 {"github.login": rx},
+                {"slack.display_name": rx},
+                {"slack.real_name": rx},
+                {"slack.name": rx},
             ]
         },
         {"_id": 0},

@@ -24,6 +24,7 @@ from yoku.connectors.slack.client import (
 from yoku.constants import INGEST_BATCH_SIZE
 from yoku.db.mongo import dc_slack_collection
 from yoku.logging import get_logger
+from yoku.proactive.events import diff_events, write_events
 
 log = get_logger("ingest_slack")
 
@@ -55,6 +56,7 @@ def main(filter_channels: list[str] | None = None) -> None:
     batch: list[UpdateOne] = []
     total = 0
     new_or_changed = 0
+    events: list[dict] = []
 
     for ch in channels:
         channel_id = ch["id"]
@@ -72,12 +74,19 @@ def main(filter_channels: list[str] | None = None) -> None:
             doc = message_to_doc(msg, channel_id, channel_name, user_map, cfg.workspace)
             key = doc["key"]
 
-            existing = coll.find_one({"key": key}, {"text": 1, "embedding": 1})
-            if existing and existing.get("text") == doc["text"]:
+            existing = coll.find_one({"key": key}, {"text": 1, "embedding": 1, "_base_text": 1})
+            # Compare against the pre-roll original (`_base_text`) when the
+            # thread rollup has rewritten `text` to the whole discussion.
+            if existing and (existing.get("_base_text") or existing.get("text")) == doc["text"]:
                 doc["embedding"] = existing.get("embedding")
+                if existing.get("_base_text"):
+                    doc["_base_text"] = existing["_base_text"]
+                    doc["text"] = existing["text"]
             else:
                 doc["embedding"] = None
+                doc["_base_text"] = None  # new/edited — rollup re-derives
                 new_or_changed += 1
+            events.extend(diff_events("dc-slack", key, existing, doc, now))
 
             doc["_synced_at"] = now
             batch.append(UpdateOne({"key": key}, {"$set": doc}, upsert=True))
@@ -94,6 +103,7 @@ def main(filter_channels: list[str] | None = None) -> None:
     if batch:
         coll.bulk_write(batch, ordered=False)
         total += len(batch)
+    write_events(events)
 
     elapsed = time.monotonic() - t0
     log.info(

@@ -14,16 +14,17 @@ from pathlib import Path
 # Make the package importable when run as a plain script (without installing).
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from yoku.core.models import (
+from yoku.schemas import (
     ChatMessage,
     ChatSession,
     GitHubPR,
     JiraTicket,
+    SlackMessage,
     UnifiedUser,
 )
 
 _OUT = Path(__file__).resolve().parent.parent / "schemas"
-_MODELS = [JiraTicket, GitHubPR, UnifiedUser, ChatSession, ChatMessage]
+_MODELS = [JiraTicket, GitHubPR, SlackMessage, UnifiedUser, ChatSession, ChatMessage]
 
 
 def main() -> None:

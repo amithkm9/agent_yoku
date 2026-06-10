@@ -33,4 +33,4 @@ def test_inbound_to_jira_tickets_from_both_sources():
 @pytest.mark.unit
 def test_relationships_for_is_bidirectional():
     names = {r.name for r in rel.relationships_for("ds-unified-users")}
-    assert names == {"jira_user_to_unified", "github_user_to_unified"}
+    assert names == {"jira_user_to_unified", "github_user_to_unified", "slack_user_to_unified"}

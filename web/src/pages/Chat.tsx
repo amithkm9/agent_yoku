@@ -113,26 +113,25 @@ function parseAnswerBlocks(text: string): AnswerBlock[] {
 
 // The agent cites its sources inline as `AS-1234` (JIRA) and
 // `AsatoCorp/repo#123` (GitHub PR). Linkify those to the actual ticket / PR so
-// every claim is one click from its source. JIRA_BASE matches the default
-// Asato Atlassian site; change here if a tenant uses a different host.
-const JIRA_BASE = "https://asato-ai.atlassian.net";
+// every claim is one click from its source. The JIRA host comes from the
+// tenant's connector config (via /me); without one, JIRA keys stay plain text.
 const CITATION_RE = /\bAS-\d+\b|\b[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+#\d+\b/g;
 
-function citationHref(token: string): string | null {
-  if (/^AS-\d+$/.test(token)) return `${JIRA_BASE}/browse/${token}`;
+function citationHref(token: string, jiraBase: string | null): string | null {
+  if (/^AS-\d+$/.test(token)) return jiraBase ? `${jiraBase}/browse/${token}` : null;
   const pr = token.match(/^([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)#(\d+)$/);
   if (pr) return `https://github.com/${pr[1]}/pull/${pr[2]}`;
   return null;
 }
 
-function linkifyCitations(text: string, keyPrefix: string): ReactNode[] {
+function linkifyCitations(text: string, keyPrefix: string, jiraBase: string | null): ReactNode[] {
   const nodes: ReactNode[] = [];
   let lastIndex = 0;
   let tokenIndex = 0;
 
   for (const match of text.matchAll(CITATION_RE)) {
     const token = match[0];
-    const href = citationHref(token);
+    const href = citationHref(token, jiraBase);
     if (href === null) continue;
     const start = match.index ?? 0;
 
@@ -156,7 +155,7 @@ function linkifyCitations(text: string, keyPrefix: string): ReactNode[] {
   return nodes;
 }
 
-function renderInline(text: string, keyPrefix: string): ReactNode[] {
+function renderInline(text: string, keyPrefix: string, jiraBase: string | null): ReactNode[] {
   const nodes: ReactNode[] = [];
   const pattern = /(\*\*.+?\*\*|`.+?`|\*[^*\n]+\*)/g;
   let lastIndex = 0;
@@ -168,14 +167,14 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
 
     if (start > lastIndex) {
       nodes.push(
-        ...linkifyCitations(text.slice(lastIndex, start), `${keyPrefix}-pre-${tokenIndex}`)
+        ...linkifyCitations(text.slice(lastIndex, start), `${keyPrefix}-pre-${tokenIndex}`, jiraBase)
       );
     }
 
     if (token.startsWith("**")) {
       nodes.push(
         <strong key={`${keyPrefix}-strong-${tokenIndex}`}>
-          {linkifyCitations(token.slice(2, -2), `${keyPrefix}-strong-${tokenIndex}`)}
+          {linkifyCitations(token.slice(2, -2), `${keyPrefix}-strong-${tokenIndex}`, jiraBase)}
         </strong>
       );
     } else if (token.startsWith("`")) {
@@ -185,7 +184,7 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
     } else {
       nodes.push(
         <em key={`${keyPrefix}-em-${tokenIndex}`}>
-          {linkifyCitations(token.slice(1, -1), `${keyPrefix}-em-${tokenIndex}`)}
+          {linkifyCitations(token.slice(1, -1), `${keyPrefix}-em-${tokenIndex}`, jiraBase)}
         </em>
       );
     }
@@ -195,13 +194,13 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
   }
 
   if (lastIndex < text.length) {
-    nodes.push(...linkifyCitations(text.slice(lastIndex), `${keyPrefix}-tail`));
+    nodes.push(...linkifyCitations(text.slice(lastIndex), `${keyPrefix}-tail`, jiraBase));
   }
 
   return nodes;
 }
 
-function AnswerContent({ text }: { text: string }) {
+function AnswerContent({ text, jiraBase }: { text: string; jiraBase: string | null }) {
   const blocks = parseAnswerBlocks(text);
 
   if (blocks.length === 0) {
@@ -212,7 +211,7 @@ function AnswerContent({ text }: { text: string }) {
     <div className="rich-text">
       {blocks.map((block, index) => {
         if (block.type === "paragraph") {
-          return <p key={index}>{renderInline(block.text, `p-${index}`)}</p>;
+          return <p key={index}>{renderInline(block.text, `p-${index}`, jiraBase)}</p>;
         }
 
         if (block.type === "ol") {
@@ -220,7 +219,7 @@ function AnswerContent({ text }: { text: string }) {
             <ol key={index}>
               {block.items.map((item, itemIndex) => (
                 <li key={itemIndex}>
-                  {renderInline(item, `ol-${index}-${itemIndex}`)}
+                  {renderInline(item, `ol-${index}-${itemIndex}`, jiraBase)}
                 </li>
               ))}
             </ol>
@@ -231,7 +230,7 @@ function AnswerContent({ text }: { text: string }) {
           <ul key={index}>
             {block.items.map((item, itemIndex) => (
               <li key={itemIndex}>
-                {renderInline(item, `ul-${index}-${itemIndex}`)}
+                {renderInline(item, `ul-${index}-${itemIndex}`, jiraBase)}
               </li>
             ))}
           </ul>
@@ -693,7 +692,7 @@ export function Chat() {
                 {turn.status ? (
                   <div className="turn-status">{turn.status}</div>
                 ) : (
-                  <AnswerContent text={turn.answer} />
+                  <AnswerContent text={turn.answer} jiraBase={user?.jira_base_url ?? null} />
                 )}
               </div>
             </div>

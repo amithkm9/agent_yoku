@@ -28,6 +28,7 @@ export interface User {
   name: string | null;
   tenant_id: string;
   is_admin: boolean;
+  jira_base_url: string | null;
 }
 
 export interface SessionSummary {

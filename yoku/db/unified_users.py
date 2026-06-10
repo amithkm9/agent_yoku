@@ -1,4 +1,4 @@
-"""Build unified_users by joining JIRA users + GitHub users on lowercased email.
+"""Build unified_users by joining JIRA + GitHub + Slack users on lowercased email.
 
 Idempotent: re-running rebuilds the collection from scratch (drop + rebuild).
 Records:
@@ -7,8 +7,14 @@ Records:
   email          canonical join key (lowercase) or null
   jira           {accountId, displayName, emailAddress, active}
   github         {login, id, name, email, is_bot}
+  slack          {user_id, name, display_name, real_name, email, is_bot}
   is_bot         true if either side is a bot
-  match_source   "email" | "name" | "jira_only" | "github_only"
+  match_source   "email" | "name" | "manual" | "jira_only" | "github_only" | "slack_only"
+
+Slack joins onto the already-merged JIRA↔GitHub rows (email exact, then
+name-slug fallback — the same strategy as the primary join). Slack emails also
+backfill `email` on rows that matched by name but had none, since JIRA/GitHub
+often withhold emails while Slack exposes them.
 
 Usage:
     yoku unify-users
@@ -25,6 +31,7 @@ from datetime import UTC, datetime
 from yoku.db.mongo import (
     dc_github_users_collection,
     dc_jira_users_collection,
+    dc_slack_users_collection,
     ds_unified_users_collection,
 )
 from yoku.logging import get_logger
@@ -60,6 +67,96 @@ def _slug(s: str) -> str:
 def _stable_user_id(*parts: str | None) -> str:
     h = hashlib.sha256("|".join(p or "" for p in parts).encode()).hexdigest()
     return h[:24]
+
+
+def _slack_block(s: dict) -> dict:
+    return {
+        "user_id": s["user_id"],
+        "name": s.get("name"),
+        "display_name": s.get("display_name"),
+        "real_name": s.get("real_name"),
+        "email": (s.get("email") or "").lower() or None,
+        "is_bot": bool(s.get("is_bot")),
+    }
+
+
+def _fold_in_slack_users(unified: list[dict]) -> dict[str, int]:
+    """Attach a `slack` block to existing rows (email exact → name slug) and
+    append `slack_only` rows for people who exist only in Slack. Mutates
+    `unified` in place; returns match counters for logging.
+    """
+    slack_users = list(
+        dc_slack_users_collection().find(
+            {},
+            {
+                "_id": 0,
+                "user_id": 1,
+                "name": 1,
+                "display_name": 1,
+                "real_name": 1,
+                "email": 1,
+                "is_bot": 1,
+            },
+        )
+    )
+
+    by_email: dict[str, dict] = {}
+    by_slug: dict[str, dict] = {}
+    for u in unified:
+        u.setdefault("slack", None)
+        if u.get("email"):
+            by_email.setdefault(u["email"], u)
+        j_name = (u.get("jira") or {}).get("displayName")
+        gh = u.get("github") or {}
+        for candidate in (j_name, gh.get("name"), gh.get("login")):
+            s = _slug(candidate)
+            if s:
+                by_slug.setdefault(s, u)
+
+    matched_email = 0
+    matched_name = 0
+    slack_only = 0
+    for s in slack_users:
+        s_email = (s.get("email") or "").lower() or None
+        target = by_email.get(s_email) if s_email else None
+        if target is not None:
+            matched_email += 1
+        else:
+            for candidate in (s.get("real_name"), s.get("display_name"), s.get("name")):
+                slug = _slug(candidate)
+                if slug and slug in by_slug:
+                    target = by_slug[slug]
+                    matched_name += 1
+                    break
+
+        if target is not None:
+            if target.get("slack") is None:
+                target["slack"] = _slack_block(s)
+            # Slack often exposes emails JIRA/GitHub withhold — backfill.
+            if not target.get("email") and s_email:
+                target["email"] = s_email
+                by_email.setdefault(s_email, target)
+            continue
+
+        unified.append(
+            {
+                "user_id": _stable_user_id(s_email, "slack", s["user_id"]),
+                "email": s_email,
+                "jira": None,
+                "github": None,
+                "slack": _slack_block(s),
+                "is_bot": bool(s.get("is_bot")),
+                "match_source": "slack_only",
+            }
+        )
+        slack_only += 1
+
+    return {
+        "inputs": len(slack_users),
+        "email": matched_email,
+        "name": matched_name,
+        "slack_only": slack_only,
+    }
 
 
 def main() -> None:
@@ -184,6 +281,8 @@ def main() -> None:
             }
         )
 
+    slack_stats = _fold_in_slack_users(unified)
+
     now = datetime.now(UTC)
     for u in unified:
         u["_synced_at"] = now
@@ -198,13 +297,17 @@ def main() -> None:
     elapsed = time.monotonic() - t0
     log.info(
         "unified_users built total=%d email=%d name=%d manual=%d "
-        "jira_only=%d github_only=%d elapsed=%.1fs",
+        "jira_only=%d github_only=%d slack_email=%d slack_name=%d "
+        "slack_only=%d elapsed=%.1fs",
         len(unified),
         matched_via_email,
         matched_via_name,
         matched_manual,
         by_source.get("jira_only", 0),
         by_source.get("github_only", 0),
+        slack_stats["email"],
+        slack_stats["name"],
+        by_source.get("slack_only", 0),
         elapsed,
     )
 

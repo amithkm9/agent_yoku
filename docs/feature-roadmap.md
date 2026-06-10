@@ -3,6 +3,13 @@
 > A deep exploration of 8 candidate features to extend yoku into a more complete
 > product. For each feature: **what it is**, **how to build it**, **why it fits**,
 > and an **architecture diagram + clear build points**.
+>
+> **Build order lives in [`build-plan.md`](build-plan.md)**, which merges these
+> 8 features with the 6 proactive phases of [`yoku_agent.md`](yoku_agent.md)
+> into one milestone sequence. Two designs below have since been unified there:
+> Feature 3's prev-state diffing now rides the proactive `events` stream
+> (no separate `dc-state-prev`), and Feature 2's action layer is built once,
+> shared with proactive Phase 6.
 
 ## Context: what yoku is today
 

@@ -21,7 +21,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from yoku.agent.chat import ask, final_answer
-from yoku.core.storage.tenancy import set_tenant
+from yoku.db.tenancy import set_tenant
 
 CASES: list[dict] = [
     {

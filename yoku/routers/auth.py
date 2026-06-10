@@ -129,4 +129,7 @@ async def signup(
 
 @router.get("/me", response_model=UserOut)
 async def me(user: CurrentUser) -> UserOut:
-    return user
+    from yoku.db import connector_configs as cc
+
+    jira_cfg = (cc.get_config("jira") or {}).get("config") or {}
+    return user.model_copy(update={"jira_base_url": jira_cfg.get("base_url")})

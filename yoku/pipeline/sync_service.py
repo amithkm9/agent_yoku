@@ -134,8 +134,11 @@ def _run_post_ingest_pipeline() -> None:
     from yoku.pipeline import embed as embed_mod
     from yoku.pipeline import pr_to_jira
     from yoku.pipeline.entity_links import build_entity_links
+    from yoku.pipeline.slack_threads import rollup_threads
     from yoku.pipeline.unify import unify_all
 
+    # Thread rollup must precede embed so re-rolled parents re-embed this pass.
+    _best_effort("slack_threads", rollup_threads)
     with _clean_argv("embed"):
         embed_mod.main()
     unified_users.main()

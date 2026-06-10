@@ -19,8 +19,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from yoku.agent import tools
-from yoku.core.config import github_prs_collection, tickets_collection
-from yoku.core.storage import tenancy
+from yoku.db import tenancy
+from yoku.db.mongo import dc_github_collection, dc_jira_collection
 from yoku.eval.retrieval import EvalCase, evaluate
 
 
@@ -32,9 +32,9 @@ def _sample_keys(collection, n: int) -> list[str]:
 def build_cases(n: int, k: int) -> list[EvalCase]:
     """Exact-key cases for a random sample of JIRA tickets and GitHub PRs."""
     cases: list[EvalCase] = []
-    for key in _sample_keys(tickets_collection, n):
+    for key in _sample_keys(dc_jira_collection, n):
         cases.append(EvalCase(query=key, expected_keys=(key,), source="jira", k=k, note="jira key"))
-    for key in _sample_keys(github_prs_collection, n):
+    for key in _sample_keys(dc_github_collection, n):
         cases.append(EvalCase(query=key, expected_keys=(key,), source="github", k=k, note="pr key"))
     return cases
 
