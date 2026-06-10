@@ -20,6 +20,7 @@ from yoku.connectors._runtime import current_jira_config
 from yoku.connectors.jira.client import issue_to_doc, search_issues
 from yoku.db.mongo import dc_jira_collection
 from yoku.logging import get_logger
+from yoku.proactive.events import TRACKED_FIELDS, diff_events, write_events
 
 log = get_logger("ingest")
 
@@ -42,6 +43,9 @@ def main(extra: str | None = None) -> None:
     seen_keys: set[str] = set()
     count = 0
     new_or_changed = 0
+    events: list[dict] = []
+    # Existing-doc projection: embedding-preservation fields + event-tracked fields.
+    proj = {"text": 1, "embedding": 1, **dict.fromkeys(TRACKED_FIELDS["dc-jira"], 1)}
 
     now = datetime.now(UTC)
     for issue in search_issues(jql):
@@ -51,12 +55,13 @@ def main(extra: str | None = None) -> None:
             continue
         seen_keys.add(key)
 
-        existing = coll.find_one({"key": key}, {"text": 1, "embedding": 1})
+        existing = coll.find_one({"key": key}, proj)
         if existing and existing.get("text") == doc["text"]:
             doc["embedding"] = existing.get("embedding")
         else:
             doc["embedding"] = None
             new_or_changed += 1
+        events.extend(diff_events("dc-jira", key, existing, doc, now))
 
         doc["_synced_at"] = now
         batch.append(UpdateOne({"key": key}, {"$set": doc}, upsert=True))
@@ -69,6 +74,13 @@ def main(extra: str | None = None) -> None:
     if batch:
         coll.bulk_write(batch, ordered=False)
         count += len(batch)
+    n_events = write_events(events)
 
     elapsed = time.monotonic() - t0
-    log.info("ingest done total=%d new_or_changed=%d elapsed=%.1fs", count, new_or_changed, elapsed)
+    log.info(
+        "ingest done total=%d new_or_changed=%d events=%d elapsed=%.1fs",
+        count,
+        new_or_changed,
+        n_events,
+        elapsed,
+    )

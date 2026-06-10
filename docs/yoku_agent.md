@@ -131,11 +131,16 @@ Indicative shapes (refined per phase):
   "collection": "ds-pull-request", "field": "status",
   "old": "open", "new": "merged", "ts": "...", "processed": false }
 
-// signals
+// signals — unique upsert key: (detector, item_key). Re-detection on a later
+// sync refreshes evidence on the SAME row; it never duplicates a signal.
 { "detector": "done_no_pr", "kind": "drift", "item_key": "jira/AS-4396",
   "person_user_id": "u_priya", "evidence": { "merged_pr": "...#212",
   "days_open_after_merge": 14 }, "confidence": 0.9,
   "status": "open",            // open | judged | dismissed | shadow | sent | resolved
+  "first_seen_at": "...",      // when the detector first fired
+  "matured_at": null,          // set once the gap has persisted past the detector's
+                               // maturation window — only matured signals are judged
+  "resolution": null,          // self_healed | acted | dismissed | expired
   "event_ids": ["..."], "created_at": "..." }
 
 // person_memory
@@ -175,12 +180,24 @@ a clean dependency DAG; build in order.
   nothing. No "what changed" → nothing to be proactive about. Everything depends
   on this.
 - **Build:**
-  - Capture prior state before upsert into `state_prev` (or diff against the
-    canonical doc pre-overwrite).
-  - `run_event_delta(tenant_id)` writes `events`, hooked into
+  - **Recommended mechanism: diff-on-upsert, not a snapshot collection.** Every
+    ingest already does a `find_one` on the existing doc before upserting (e.g.
+    `connectors/jira/ingest.py` fetches `{text, embedding}` to decide whether to
+    clear the embedding). Widen that projection to the tracked fields (`status`,
+    `assignee`, `linked_prs`, …) and emit an event row right there when a value
+    changes — the prior state is already in hand, for free. `state_prev` then
+    shrinks to a thin fallback for docs created before this shipped (first sync
+    after deploy emits no spurious `updated` events). Mongo change streams are
+    rejected: they require a replica set, which local dev doesn't guarantee.
+  - `run_event_delta(tenant_id)` finalizes/flushes `events`, hooked into
     `yoku/pipeline/sync_service._run_post_ingest_pipeline` — the same seam where
     `unify` and `entity_links` already plug in as best-effort steps.
-- **New:** `yoku/proactive/events.py`; collections `events`, `state_prev`.
+  - **Events are dual-use.** The same stream is the prev-state source for
+    trend analytics (feature-roadmap.md #3): status-transition metrics, cycle
+    times, and throughput are aggregations over `events`. Do **not** build that
+    feature's separate `dc-state-prev` — one delta mechanism serves both.
+- **New:** `yoku/proactive/events.py`; collections `events`, `state_prev`
+  (thin bootstrap fallback only).
 - **Done when:** a sync produces correct event rows for created / updated /
   linked changes, verifiable in a test. No user-facing output yet.
 - **Depends on:** nothing.
@@ -195,8 +212,22 @@ a clean dependency DAG; build in order.
     `merged_no_ticket`. Each is a pure function over `events` + canonical `ds-*`
     + `ds-entity-links`, emitting `Signal{kind, item, person, evidence,
     confidence}`.
-  - `signals` collection + `GET /api/inbox` + a "Proactive" tab in the React UI
-    listing gaps, each citing its key.
+  - **Signal maturation (hysteresis).** Each detector declares a maturation
+    window (e.g. `done_no_pr: 3 days`). A signal is upserted the moment the
+    detector fires but is only *judged/surfaced* once the gap has persisted past
+    its window across syncs. This kills the worst false-positive class — flagging
+    a transient state (PR merged ten minutes ago; the person simply hasn't closed
+    the ticket *yet*) — with zero LLM cost.
+  - **Signal lifecycle + auto-resolution.** Signals upsert on
+    `(detector, item_key)`. When a later sync shows the underlying gap closed
+    *without* yoku having said anything, mark `resolution: "self_healed"`; after
+    a conversation, `"acted"`; on user dismissal, `"dismissed"`. These outcomes
+    are the ground truth that Phase 3's memory learns from and §7.3's
+    precision/recall eval measures against — capture them from day one.
+  - `signals` collection + `GET /api/inbox` (with confirm/dismiss actions) + a
+    "Proactive" tab in the React UI listing matured gaps, each citing its key.
+    Every confirm/dismiss is a **label** — the Inbox doubles as the labeling
+    tool for the eval set (§7.3).
 - **New:** `yoku/proactive/detectors/*`, `yoku/proactive/signals.py`,
   `yoku/routers/inbox.py`, web Inbox tab; collection `signals`.
 - **Done when:** AS-4396 (Done, no linked PR) appears in the Inbox after a sync,
@@ -316,8 +347,22 @@ Breadth, not architecture. That is the payoff of building the spine right.
 - **Scheduling** — `run_proactive_agent` fires after each sync via the existing
   APScheduler (`yoku/pipeline/scheduler.py`), non-overlapping, off under
   `ENV=test`/`ci` — the same pattern as auto-sync.
-- **Cost** — cheap deterministic detectors (Phase 2) gate the expensive LLM
-  sub-agents (Phase 3), so we don't run judgment on every event.
+- **Cost** — strictly tiered, cheapest gate first:
+  `detector (pure function) → maturation window (clock) → memory lookup (one
+  mongo read) → LLM judges (two sub-agents)`. Judgment runs only on matured,
+  not-previously-dismissed signals — typically a handful per sync, not one per
+  event. Batch the `person_agent` call when several signals share a person
+  (one activity read serves all of them).
+- **Latency** — the loop's reaction time is bounded by the 60-min sync poll.
+  Acceptable for v1 (these gaps live for days, not minutes). When it matters,
+  webhooks (feature-roadmap.md #5) slot in *above* Phase 1: a webhook-triggered
+  `sync_one(key)` runs the same diff-on-upsert path and emits the same events —
+  an accelerant, not a second pipeline.
+- **Digest fallback (post-Phase 6, opt-in)** — signals that mature but stay
+  below the conversation bar don't have to die silently: an opt-in per-person
+  weekly digest DM can batch them. Strictly secondary — the identity stays
+  *teammate, not dashboard* — but it keeps borderline signal from being pure
+  waste.
 
 ---
 
@@ -335,27 +380,41 @@ Breadth, not architecture. That is the payoff of building the spine right.
 
 ---
 
-## 7. Open decisions (resolve as we build)
+## 7. Open decisions — resolved recommendations
 
-1. **Autonomous send vs. approval gate.** `vision.md` sends without a human
-   confirming, trusting extreme precision. Recommendation: ship **proposal-gated**
-   (Phases 5–6), earn trust, then graduate only the safest reversible actions to
-   autonomous.
-2. **Prior-state capture mechanism (Phase 1).** Snapshot collection
-   (`state_prev`) vs. diff-on-upsert vs. Mongo change streams. Pick before
-   building Phase 1 — it shapes everything above it.
-3. **Precision vs. recall.** The two-agent AND-gate maximizes precision but will
-   silently swallow real gaps. How do we measure what it missed? (An eval harness
-   over a labeled gap set, mirroring `eval/retrieval.py`.)
+1. **Autonomous send vs. approval gate → proposal-gated first.** `vision.md`
+   sends without a human confirming, trusting extreme precision. Ship
+   **proposal-gated** (Phases 5–6), earn trust, then graduate only the safest
+   reversible actions (linking, labeling) to autonomous. The action layer is
+   built **once** and shared by both surfaces: the same
+   `ActionExecutor` + `action_log` serve a proposal confirmed in a chat turn
+   (feature-roadmap.md #2) and one confirmed in a proactive DM (Phase 6).
+2. **Prior-state capture (Phase 1) → diff-on-upsert.** The ingest upsert
+   already reads the existing doc before writing; widen the projection and emit
+   the event at that seam (see Phase 1 build notes). `state_prev` survives only
+   as a bootstrap fallback; change streams are out (replica-set requirement).
+3. **Precision vs. recall → shadow mode *is* the eval.** The two-agent AND-gate
+   maximizes precision but will silently swallow real gaps. Measure both sides
+   with data the loop already produces:
+   - **Precision:** every shadow/Inbox item carries confirm/dismiss buttons;
+     the confirm rate per detector is the precision metric. Go live on a
+     detector only above a threshold (e.g. >70% confirmed over 2 weeks).
+   - **Recall:** log judge-rejected signals too (`status: "judged"`,
+     verdict attached). Periodically sample them into the Inbox as
+     "low-confidence" items; confirmed ones are AND-gate misses. Together with
+     `resolution: "self_healed"` rates, this yields a labeled gap set over time
+     — the harness then mirrors `eval/retrieval.py` over it, with no separate
+     labeling project.
 
 ---
 
 ## 8. We are here
 
 ```
-[Phase 1] ← START   [2] Inbox   [3] Judge+Memory   [4] Slack   [5] Speak   [6] Act
-   ▲ build this first (events stream); nothing works without it
+[Phase 1 ✓]   [2] Inbox ← NEXT   [3] Judge+Memory   [4a Slack identity ✓ | 4b bot]   [5] Speak   [6] Act
 ```
 
-Start with Phase 1 — small, self-contained, and the foundation everything else
-consumes.
+Phase 1 shipped (build-plan M2): diff-on-upsert events in all four ingest
+paths + `linked` events from `pr_to_jira`, into a per-tenant `events`
+collection (`yoku/proactive/events.py`). Slack identity (Phase 4a) shipped
+earlier as build-plan M0a. Next: Phase 2 — detectors → signals → Inbox.

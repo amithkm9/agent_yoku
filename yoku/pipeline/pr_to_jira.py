@@ -18,8 +18,21 @@ from pymongo import UpdateOne
 from yoku.constants import LINK_BATCH_SIZE
 from yoku.db.mongo import dc_github_collection, dc_jira_collection
 from yoku.logging import get_logger
+from yoku.proactive.events import linked_event, write_events
 
 log = get_logger("link_prs")
+
+
+def _existing_links() -> dict[str, set[str]]:
+    """{jira key -> PR keys already on its linked_prs}, for EVERY ticket — so
+    only genuinely new links on tickets that exist emit a `linked` event (the
+    pass itself re-upserts every pair, and a dangling ticket ref must not
+    re-fire each sync).
+    """
+    return {
+        d["key"]: {p.get("key") for p in d.get("linked_prs") or [] if isinstance(p, dict)}
+        for d in dc_jira_collection().find({}, {"key": 1, "linked_prs.key": 1})
+    }
 
 
 def main() -> None:
@@ -35,6 +48,8 @@ def main() -> None:
     ops: list[UpdateOne] = []
     scanned = 0
     linked_keys: set[str] = set()
+    prior = _existing_links()
+    events: list[dict] = []
 
     cursor = gh_coll.find(
         {"jira_keys": {"$ne": []}},
@@ -52,6 +67,8 @@ def main() -> None:
         }
         for jk in pr["jira_keys"]:
             linked_keys.add(jk)
+            if jk in prior and pr["key"] not in prior[jk]:
+                events.append(linked_event(jk, pr["key"]))
             ops.append(
                 UpdateOne(
                     {"key": jk},
@@ -70,12 +87,14 @@ def main() -> None:
 
     if ops:
         jira_coll.bulk_write(ops, ordered=True)
+    n_events = write_events(events)
 
     elapsed = time.monotonic() - t0
     log.info(
-        "link done prs_scanned=%d unique_jira_keys=%d elapsed=%.1fs",
+        "link done prs_scanned=%d unique_jira_keys=%d new_links=%d elapsed=%.1fs",
         scanned,
         len(linked_keys),
+        n_events,
         elapsed,
     )
 

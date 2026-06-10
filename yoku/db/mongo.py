@@ -197,6 +197,24 @@ def auth_users_collection() -> Collection:
     return _ensure(_db()["auth_users"], [IndexModel("email", unique=True)])
 
 
+def events_collection() -> Collection:
+    """Proactive-engine event stream (docs/yoku_agent.md Phase 1).
+
+    Engine-internal: deliberately NOT in ALLOWED_COLLECTIONS — the agent never
+    reads it. Written by connector ingests (diff-on-upsert) and pr_to_jira;
+    consumed by detectors and trend analytics.
+    """
+    return _ensure(
+        _db()["events"],
+        [
+            IndexModel("doc_key"),
+            IndexModel([("ts", DESCENDING)]),
+            IndexModel([("processed", ASCENDING), ("ts", ASCENDING)]),
+            IndexModel("kind"),
+        ],
+    )
+
+
 # ---------------------------------------------------------------------------
 # Internal dc-* accessor map — for pipeline/embed code that reads raw collections
 DC_COLLECTIONS = {

@@ -23,6 +23,7 @@ from yoku.connectors.github.client import (
 from yoku.constants import INGEST_BATCH_SIZE
 from yoku.db.mongo import dc_github_collection
 from yoku.logging import get_logger
+from yoku.proactive.events import TRACKED_FIELDS, diff_events, write_events
 
 log = get_logger("ingest_github")
 
@@ -54,6 +55,9 @@ def main(filter_names: list[str] | None = None) -> None:
     total = 0
     new_or_changed = 0
     skipped_bots = 0
+    events: list[dict] = []
+    # Existing-doc projection: embedding-preservation fields + event-tracked fields.
+    proj = {"text": 1, "embedding": 1, **dict.fromkeys(TRACKED_FIELDS["dc-github"], 1)}
 
     for repo_full_name in repos:
         per_repo = 0
@@ -64,12 +68,13 @@ def main(filter_names: list[str] | None = None) -> None:
             doc = pr_to_doc(pr, repo_full_name)
             key = doc["key"]
 
-            existing = coll.find_one({"key": key}, {"text": 1, "embedding": 1})
+            existing = coll.find_one({"key": key}, proj)
             if existing and existing.get("text") == doc["text"]:
                 doc["embedding"] = existing.get("embedding")
             else:
                 doc["embedding"] = None
                 new_or_changed += 1
+            events.extend(diff_events("dc-github", key, existing, doc, now))
 
             doc["_synced_at"] = now
             batch.append(UpdateOne({"key": key}, {"$set": doc}, upsert=True))
@@ -86,6 +91,7 @@ def main(filter_names: list[str] | None = None) -> None:
     if batch:
         coll.bulk_write(batch, ordered=False)
         total += len(batch)
+    write_events(events)
 
     elapsed = time.monotonic() - t0
     log.info(
