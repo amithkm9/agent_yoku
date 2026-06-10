@@ -6,8 +6,11 @@ coding agent.
 
 ```
 docs/
-└── adding-a-connector.md   # onboard a new source (Confluence, Notion, …):
-                            #   connector → Mongo collection → registries → agent
+├── adding-a-connector.md   # onboard a new source (Confluence, Notion, …):
+│                           #   connector → Mongo collection → registries → agent
+├── yoku_agent.md           # proactive agent — the detailed build plan behind
+│                           #   vision.md (events → judge → converse → act)
+└── feature-roadmap.md      # deep dive on 8 candidate features to extend yoku
 ```
 
 Each doc is single-topic and front-matter'd (`name` / `description` /
