@@ -1,0 +1,58 @@
+# Golden answer-quality cases — `make eval` replays these through the live
+# agent and scores citation recall + must-mention + LLM-judged groundedness.
+#
+# Curation rules:
+# - Pick CLOSED tickets / MERGED PRs (stable; open items rot as data moves).
+# - expected_citations: keys a correct answer must cite (AS-1234, org/repo#56).
+# - must_mention: case-insensitive substrings a correct answer must contain.
+# - Keep queries phrased the way a teammate would actually ask.
+#
+# Grow this set whenever a real regression slips through — every bug becomes
+# a case. Target ~30 cases across the prompt's question taxonomy.
+
+cases:
+  # --- point lookups -------------------------------------------------------
+  - query: "tell me about AS-4965"
+    expected_citations: ["AS-4965"]
+    must_mention: ["submodule"]
+    category: point
+    note: closed ticket, stable
+
+  - query: "what is AsatoCorp/asato-skills#964 about?"
+    expected_citations: ["AsatoCorp/asato-skills#964"]
+    must_mention: ["ssl"]
+    category: point
+    note: merged PR, stable
+
+  # --- cross-source --------------------------------------------------------
+  - query: "which PRs implement AS-4965?"
+    expected_citations: ["AS-4965", "AsatoCorp/asato-features#40"]
+    category: cross-source
+    note: ticket with linked_prs; both sides must be cited
+
+  - query: "which JIRA tickets does AsatoCorp/asato-skills#961 reference?"
+    expected_citations: ["AS-4945", "AS-4961"]
+    category: cross-source
+    note: merged PR with two jira_keys
+
+  - query: "is there a ticket behind the PR-body feature-id metadata work?"
+    expected_citations: ["AS-4963"]
+    category: cross-source
+    note: phrasing avoids the key so retrieval has to find it
+
+  # --- person --------------------------------------------------------------
+  - query: "what kind of work does kcsraju do?"
+    must_mention: ["krishna"]
+    category: person
+    note: resolve_user should surface the unified identity (manual alias)
+
+  # --- broad / structural --------------------------------------------------
+  - query: "what was the submodule conflict handler work about?"
+    expected_citations: ["AS-4965"]
+    category: broad
+    note: semantic search must land the right ticket from a paraphrase
+
+  - query: "how many JIRA tickets are in status Done?"
+    must_mention: ["done"]
+    category: analytical
+    note: count query; exact number changes, so only sanity-check phrasing

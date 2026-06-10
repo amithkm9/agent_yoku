@@ -1,4 +1,4 @@
-.PHONY: help install install-dev fmt lint test pre-commit web-lint web-build ingest-jira ingest-github ingest-users embed link refresh-all status ui api web web-install chat clean schemas agent-smoke retrieval-eval
+.PHONY: help install install-dev fmt lint test pre-commit web-lint web-build ingest-jira ingest-github ingest-users embed link refresh-all status ui api web web-install chat clean schemas agent-smoke retrieval-eval eval
 
 POETRY := poetry run
 PY := $(POETRY) python
@@ -35,6 +35,7 @@ help:
 	@echo "  make chat Q='...'    one-shot CLI query"
 	@echo "  make agent-smoke     Run the agent regression suite"
 	@echo "  make retrieval-eval TENANT=asato  Score retrieval on golden queries"
+	@echo "  make eval            Score final answers on the golden set (hits OpenAI)"
 
 install:
 	poetry install --no-root --without dev
@@ -77,6 +78,9 @@ agent-smoke:
 
 retrieval-eval:
 	$(PY) scripts/retrieval_eval.py --tenant $(TENANT)
+
+eval:
+	$(PY) scripts/answer_eval.py --tenant $(or $(TENANT),asato)
 
 ingest-jira:
 	$(CLI) ingest jira
