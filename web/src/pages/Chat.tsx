@@ -253,6 +253,15 @@ function firstNameOf(user: User | null): string {
   return first.charAt(0).toUpperCase() + first.slice(1);
 }
 
+// "14:26" for today, "Jun 1" for anything older — recents don't need seconds.
+function formatWhen(iso: string): string {
+  const d = new Date(iso);
+  if (d.toDateString() === new Date().toDateString()) {
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  }
+  return d.toLocaleDateString([], { month: "short", day: "numeric" });
+}
+
 // Quick-start prompts tailored to what yoku actually knows about:
 // the tenant's JIRA tickets + GitHub PRs.
 interface Suggestion {
@@ -328,6 +337,7 @@ export function Chat() {
   const [freshness, setFreshness] = useState<SourceFreshness[]>([]);
   const [activeSession, setActiveSession] = useState<string | null>(null);
   const [history, setHistory] = useState<ChatTurn[]>([]);
+  const [gapCount, setGapCount] = useState<number>(0);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [syncing, setSyncing] = useState<Set<string>>(new Set());
@@ -335,11 +345,16 @@ export function Chat() {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    document.title = "Agent Yoku";
     api
       .me()
       .then(setUser)
       .catch(() => nav("/login"));
     void refresh();
+    api
+      .listInbox()
+      .then((r) => setGapCount(r.total_matured))
+      .catch(() => setGapCount(0));
   }, []);
 
   useEffect(() => {
@@ -467,6 +482,19 @@ export function Chat() {
         <button className="primary block" onClick={() => void newSession()}>
           + New chat
         </button>
+        <nav className="side-nav">
+          <Link to="/inbox" className="side-nav-item">
+            <SparkleIcon className="nav-icon" />
+            <span>Proactive</span>
+            {gapCount > 0 && <span className="count-badge">{gapCount}</span>}
+          </Link>
+          {user?.is_admin && (
+            <Link to="/settings" className="side-nav-item">
+              <SettingsIcon />
+              <span>Settings</span>
+            </Link>
+          )}
+        </nav>
         <div className="section-title">Recents</div>
         <ul className="session-list">
           {sessions.map((s) => (
@@ -477,8 +505,7 @@ export function Chat() {
             >
               <div className="title">{s.title || "Untitled chat"}</div>
               <div className="meta">
-                {s.turn_count} turn{s.turn_count === 1 ? "" : "s"} ·{" "}
-                {new Date(s.last_active_at).toLocaleString()}
+                {s.turn_count} turn{s.turn_count === 1 ? "" : "s"} · {formatWhen(s.last_active_at)}
               </div>
               <button
                 className="del"
@@ -499,22 +526,14 @@ export function Chat() {
         {user && (
           <div className="sidebar-bottom">
             <div className="account-card">
-              <div className="user-name">{user.name || user.email}</div>
+              {user.name && user.name !== user.email && (
+                <div className="user-name">{user.name}</div>
+              )}
               <div className="account-email">{user.email}</div>
               <div className="user-tenant">tenant: {user.tenant_id}</div>
-              <div className="account-actions">
-                <Link to="/inbox" className="account-button" aria-label="Open proactive inbox">
-                  <SparkleIcon />
-                  <span>Proactive</span>
-                </Link>
-                <Link to="/settings" className="account-button" aria-label="Open settings">
-                  <SettingsIcon />
-                  <span>Settings</span>
-                </Link>
-                <button className="account-button" onClick={logout}>
-                  <span>Log out</span>
-                </button>
-              </div>
+              <button className="account-button block" onClick={logout}>
+                <span>Log out</span>
+              </button>
             </div>
           </div>
         )}
@@ -620,14 +639,12 @@ export function Chat() {
                         label: "Slack messages",
                         icon: (
                           <svg viewBox="0 0 24 24" fill="none">
-                            <path d="M9 3a2 2 0 1 0 0 4h2V3H9Z" fill="currentColor" opacity="0.9"/>
-                            <path d="M3 9a2 2 0 1 0 4 0V7H3v2Z" fill="currentColor" opacity="0.7"/>
-                            <path d="M15 21a2 2 0 1 0 0-4h-2v4h2Z" fill="currentColor" opacity="0.9"/>
-                            <path d="M21 15a2 2 0 1 0-4 0v2h4v-2Z" fill="currentColor" opacity="0.7"/>
-                            <path d="M3 15a2 2 0 1 0 4 0v-2H3v2Z" fill="currentColor" opacity="0.6"/>
-                            <path d="M9 21a2 2 0 1 0 0-4H7v4h2Z" fill="currentColor" opacity="0.8"/>
-                            <path d="M21 9a2 2 0 1 0-4 0v2h4V9Z" fill="currentColor" opacity="0.6"/>
-                            <path d="M15 3a2 2 0 1 0 0 4h2V3h-2Z" fill="currentColor" opacity="0.8"/>
+                            <path
+                              d="M9.6 4 7.8 20M16.4 4l-1.8 16M4.2 9.2h16M3.8 14.8h16"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                            />
                           </svg>
                         ),
                       },

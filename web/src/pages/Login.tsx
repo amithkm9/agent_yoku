@@ -41,11 +41,18 @@ export function Login() {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <h1 className="auth-title">yoku</h1>
-        <p className="auth-subtitle">
-          {mode === "login" ? "Sign in to your tenant" : "Create an account"}
-        </p>
-        <p className="auth-subtitle">
+        <div className="auth-brand">
+          <span className="brand-mark" aria-hidden="true">
+            <span>AY</span>
+          </span>
+          <div>
+            <h1 className="auth-title">Agent Yoku</h1>
+            <p className="auth-subtitle">
+              {mode === "login" ? "Sign in to your workspace" : "Create an account"}
+            </p>
+          </div>
+        </div>
+        <p className="auth-hint">
           {mode === "signup"
             ? "Choose a new tenant name to create your workspace, or an existing one if you were invited."
             : "Enter the exact tenant name for your workspace."}
@@ -100,8 +107,8 @@ export function Login() {
 
           {error && <div className="auth-error">{error}</div>}
 
-          <button type="submit" className="primary" disabled={loading}>
-            {loading ? "…" : mode === "login" ? "Sign in" : "Create account"}
+          <button type="submit" className="primary block" disabled={loading}>
+            {loading ? "Signing in…" : mode === "login" ? "Sign in" : "Create account"}
           </button>
         </form>
 

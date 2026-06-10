@@ -227,7 +227,7 @@ export const api = {
   counts: () => request<Counts>("/api/stats/counts"),
   freshness: () => request<SourceFreshness[]>("/api/stats/freshness"),
 
-  listInbox: () => request<InboxResponse>("/api/inbox"),
+  listInbox: () => request<InboxResponse>("/api/inbox?limit=100"),
   confirmSignal: (id: string) =>
     request<Signal>(`/api/inbox/${id}/confirm`, { method: "POST" }),
   dismissSignal: (id: string) =>

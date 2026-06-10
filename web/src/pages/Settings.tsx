@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
   api,
   ConnectorStatus,
@@ -8,7 +8,7 @@ import {
   SlackConfigIn,
   User,
 } from "../lib/api";
-import { AppBrand, SettingsIcon } from "../components/AppChrome";
+import { AppHeader } from "../components/AppChrome";
 
 type EditingName = "jira" | "github" | "slack" | null;
 
@@ -30,6 +30,7 @@ export function Settings() {
   }, []);
 
   useEffect(() => {
+    document.title = "Agent Yoku — Settings";
     api.me().then(setUser).catch(() => nav("/login"));
     refresh();
   }, [nav, refresh]);
@@ -71,7 +72,7 @@ export function Settings() {
   if (!user.is_admin) {
     return (
       <div className="settings-shell">
-        <SettingsHeader user={user} />
+        <AppHeader user={user} subtitle="Tenant settings" />
         <main className="settings-main">
           <p className="muted">
             Only tenant admins can manage connectors. Ask your tenant admin to set this up.
@@ -83,7 +84,7 @@ export function Settings() {
 
   return (
     <div className="settings-shell">
-      <SettingsHeader user={user} />
+      <AppHeader user={user} subtitle="Tenant settings" />
       <main className="settings-main">
         <section className="connector-hero">
           <div>
@@ -149,27 +150,6 @@ export function Settings() {
         </section>
       </main>
     </div>
-  );
-}
-
-function SettingsHeader({ user }: { user: User }) {
-  return (
-    <header className="settings-header">
-      <AppBrand subtitle="Tenant settings" />
-      <nav>
-        <NavLink
-          to="/settings"
-          className={({ isActive }) => `nav-pill${isActive ? " active" : ""}`}
-        >
-          <SettingsIcon />
-          <span>Settings</span>
-        </NavLink>
-      </nav>
-      <div className="who">
-        <div className="user-name">{user.name || user.email}</div>
-        <div className="user-tenant">tenant: {user.tenant_id}</div>
-      </div>
-    </header>
   );
 }
 
