@@ -101,17 +101,19 @@ def run_detectors(now: datetime | None = None) -> dict[str, dict]:
                         "status": "open",
                         "label": None,
                         "resolution": None,
+                        "verdict": None,
                         "first_seen_at": now,
                         "matured_at": now if already_mature else None,
                         "created_at": now,
                     }
                 )
                 counts["new"] += 1
-            elif existing["status"] == "dismissed":
-                # Sticky: a human said no. Track that we still see it, nothing more.
+            elif existing["status"] in ("dismissed", "judged"):
+                # Sticky: a human said no, or the judge rejected it. Track that
+                # we still see it, nothing more — no re-litigating every sync.
                 coll.update_one({"_id": existing["_id"]}, {"$set": {"last_seen_at": now}})
             elif existing["status"] == "resolved":
-                # Self-healed gap re-opened — treat as a fresh occurrence.
+                # Self-healed gap re-opened — a fresh occurrence, judged anew.
                 coll.update_one(
                     {"_id": existing["_id"]},
                     {
@@ -119,6 +121,7 @@ def run_detectors(now: datetime | None = None) -> dict[str, dict]:
                             **fresh,
                             "status": "open",
                             "resolution": None,
+                            "verdict": None,
                             "first_seen_at": now,
                             "matured_at": now if already_mature else None,
                         }
@@ -141,9 +144,14 @@ def run_detectors(now: datetime | None = None) -> dict[str, dict]:
             },
             {"$set": {"matured_at": now}},
         )
-        # Auto-resolve open signals whose gap is no longer observed.
+        # Auto-resolve signals whose gap is no longer observed — including
+        # judge-rejected ones, so the recall stream records how they ended.
         healed = coll.update_many(
-            {"detector": det.name, "status": "open", "item_key": {"$nin": sorted(found_keys)}},
+            {
+                "detector": det.name,
+                "status": {"$in": ["open", "judged"]},
+                "item_key": {"$nin": sorted(found_keys)},
+            },
             {"$set": {"status": "resolved", "resolution": "self_healed", "resolved_at": now}},
         )
         counts["self_healed"] = healed.modified_count
@@ -157,9 +165,13 @@ def label_signal(signal_id: str, label: str, user_id: str) -> dict | None:
     """Record a human verdict on a signal — the eval label stream.
 
     confirm: "real gap" — stays open/actionable, labeled for precision metrics.
-    dismiss: "not a gap" — sticky; the detector will never resurface this item.
+    dismiss: "not a gap" — sticky; the detector will never resurface this item,
+    and the dismissal lands in the person's memory so repeated "no"s suppress
+    the whole pattern for them (Phase 3).
     Returns the updated signal, or None if the id is unknown.
     """
+    from yoku.proactive.memory import record_dismissal
+
     now = datetime.now(UTC)
     update: dict = {"label": label, "labeled_by": user_id, "labeled_at": now}
     if label == "dismissed":
@@ -167,4 +179,12 @@ def label_signal(signal_id: str, label: str, user_id: str) -> dict | None:
         update["resolution"] = "dismissed"
     coll = signals_collection()
     coll.update_one({"signal_id": signal_id}, {"$set": update})
-    return coll.find_one({"signal_id": signal_id}, {"_id": 0})
+    doc = coll.find_one({"signal_id": signal_id}, {"_id": 0})
+    if doc and label == "dismissed" and doc.get("person_user_id"):
+        record_dismissal(
+            user_id=doc["person_user_id"],
+            pattern=doc["detector"],
+            item_key=doc["item_key"],
+            by=user_id,
+        )
+    return doc

@@ -220,10 +220,18 @@ def refresh_all(skip_jira: bool, skip_github: bool) -> None:
     from yoku.pipeline.entity_links import build_entity_links
 
     build_entity_links()
+    click.secho("→ person baselines", fg="cyan")
+    from yoku.proactive.baselines import compute_baselines
+
+    compute_baselines()
     click.secho("→ proactive detectors", fg="cyan")
     from yoku.proactive.signals import run_detectors
 
     run_detectors()
+    click.secho("→ judge signals", fg="cyan")
+    from yoku.proactive.judge import judge_signals
+
+    judge_signals()
     click.secho("→ trend metrics", fg="cyan")
     from yoku.pipeline.metrics import compute_metrics
 

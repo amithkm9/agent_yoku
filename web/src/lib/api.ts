@@ -84,6 +84,12 @@ export interface Signal {
   url: string | null;
   status: string;
   label: string | null;
+  verdict: {
+    real?: boolean;
+    item?: { real?: boolean; reason?: string };
+    person?: { normal_for_person?: boolean; reason?: string };
+    suppressed_by?: string;
+  } | null;
   first_seen_at: string | null;
   matured_at: string | null;
   last_seen_at: string | null;
@@ -93,6 +99,7 @@ export interface InboxResponse {
   signals: Signal[];
   total_open: number;
   total_matured: number;
+  total_suppressed: number;
 }
 
 export interface TrendPoint {

@@ -10,11 +10,13 @@ from yoku.agent.tools._registry import discover_tools
 _EXPECTED = {
     "describe_collection",
     "describe_collections",
+    "get_memory",
     "list_collections",
     "mongo_count",
     "mongo_query",
     "resolve_user",
     "semantic_search",
+    "update_memory",
     "who_knows",
 }
 

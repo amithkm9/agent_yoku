@@ -35,6 +35,7 @@ async def list_inbox(_: CurrentUser, limit: int = 50) -> InboxResponse:
         signals=[SignalOut(**r) for r in rows],
         total_open=coll.count_documents({"status": "open"}),
         total_matured=coll.count_documents(matured_filter),
+        total_suppressed=coll.count_documents({"status": "judged"}),
     )
 
 

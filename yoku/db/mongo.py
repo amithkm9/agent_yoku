@@ -246,6 +246,25 @@ def signals_collection() -> Collection:
     )
 
 
+def person_memory_collection() -> Collection:
+    """Per-person memory for the proactive engine (docs/yoku_agent.md Phase 3).
+
+    Dismissals and learned patterns — what keeps yoku from nagging. The agent
+    reaches it only through the get_memory / update_memory tools, never via
+    mongo_query (deliberately off ALLOWED_COLLECTIONS).
+    """
+    return _ensure(_db()["person_memory"], [IndexModel("user_id", unique=True)])
+
+
+def baselines_collection() -> Collection:
+    """Per-person rolling activity stats (docs/yoku_agent.md Phase 3).
+
+    Engine-internal: feeds the person-dimension judgment ("is this gap normal
+    for this person?"). Recomputed each sync.
+    """
+    return _ensure(_db()["baselines"], [IndexModel("user_id", unique=True)])
+
+
 # ---------------------------------------------------------------------------
 # Internal dc-* accessor map — for pipeline/embed code that reads raw collections
 DC_COLLECTIONS = {

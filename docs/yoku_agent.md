@@ -411,7 +411,7 @@ Breadth, not architecture. That is the payoff of building the spine right.
 ## 8. We are here
 
 ```
-[Phase 1 ✓]   [2 Inbox ✓]   [3] Judge+Memory ← NEXT   [4a Slack identity ✓ | 4b bot]   [5] Speak   [6] Act
+[Phase 1 ✓]   [2 Inbox ✓]   [3 Judge+Memory ✓]   [4a Slack identity ✓ | 4b bot ← NEXT]   [5] Speak   [6] Act
 ```
 
 Phase 1 shipped (build-plan M2): diff-on-upsert events in all four ingest
@@ -420,5 +420,15 @@ collection (`yoku/proactive/events.py`). Phase 2 shipped (build-plan M3):
 auto-discovered detectors (`yoku/proactive/detectors/`) with recency windows
 + maturation, the `signals` lifecycle (sticky dismissal, self-heal
 auto-resolution, confirm/dismiss labels) in `yoku/proactive/signals.py`,
-`GET /api/inbox`, and the React Proactive tab. Slack identity (Phase 4a)
-shipped earlier as build-plan M0a. Next: Phase 3 — judgment + memory.
+`GET /api/inbox`, and the React Proactive tab. Phase 3 shipped (build-plan
+M5): tiered judgment in `yoku/proactive/judge.py` — human-confirmed labels
+override everything, then memory (`yoku/proactive/memory.py`, fed by Inbox
+dismissals), then deterministic per-person baselines
+(`yoku/proactive/baselines.py`), then the budgeted LLM item∧person AND-gate;
+rejected verdicts are retained (status `judged`) as the §7.3 recall stream.
+One deliberate deviation: the two judgment dimensions are single-shot
+structured LLM calls over pre-gathered evidence, not tool-using sub-agents —
+same epistemics, ~10× cheaper; full sub-agents arrive with Phase 5
+conversations. `get_memory` / `update_memory` are live agent tools. Slack
+identity (Phase 4a) shipped as build-plan M0a. Next: Phase 4b — the Slack
+bot voice (build-plan M6).

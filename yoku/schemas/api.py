@@ -75,6 +75,7 @@ class SignalOut(BaseModel):
     url: str | None = None
     status: str
     label: str | None = None
+    verdict: dict | None = None  # judge outcome: real, item/person reasons
     first_seen_at: datetime | None = None
     matured_at: datetime | None = None
     last_seen_at: datetime | None = None
@@ -84,6 +85,9 @@ class InboxResponse(BaseModel):
     signals: list[SignalOut]
     total_open: int
     total_matured: int
+    # Signals the judge or memory/baseline tiers suppressed (status=judged) —
+    # surfaced as a count so suppression is transparent, never silent.
+    total_suppressed: int = 0
 
 
 class TrendPoint(BaseModel):

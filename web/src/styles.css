@@ -1572,3 +1572,8 @@ code.signal-key {
   font-size: 11px;
   padding: 4px 2px 0;
 }
+
+.signal-chip--judged {
+  background: var(--success-bg);
+  color: var(--success);
+}

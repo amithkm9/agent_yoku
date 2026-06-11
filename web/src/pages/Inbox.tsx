@@ -43,9 +43,10 @@ export function Inbox() {
   const nav = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [signals, setSignals] = useState<Signal[] | null>(null); // null = loading
-  const [totals, setTotals] = useState<{ open: number; matured: number }>({
+  const [totals, setTotals] = useState<{ open: number; matured: number; suppressed: number }>({
     open: 0,
     matured: 0,
+    suppressed: 0,
   });
   const [filter, setFilter] = useState<string>("all");
   const [busy, setBusy] = useState<string | null>(null);
@@ -55,7 +56,11 @@ export function Inbox() {
     try {
       const r = await api.listInbox();
       setSignals(r.signals);
-      setTotals({ open: r.total_open, matured: r.total_matured });
+      setTotals({
+        open: r.total_open,
+        matured: r.total_matured,
+        suppressed: r.total_suppressed,
+      });
     } catch (e) {
       setSignals([]);
       setError(e instanceof Error ? e.message : String(e));
@@ -91,7 +96,11 @@ export function Inbox() {
       } else {
         await api.dismissSignal(signal.signal_id);
         setSignals((list) => (list ?? []).filter((s) => s.signal_id !== signal.signal_id));
-        setTotals((t) => ({ open: Math.max(0, t.open - 1), matured: Math.max(0, t.matured - 1) }));
+        setTotals((t) => ({
+          ...t,
+          open: Math.max(0, t.open - 1),
+          matured: Math.max(0, t.matured - 1),
+        }));
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -186,6 +195,14 @@ export function Inbox() {
                       {s.label === "confirmed" && (
                         <span className="signal-chip signal-chip--confirmed">confirmed</span>
                       )}
+                      {s.verdict?.real === true && (
+                        <span
+                          className="signal-chip signal-chip--judged"
+                          title={s.verdict.item?.reason || "Judged a real gap"}
+                        >
+                          ✓ judged real
+                        </span>
+                      )}
                     </div>
                     <div className="signal-title">{s.title || "(no title)"}</div>
                     <div className="signal-meta muted">
@@ -222,8 +239,11 @@ export function Inbox() {
         {signals !== null && signals.length > 0 && (
           <p className="muted inbox-footnote">
             Showing {visible.length} of {totals.matured} matured gaps ({totals.open} open in
-            total). Gaps younger than each detector's maturation window stay hidden until
-            they persist.
+            total{totals.suppressed > 0
+              ? `; ${totals.suppressed} suppressed as normal workflow or judged not real`
+              : ""}
+            ). Gaps younger than each detector's maturation window stay hidden until they
+            persist.
           </p>
         )}
       </main>

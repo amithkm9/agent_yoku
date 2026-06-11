@@ -103,6 +103,14 @@ class Settings(BaseSettings):
     auto_sync_enabled: bool = True
     sync_interval_minutes: int = 60
 
+    # Proactive judgment (docs/yoku_agent.md Phase 3) — the LLM tier that
+    # decides whether a matured gap signal is real. Deterministic tiers
+    # (memory, baselines) always run; this gates only the paid LLM calls.
+    # judge_budget_per_run caps LLM-judged signals per sync (cost control);
+    # deferred signals are logged and picked up next run.
+    judge_enabled: bool = True
+    judge_budget_per_run: int = 20
+
     @property
     def is_default_jwt_secret(self) -> bool:
         """True when the built-in dev secret is still in use (unsafe in prod)."""
