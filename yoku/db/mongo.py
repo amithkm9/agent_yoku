@@ -215,6 +215,21 @@ def events_collection() -> Collection:
     )
 
 
+def ds_metrics_collection() -> Collection:
+    """Weekly trend metrics (build-plan M4) — one row per (metric, week).
+
+    Agent-readable (whitelisted): backs trend questions in chat and the
+    Trends dashboard. Recomputed idempotently by the metrics pipeline step.
+    """
+    return _ensure(
+        _db()["ds-metrics"],
+        [
+            IndexModel([("metric", ASCENDING), ("week", ASCENDING)], unique=True),
+            IndexModel([("week", DESCENDING)]),
+        ],
+    )
+
+
 def signals_collection() -> Collection:
     """Candidate gaps emitted by proactive detectors (docs/yoku_agent.md Phase 2).
 
@@ -251,6 +266,7 @@ ALLOWED_COLLECTIONS = {
     "ds-conversation": ds_conversation_collection,
     "ds-entity-links": ds_entity_links_collection,
     "ds-unified-users": ds_unified_users_collection,
+    "ds-metrics": ds_metrics_collection,
 }
 
 

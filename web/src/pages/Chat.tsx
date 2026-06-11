@@ -17,7 +17,13 @@ import {
   setToken,
   User,
 } from "../lib/api";
-import { AppBrand, SendIcon, SettingsIcon, SparkleIcon } from "../components/AppChrome";
+import {
+  AppBrand,
+  SendIcon,
+  SettingsIcon,
+  SparkleIcon,
+  TrendsIcon,
+} from "../components/AppChrome";
 
 function extractText(content: unknown): string {
   if (content == null) return "";
@@ -487,6 +493,10 @@ export function Chat() {
             <SparkleIcon className="nav-icon" />
             <span>Proactive</span>
             {gapCount > 0 && <span className="count-badge">{gapCount}</span>}
+          </Link>
+          <Link to="/trends" className="side-nav-item">
+            <TrendsIcon />
+            <span>Trends</span>
           </Link>
           {user?.is_admin && (
             <Link to="/settings" className="side-nav-item">

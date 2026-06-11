@@ -44,6 +44,13 @@ export function AppHeader({ user, subtitle }: { user: User; subtitle: string }) 
           <span>Proactive</span>
           {gaps != null && gaps > 0 && <span className="count-badge">{gaps}</span>}
         </NavLink>
+        <NavLink
+          to="/trends"
+          className={({ isActive }) => `nav-pill${isActive ? " active" : ""}`}
+        >
+          <TrendsIcon />
+          <span>Trends</span>
+        </NavLink>
         {user.is_admin && (
           <NavLink
             to="/settings"
@@ -59,6 +66,19 @@ export function AppHeader({ user, subtitle }: { user: User; subtitle: string }) 
         <div className="user-tenant">tenant: {user.tenant_id}</div>
       </div>
     </header>
+  );
+}
+
+export function TrendsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="nav-icon" aria-hidden="true">
+      <path
+        d="M4 19V11M9.5 19V5M15 19v-6M20.5 19V8M2.5 21h19"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+    </svg>
   );
 }
 

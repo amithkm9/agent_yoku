@@ -151,9 +151,12 @@ def _run_post_ingest_pipeline() -> None:
     # discard the core refresh that already succeeded above.
     _best_effort("unify", unify_all)
     _best_effort("entity_links", build_entity_links)
+    from yoku.pipeline.metrics import compute_metrics
+
     # Proactive detectors close the pipeline — they read what everything
-    # above just wrote.
+    # above just wrote. Metrics come last so `signals_open` reflects this run.
     _best_effort("detectors", run_detectors)
+    _best_effort("metrics", compute_metrics)
 
 
 def list_tenant_ids() -> list[str]:

@@ -95,6 +95,17 @@ export interface InboxResponse {
   total_matured: number;
 }
 
+export interface TrendPoint {
+  week: string; // ISO date of the week's Monday
+  value: number;
+  n: number | null;
+}
+
+export interface TrendsResponse {
+  weeks: string[];
+  series: Record<string, TrendPoint[]>;
+}
+
 export interface PersistedMessage {
   role: "human" | "ai" | "tool" | "system";
   content: unknown;
@@ -228,6 +239,7 @@ export const api = {
   freshness: () => request<SourceFreshness[]>("/api/stats/freshness"),
 
   listInbox: () => request<InboxResponse>("/api/inbox?limit=100"),
+  trends: (weeks = 12) => request<TrendsResponse>(`/api/stats/trends?weeks=${weeks}`),
   confirmSignal: (id: string) =>
     request<Signal>(`/api/inbox/${id}/confirm`, { method: "POST" }),
   dismissSignal: (id: string) =>

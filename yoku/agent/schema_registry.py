@@ -23,6 +23,7 @@ from yoku.schemas import (
     GitHubUser,
     JiraTicket,
     JiraUser,
+    MetricPoint,
     PullRequest,
     SlackMessage,
     SlackUser,
@@ -50,6 +51,7 @@ COLLECTION_MODELS: dict[str, type[BaseModel]] = {
     "ds-conversation": Conversation,
     "ds-entity-links": EntityLink,
     "ds-unified-users": UnifiedUser,
+    "ds-metrics": MetricPoint,
 }
 
 

@@ -10,6 +10,7 @@ from yoku.schemas.directory import GitHubUser, JiraUser, SlackUser
 from yoku.schemas.entity_link import EntityLink
 from yoku.schemas.github import GitHubPR, PRStatus
 from yoku.schemas.jira import JiraTicket, LinkedPR
+from yoku.schemas.metric import MetricPoint
 from yoku.schemas.session import ChatMessage, ChatSession
 from yoku.schemas.slack import SlackMessage
 from yoku.schemas.unified import (
@@ -32,6 +33,7 @@ __all__ = [
     "JiraUser",
     "JiraUserBlock",
     "LinkedPR",
+    "MetricPoint",
     "PRStatus",
     "Primitive",
     "PullRequest",

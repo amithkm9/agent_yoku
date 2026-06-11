@@ -86,6 +86,17 @@ class InboxResponse(BaseModel):
     total_matured: int
 
 
+class TrendPoint(BaseModel):
+    week: str  # ISO date of the week's Monday
+    value: float
+    n: int | None = None
+
+
+class TrendsResponse(BaseModel):
+    weeks: list[str]
+    series: dict[str, list[TrendPoint]]
+
+
 class SessionSummary(BaseModel):
     session_id: str
     title: str | None

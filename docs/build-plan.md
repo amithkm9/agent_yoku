@@ -93,10 +93,11 @@ window, citing the key; dismissing it sticks; a self-healing gap records
 
 ## M4 — Trends & dashboards *(parallel after M2)*
 
-Feature #3, now riding the events stream: aggregate `events` into `dc-metrics`
-(Mongo time-series) — cycle times, transitions, throughput. `/api/stats/trends`
-+ React dashboard page + whitelist `dc-metrics` so chat can answer
-"how has velocity changed?".
+Feature #3, now riding the events stream: aggregate documents + `events` into
+`ds-metrics` (derived → ds-*, agent-readable per the naming convention; the
+roadmap's original `dc-metrics` name was wrong for an agent-facing collection)
+— cycle times, transitions, throughput. `/api/stats/trends` + React dashboard
+page + whitelist `ds-metrics` so chat can answer "how has velocity changed?".
 
 **Done when:** the dashboard renders real trends and the agent answers a trend
 question from `dc-metrics`.

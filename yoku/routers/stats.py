@@ -15,9 +15,10 @@ from yoku.db.mongo import (
     dc_jira_users_collection,
     dc_slack_collection,
     dc_slack_users_collection,
+    ds_metrics_collection,
     ds_unified_users_collection,
 )
-from yoku.schemas.api import CountsResponse, SourceFreshness
+from yoku.schemas.api import CountsResponse, SourceFreshness, TrendPoint, TrendsResponse
 
 router = APIRouter(prefix="/stats", tags=["stats"])
 
@@ -41,3 +42,27 @@ async def counts(_user: CurrentUser) -> CountsResponse:
 async def freshness(_user: CurrentUser) -> list[SourceFreshness]:
     """How current each data source is — drives the sidebar 'synced X ago' badge."""
     return [SourceFreshness(**row) for row in source_freshness()]
+
+
+@router.get("/trends", response_model=TrendsResponse)
+async def trends(_user: CurrentUser, weeks: int = 12) -> TrendsResponse:
+    """Weekly trend series from ds-metrics — drives the Trends dashboard.
+
+    Returns the trailing `weeks` of every computed metric, sparse weeks
+    omitted per series (the UI fills gaps with zeros for count metrics).
+    """
+    weeks = max(4, min(weeks, 52))
+    rows = list(
+        ds_metrics_collection()
+        .find({}, {"_id": 0, "metric": 1, "week": 1, "value": 1, "n": 1})
+        .sort([("week", 1)])
+    )
+    all_weeks = sorted({r["week"] for r in rows})[-weeks:]
+    keep = set(all_weeks)
+    series: dict[str, list[TrendPoint]] = {}
+    for r in rows:
+        if r["week"] in keep:
+            series.setdefault(r["metric"], []).append(
+                TrendPoint(week=r["week"], value=r["value"], n=r.get("n"))
+            )
+    return TrendsResponse(weeks=all_weeks, series=series)

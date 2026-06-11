@@ -224,6 +224,10 @@ def refresh_all(skip_jira: bool, skip_github: bool) -> None:
     from yoku.proactive.signals import run_detectors
 
     run_detectors()
+    click.secho("→ trend metrics", fg="cyan")
+    from yoku.pipeline.metrics import compute_metrics
+
+    compute_metrics()
     click.secho("✓ refresh-all done", fg="green")
 
 

@@ -129,7 +129,7 @@ def test_post_ingest_pipeline_runs_unify_then_entity_links(monkeypatch):
     """Every post-ingest step runs; unify then entity_links close out the pipeline."""
     from yoku.db import backfill, unified_users
     from yoku.pipeline import embed as embed_mod
-    from yoku.pipeline import entity_links, pr_to_jira, slack_threads, unify
+    from yoku.pipeline import entity_links, metrics, pr_to_jira, slack_threads, unify
     from yoku.proactive import signals as signals_mod
 
     order: list[str] = []
@@ -141,11 +141,12 @@ def test_post_ingest_pipeline_runs_unify_then_entity_links(monkeypatch):
     monkeypatch.setattr(unify, "unify_all", lambda: order.append("unify_docs"))
     monkeypatch.setattr(entity_links, "build_entity_links", lambda: order.append("entity_links"))
     monkeypatch.setattr(signals_mod, "run_detectors", lambda: order.append("detectors"))
+    monkeypatch.setattr(metrics, "compute_metrics", lambda: order.append("metrics"))
 
     sync_service._run_post_ingest_pipeline()
 
     # Thread rollup precedes embed so re-rolled parents re-embed in this pass;
-    # detectors close the pipeline — they read what everything above wrote.
+    # detectors then metrics close the pipeline (metrics snapshot the signals).
     assert order == [
         "slack_threads",
         "embed",
@@ -155,6 +156,7 @@ def test_post_ingest_pipeline_runs_unify_then_entity_links(monkeypatch):
         "unify_docs",
         "entity_links",
         "detectors",
+        "metrics",
     ]
 
 
@@ -164,6 +166,7 @@ def test_post_ingest_projection_failure_is_best_effort(monkeypatch, reset_tenant
     from yoku.db import backfill, unified_users
     from yoku.pipeline import embed as embed_mod
     from yoku.pipeline import entity_links, pr_to_jira, slack_threads, unify
+    from yoku.pipeline import metrics as metrics_mod
     from yoku.proactive import signals as signals_mod
 
     ran: list[str] = []
@@ -173,6 +176,7 @@ def test_post_ingest_projection_failure_is_best_effort(monkeypatch, reset_tenant
     monkeypatch.setattr(pr_to_jira, "main", lambda: ran.append("link"))
     monkeypatch.setattr(backfill, "main", lambda: ran.append("backfill"))
     monkeypatch.setattr(signals_mod, "run_detectors", lambda: ran.append("detectors"))
+    monkeypatch.setattr(metrics_mod, "compute_metrics", lambda: ran.append("metrics"))
 
     def boom():
         raise RuntimeError("mongo down")
@@ -191,6 +195,7 @@ def test_post_ingest_projection_failure_is_best_effort(monkeypatch, reset_tenant
         "backfill",
         "entity_links",
         "detectors",
+        "metrics",
     ]
 
 

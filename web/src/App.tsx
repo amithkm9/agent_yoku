@@ -3,6 +3,7 @@ import { Login } from "./pages/Login";
 import { Chat } from "./pages/Chat";
 import { Inbox } from "./pages/Inbox";
 import { Settings } from "./pages/Settings";
+import { Trends } from "./pages/Trends";
 import { getToken } from "./lib/api";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -34,6 +35,14 @@ export function App() {
         element={
           <RequireAuth>
             <Inbox />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/trends"
+        element={
+          <RequireAuth>
+            <Trends />
           </RequireAuth>
         }
       />
