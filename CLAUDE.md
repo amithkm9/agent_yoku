@@ -1,6 +1,6 @@
 # yoku — agent guide
 
-Cross-source agent over Asato's JIRA tickets, GitHub PRs, and Slack messages.
+Cross-source agent over a team's JIRA tickets, GitHub PRs, and Slack messages.
 Ingests them into MongoDB, embeds them, and answers questions through a `deepagents` planning
 agent (`gpt-5.4-mini`) behind a FastAPI + React app. Full overview: `README.md`.
 

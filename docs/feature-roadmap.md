@@ -474,8 +474,8 @@ eval/answer_quality.py
 ### 1. What it is (deeply)
 A bundle of cheap, high-frequency wins:
 - **(a) Fix citation base URL** — `Chat.tsx:118` hardcodes
-  `https://asato-ai.atlassian.net` for JIRA links, ignoring the tenant's configured
-  `base_url`. **This is an outright bug for any non-Asato tenant.**
+  one specific Atlassian site for JIRA links, ignoring the tenant's configured
+  `base_url`. **This is an outright bug for every other tenant.**
 - **(b) Saved/pinned queries** surfaced as one-click chips (beyond the 5 hardcoded
   suggestions).
 - **(c) Shareable answers** — permalink to a turn so people can paste it in Slack.
@@ -498,7 +498,7 @@ A bundle of cheap, high-frequency wins:
 ### 3. Why it fits
 - Daily-touch surfaces — they make yoku feel *finished*.
 - (a) is a real correctness bug for multi-tenancy (the whole product is
-  multi-tenant; a hardcoded Asato URL breaks every other tenant's citations).
+  multi-tenant; a hardcoded URL breaks every other tenant's citations).
 - Great "filler" track to run in parallel with the big bets.
 
 ### 4. Architecture + build points

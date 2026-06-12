@@ -57,7 +57,7 @@ Fixes answers that are **wrong today**. Pure data/frontend layer, near-zero risk
   the tenant's connector `base_url` through the API.
 
 **Done when:** `resolve_user("priya")` returns her Slack identity; a threaded
-discussion comes back as one conversation; a non-Asato tenant's citations link
+discussion comes back as one conversation; every tenant's citations link
 to *their* JIRA.
 
 ## M1 — Answer-quality eval harness *(parallel track; before behavior changes)*

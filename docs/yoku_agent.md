@@ -56,7 +56,7 @@ A large part of "going proactive" is making that dormant signal valuable.
 ### Running example (used throughout)
 
 > **AS-4396** — "Add rate-limiting to the chat API," assigned to **Priya**.
-> - PR `AsatoCorp/agent-svc#212` merges (branch `priya/AS-4396-rate-limit`).
+> - PR `acme/agent-svc#212` merges (branch `priya/AS-4396-rate-limit`).
 >   The ticket stays **In Progress**.
 > - In `#eng`, Priya wrote *"shipped the rate limiter 🎉 will close the ticket
 >   tomorrow."* She never did.
@@ -127,7 +127,7 @@ Indicative shapes (refined per phase):
 
 ```jsonc
 // events
-{ "kind": "updated", "doc_key": "github/AsatoCorp/agent-svc#212",
+{ "kind": "updated", "doc_key": "github/acme/agent-svc#212",
   "collection": "ds-pull-request", "field": "status",
   "old": "open", "new": "merged", "ts": "...", "processed": false }
 
