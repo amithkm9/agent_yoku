@@ -154,14 +154,16 @@ def _run_post_ingest_pipeline() -> None:
     from yoku.pipeline.metrics import compute_metrics
     from yoku.proactive.baselines import compute_baselines
     from yoku.proactive.judge import judge_signals
+    from yoku.proactive.orchestrator import run_proactive_loop
 
     # Proactive stages close the pipeline — they read what everything above
     # just wrote. Baselines feed the judge's person dimension; the judge runs
-    # over what detectors found; metrics come last so `signals_open` reflects
-    # this run's outcome.
+    # over what detectors found; the speak-first loop shadows/sends for
+    # judged-real gaps; metrics come last so `signals_open` reflects this run.
     _best_effort("baselines", compute_baselines)
     _best_effort("detectors", run_detectors)
     _best_effort("judge", judge_signals)
+    _best_effort("proactive_loop", run_proactive_loop)
     _best_effort("metrics", compute_metrics)
 
 

@@ -11,8 +11,10 @@ docs/
 ├── yoku_agent.md           # proactive agent — the detailed build plan behind
 │                           #   vision.md (events → judge → converse → act)
 ├── feature-roadmap.md      # deep dive on 8 candidate features to extend yoku
-└── build-plan.md           # THE agreed order — merges the 8 features + 6
-                            #   proactive phases into one milestone sequence
+├── build-plan.md           # THE agreed order — merges the 8 features + 6
+│                           #   proactive phases into one milestone sequence
+└── slack-app-setup.md      # enable the bot voice: scopes, event subscriptions,
+                            #   team id + signing secret, verification steps
 ```
 
 Each doc is single-topic and front-matter'd (`name` / `description` /

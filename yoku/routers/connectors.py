@@ -140,16 +140,26 @@ async def upsert_github(payload: GithubConfigIn, admin: AdminUser) -> ConnectorS
 
 @router.put("/slack", response_model=ConnectorStatus)
 async def upsert_slack(payload: SlackConfigIn, admin: AdminUser) -> ConnectorStatus:
-    """Store Slack creds for the current tenant. Bot token is encrypted at rest."""
+    """Store Slack creds for the current tenant. Bot token + signing secret
+    are encrypted at rest."""
     bot_token = _resolve_token("slack", payload.bot_token)
+    # Signing secret is optional (ingest-only tenants don't need the bot
+    # voice); blank on edit keeps the previously stored value.
+    existing = cc.get_config_decrypted("slack") or {}
+    secrets = {"bot_token": bot_token}
+    signing_secret = payload.signing_secret or existing.get("signing_secret")
+    if signing_secret:
+        secrets["signing_secret"] = signing_secret
     cc.upsert_config(
         name="slack",
         config={
             "workspace": payload.workspace,
             "lookback_days": payload.lookback_days,
             "channel_types": payload.channel_types,
+            "team_id": payload.team_id or None,
+            "proactive_send_enabled": payload.proactive_send_enabled,
         },
-        secrets={"bot_token": bot_token},
+        secrets=secrets,
         user_id=admin.id,
     )
     return _status_doc("slack", cc.get_config("slack"))

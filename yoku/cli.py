@@ -232,11 +232,57 @@ def refresh_all(skip_jira: bool, skip_github: bool) -> None:
     from yoku.proactive.judge import judge_signals
 
     judge_signals()
+    click.secho("→ proactive loop (shadow/send)", fg="cyan")
+    from yoku.proactive.orchestrator import run_proactive_loop
+
+    run_proactive_loop()
     click.secho("→ trend metrics", fg="cyan")
     from yoku.pipeline.metrics import compute_metrics
 
     compute_metrics()
     click.secho("✓ refresh-all done", fg="green")
+
+
+@cli.command("slack-test-dm")
+@click.argument("person")
+@click.option("--message", default="👋 Test message from yoku — checking my Slack voice works.")
+@click.option(
+    "--send",
+    is_flag=True,
+    help="Actually post the DM. Without this flag the command only shows what would be sent.",
+)
+def slack_test_dm(person: str, message: str, send: bool) -> None:
+    """Resolve PERSON to their Slack identity and (dry-run by default) DM them.
+
+    The M6 verification path: uses the tenant's stored bot token via the same
+    config the scheduler uses. Requires chat:write + im:write scopes.
+    """
+    from yoku.proactive.messenger import send_dm
+
+    if send:
+        from yoku.connectors._runtime import slack_config_from_dict, use_slack
+        from yoku.db import connector_configs as cc
+
+        decrypted = cc.get_config_decrypted("slack") or {}
+        if not decrypted.get("bot_token"):
+            raise click.ClickException(
+                "no Slack bot token stored for this tenant — connect the Slack app "
+                "first (docs/slack-app-setup.md)"
+            )
+        with use_slack(slack_config_from_dict(decrypted)):
+            result = send_dm(person, message, dry_run=False)
+    else:
+        # Dry run is pure identity resolution — no Slack API, no token needed.
+        result = send_dm(person, message, dry_run=True)
+    if "error" in result:
+        raise click.ClickException(result["error"])
+    if result.get("dry_run"):
+        t = result["target"]
+        click.secho(f"would DM {t['name']} ({t['slack_user_id']}):", fg="cyan")
+        click.echo(f"  {result['would_send']}")
+        click.echo("re-run with --send to post it")
+    else:
+        click.secho(f"sent — channel={result['channel']} ts={result['ts']}", fg="green")
 
 
 @cli.command()

@@ -145,11 +145,12 @@ def run_detectors(now: datetime | None = None) -> dict[str, dict]:
             {"$set": {"matured_at": now}},
         )
         # Auto-resolve signals whose gap is no longer observed — including
-        # judge-rejected ones, so the recall stream records how they ended.
+        # judge-rejected and spoken-about ones, so every path records how it
+        # ended (a healed `sent` gap is the best outcome there is).
         healed = coll.update_many(
             {
                 "detector": det.name,
-                "status": {"$in": ["open", "judged"]},
+                "status": {"$in": ["open", "judged", "shadow", "sent"]},
                 "item_key": {"$nin": sorted(found_keys)},
             },
             {"$set": {"status": "resolved", "resolution": "self_healed", "resolved_at": now}},

@@ -265,6 +265,55 @@ def baselines_collection() -> Collection:
     return _ensure(_db()["baselines"], [IndexModel("user_id", unique=True)])
 
 
+def action_log_collection() -> Collection:
+    """Audit of every proposed / executed / rejected write-back (Phase 6).
+
+    Non-negotiable for a side-effecting system: every action lands here at
+    proposal time and its outcome is recorded. Engine-internal — surfaced
+    through /api/actions, never raw mongo_query.
+    """
+    return _ensure(
+        _db()["action_log"],
+        [
+            IndexModel("action_id", unique=True),
+            IndexModel([("status", ASCENDING), ("proposed_at", DESCENDING)]),
+            IndexModel("target_key"),
+        ],
+    )
+
+
+def conversations_collection() -> Collection:
+    """Conversations yoku starts about gaps (docs/yoku_agent.md Phase 5).
+
+    One per signal (unique) — yoku never opens two threads on the same gap.
+    States: shadow (drafted, not sent) | awaiting_reply | replied | closed.
+    """
+    return _ensure(
+        _db()["conversations"],
+        [
+            IndexModel("signal_id", unique=True),
+            IndexModel([("person_user_id", ASCENDING), ("opened_at", DESCENDING)]),
+            IndexModel("state"),
+        ],
+    )
+
+
+def slack_inbound_collection() -> Collection:
+    """Verified inbound Slack events — DMs and @mentions (Phase 4b).
+
+    Engine-internal holding pen: Phase 5's conversation loop consumes rows
+    (`processed` flag) and threads replies back into open conversations.
+    """
+    return _ensure(
+        _db()["slack_inbound"],
+        [
+            IndexModel([("event_id", ASCENDING)], unique=True, sparse=True),
+            IndexModel([("processed", ASCENDING), ("received_at", ASCENDING)]),
+            IndexModel("slack_user_id"),
+        ],
+    )
+
+
 # ---------------------------------------------------------------------------
 # Internal dc-* accessor map — for pipeline/embed code that reads raw collections
 DC_COLLECTIONS = {

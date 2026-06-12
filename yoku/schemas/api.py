@@ -76,6 +76,8 @@ class SignalOut(BaseModel):
     status: str
     label: str | None = None
     verdict: dict | None = None  # judge outcome: real, item/person reasons
+    # The DM the proactive loop drafted (shadow) or sent for this gap.
+    proposed_message: str | None = None
     first_seen_at: datetime | None = None
     matured_at: datetime | None = None
     last_seen_at: datetime | None = None
@@ -88,6 +90,29 @@ class InboxResponse(BaseModel):
     # Signals the judge or memory/baseline tiers suppressed (status=judged) —
     # surfaced as a count so suppression is transparent, never silent.
     total_suppressed: int = 0
+
+
+class ActionOut(BaseModel):
+    """One write-back action in its audit-log state."""
+
+    action_id: str
+    action_type: str
+    target_key: str
+    payload: dict = {}
+    status: str  # proposed | executed | failed | rejected
+    proposed_by: str
+    source: str
+    signal_id: str | None = None
+    proposed_at: datetime | None = None
+    approved_by: str | None = None
+    executed_at: datetime | None = None
+    result: dict | None = None
+    error: str | None = None
+
+
+class ActionsResponse(BaseModel):
+    actions: list[ActionOut]
+    total_proposed: int
 
 
 class TrendPoint(BaseModel):
@@ -199,7 +224,8 @@ def normalize_slack_workspace(raw: str) -> str:
 
 
 class SlackConfigIn(BaseModel):
-    """Inbound Slack config. `bot_token` is optional on edit — blank means keep existing."""
+    """Inbound Slack config. `bot_token` / `signing_secret` are optional on
+    edit — blank means keep existing."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -207,6 +233,13 @@ class SlackConfigIn(BaseModel):
     bot_token: str | None = None
     lookback_days: int = 90
     channel_types: str = "public_channel"
+    # Bot voice (Phase 4b): the workspace's team id (T…) routes inbound events
+    # to this tenant; the signing secret verifies they really came from Slack.
+    team_id: str | None = None
+    signing_secret: str | None = None
+    # Phase 5 go-live flag: when False (default) the proactive loop only
+    # drafts messages (shadow mode); flip once shadow output earns trust.
+    proactive_send_enabled: bool = False
 
     @field_validator("workspace")
     @classmethod

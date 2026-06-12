@@ -49,6 +49,36 @@ def _paginate(endpoint: str, list_key: str, params: dict[str, Any] | None = None
         p["cursor"] = cursor
 
 
+@make_retry("slack", _retry_log)
+def _post(endpoint: str, payload: dict[str, Any]) -> dict:
+    r = requests.post(f"{_BASE}/{endpoint}", headers=_headers(), json=payload, timeout=30)
+    r.raise_for_status()
+    data = r.json()
+    if not data.get("ok"):
+        raise requests.HTTPError(f"Slack API error: {data.get('error', 'unknown')}")
+    return data
+
+
+def auth_test() -> dict:
+    """Identify the bot token: returns user_id, bot_id, team_id, team."""
+    return _get("auth.test")
+
+
+def open_dm(user_id: str) -> str:
+    """Open (or fetch) the bot's DM channel with a user. Returns the channel id."""
+    data = _post("conversations.open", {"users": user_id})
+    return data["channel"]["id"]
+
+
+def post_message(channel: str, text: str, thread_ts: str | None = None) -> dict:
+    """Post a message; returns {channel, ts} of the posted message."""
+    payload: dict[str, Any] = {"channel": channel, "text": text}
+    if thread_ts:
+        payload["thread_ts"] = thread_ts
+    data = _post("chat.postMessage", payload)
+    return {"channel": data.get("channel"), "ts": data.get("ts")}
+
+
 def list_channels(channel_types: str = "public_channel") -> Iterator[dict]:
     """Yield non-archived channels of the configured type(s)."""
     for ch in _paginate("conversations.list", "channels", {"types": channel_types}):

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { api, Signal, User } from "../lib/api";
+import { Action, api, Signal, User } from "../lib/api";
 import { AppHeader, SparkleIcon } from "../components/AppChrome";
 
 // Human label per detector — what the gap *means*, not its internal name.
@@ -51,6 +51,7 @@ export function Inbox() {
   const [filter, setFilter] = useState<string>("all");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pendingActions, setPendingActions] = useState<Action[]>([]);
 
   const refresh = useCallback(async () => {
     try {
@@ -64,6 +65,12 @@ export function Inbox() {
     } catch (e) {
       setSignals([]);
       setError(e instanceof Error ? e.message : String(e));
+    }
+    try {
+      const a = await api.listActions();
+      setPendingActions(a.actions.filter((x) => x.status === "proposed"));
+    } catch {
+      setPendingActions([]); // non-admins simply see no action queue
     }
   }, []);
 
@@ -110,6 +117,20 @@ export function Inbox() {
     }
   }
 
+  async function actOnAction(a: Action, approve: boolean) {
+    setBusy(a.action_id);
+    setError(null);
+    try {
+      if (approve) await api.approveAction(a.action_id);
+      else await api.rejectAction(a.action_id);
+      setPendingActions((list) => list.filter((x) => x.action_id !== a.action_id));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
   if (!user) return null;
 
   return (
@@ -121,6 +142,53 @@ export function Inbox() {
           <div className="banner error" onClick={() => setError(null)}>
             {error}
           </div>
+        )}
+
+        {pendingActions.length > 0 && (
+          <section className="actions-pending">
+            <h3>Pending actions</h3>
+            <p className="muted">
+              Write-backs yoku proposed. Approving executes against the real system —
+              every outcome is audit-logged.
+            </p>
+            <ul className="signal-list">
+              {pendingActions.map((a) => (
+                <li key={a.action_id} className="signal-row">
+                  <div className="signal-body">
+                    <div className="signal-top">
+                      <span className="signal-chip signal-chip--action">
+                        {a.action_type.replace(/_/g, " ")}
+                      </span>
+                      <code className="signal-key">{a.target_key || "(new)"}</code>
+                      <span className="muted">via {a.source}</span>
+                    </div>
+                    <div className="signal-meta muted">
+                      {Object.entries(a.payload)
+                        .map(([k, v]) => `${k}: ${String(v).slice(0, 80)}`)
+                        .join(" · ")}
+                    </div>
+                  </div>
+                  <div className="signal-actions">
+                    <button
+                      className="signal-btn confirm"
+                      disabled={busy === a.action_id || !user.is_admin}
+                      title={user.is_admin ? "Execute this action" : "Admins only"}
+                      onClick={() => void actOnAction(a, true)}
+                    >
+                      Approve
+                    </button>
+                    <button
+                      className="signal-btn dismiss"
+                      disabled={busy === a.action_id || !user.is_admin}
+                      onClick={() => void actOnAction(a, false)}
+                    >
+                      Reject
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
         )}
 
         <div className="inbox-intro">
@@ -203,8 +271,29 @@ export function Inbox() {
                           ✓ judged real
                         </span>
                       )}
+                      {s.status === "shadow" && (
+                        <span
+                          className="signal-chip signal-chip--shadow"
+                          title="Drafted but not sent — shadow mode"
+                        >
+                          ✉ drafted
+                        </span>
+                      )}
+                      {s.status === "sent" && (
+                        <span className="signal-chip signal-chip--sent" title="DM sent">
+                          ✉ sent
+                        </span>
+                      )}
                     </div>
                     <div className="signal-title">{s.title || "(no title)"}</div>
+                    {s.proposed_message && (
+                      <div className="signal-draft">
+                        <span className="signal-draft-label">
+                          {s.status === "sent" ? "yoku said:" : "yoku would say:"}
+                        </span>
+                        “{s.proposed_message}”
+                      </div>
+                    )}
                     <div className="signal-meta muted">
                       {s.person_name || "Unassigned"}
                       {s.evidence.repo ? ` · ${String(s.evidence.repo)}` : ""}

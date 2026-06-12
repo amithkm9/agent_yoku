@@ -518,6 +518,9 @@ function SlackEditor({
     bot_token: "",
     lookback_days: (cfg.lookback_days as number) || 90,
     channel_types: (cfg.channel_types as string) || "public_channel",
+    team_id: (cfg.team_id as string) || "",
+    signing_secret: "",
+    proactive_send_enabled: Boolean(cfg.proactive_send_enabled),
   });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -529,6 +532,8 @@ function SlackEditor({
     try {
       const payload: SlackConfigIn = { ...form };
       if (!payload.bot_token) delete payload.bot_token;
+      if (!payload.signing_secret) delete payload.signing_secret;
+      if (!payload.team_id) delete payload.team_id;
       await api.saveSlackConfig(payload);
       onSaved();
     } catch (e) {
@@ -591,6 +596,39 @@ function SlackEditor({
           onChange={(e) => setForm({ ...form, channel_types: e.target.value })}
         />
         <small>{initial?.guide.field_help.channel_types || "Comma-separated: public_channel, private_channel."}</small>
+      </label>
+      <label className="field">
+        <span>Team ID (bot voice, optional)</span>
+        <input
+          value={form.team_id || ""}
+          onChange={(e) => setForm({ ...form, team_id: e.target.value })}
+          placeholder="T0123ABCD"
+        />
+        <small>{initial?.guide.field_help.team_id || "Workspace team ID — routes inbound Slack events to this tenant."}</small>
+      </label>
+      <label className="field">
+        <span>Signing secret (bot voice, optional)</span>
+        <input
+          type="password"
+          value={form.signing_secret || ""}
+          onChange={(e) => setForm({ ...form, signing_secret: e.target.value })}
+          placeholder={initial?.configured ? "leave blank to keep existing" : ""}
+        />
+        <small>{initial?.guide.field_help.signing_secret || "App signing secret — verifies inbound events. Stored encrypted."}</small>
+      </label>
+      <label className="field field-checkbox">
+        <span>Proactive DMs</span>
+        <span className="checkbox-row">
+          <input
+            type="checkbox"
+            checked={Boolean(form.proactive_send_enabled)}
+            onChange={(e) => setForm({ ...form, proactive_send_enabled: e.target.checked })}
+          />
+          <span>
+            Let yoku actually send gap nudges as Slack DMs. Off = shadow mode:
+            drafts appear in the Proactive inbox only.
+          </span>
+        </span>
       </label>
       {err && <div className="auth-error">{err}</div>}
       <div className="connector-actions">

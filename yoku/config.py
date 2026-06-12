@@ -111,6 +111,21 @@ class Settings(BaseSettings):
     judge_enabled: bool = True
     judge_budget_per_run: int = 20
 
+    # Speaking first (docs/yoku_agent.md Phase 5). Real DMs require ALL of:
+    # this global switch, the tenant's `proactive_send_enabled` flag on its
+    # Slack config, and a stored bot token — otherwise the orchestrator runs
+    # in shadow mode (drafts land in the Inbox, nothing is sent).
+    proactive_speak_enabled: bool = True
+    # At most this many yoku-initiated DMs per person per day.
+    proactive_daily_dm_cap: int = 1
+    # Optional quiet hours in UTC, "start-end" 24h (e.g. "20-06"): no DMs
+    # inside the window; drafts wait for the next sync outside it.
+    proactive_quiet_utc: str | None = None
+    # Phase 6: allow an affirmative DM reply ("yes" / "go ahead") from the
+    # person yoku messaged to approve THAT gap's pending action. Off by
+    # default — approval then happens only in the web UI / API.
+    dm_approval_enabled: bool = False
+
     @property
     def is_default_jwt_secret(self) -> bool:
         """True when the built-in dev secret is still in use (unsafe in prod)."""

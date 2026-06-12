@@ -1577,3 +1577,58 @@ code.signal-key {
   background: var(--success-bg);
   color: var(--success);
 }
+
+.signal-chip--shadow {
+  background: #f0eefe;
+  color: #6d5efc;
+  border: 1px dashed var(--primary-border);
+}
+.signal-chip--sent {
+  background: var(--success-bg);
+  color: var(--success);
+}
+.signal-draft {
+  margin-top: 6px;
+  padding: 8px 12px;
+  border-left: 3px solid var(--primary-border);
+  background: var(--bg-subtle);
+  border-radius: 0 8px 8px 0;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.signal-draft-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
+
+.field-checkbox .checkbox-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+}
+.field-checkbox input[type="checkbox"] {
+  width: auto;
+  margin-top: 2px;
+}
+
+.actions-pending {
+  margin-bottom: 24px;
+}
+.actions-pending h3 {
+  margin: 0 0 2px;
+}
+.actions-pending > p {
+  margin: 0 0 10px;
+  font-size: 12px;
+}
+.signal-chip--action {
+  background: #fff4e0;
+  color: var(--warning);
+}

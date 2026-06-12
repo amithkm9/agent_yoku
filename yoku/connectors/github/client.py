@@ -66,6 +66,26 @@ def list_non_archived_repos() -> Iterator[dict]:
         yield repo
 
 
+@make_retry("github", _retry_log)
+def _post(url: str, payload: dict[str, Any]) -> requests.Response:
+    r = requests.post(url, headers=_headers(), json=payload, timeout=30)
+    r.raise_for_status()
+    return r
+
+
+def get_pull(repo_full_name: str, number: int) -> dict:
+    """Fetch one PR in the same shape `list_pulls` yields."""
+    cfg = current_github_config()
+    return _get(f"{cfg.api_base}/repos/{repo_full_name}/pulls/{number}").json()
+
+
+def comment_on_pr(repo_full_name: str, number: int, body: str) -> dict:
+    """Comment on a PR (via the issues endpoint, as PR comments are issue comments)."""
+    cfg = current_github_config()
+    r = _post(f"{cfg.api_base}/repos/{repo_full_name}/issues/{number}/comments", {"body": body})
+    return {"comment_id": r.json().get("id"), "url": r.json().get("html_url")}
+
+
 def list_pulls(repo_full_name: str, since: datetime) -> Iterator[dict]:
     """Yield PRs updated >= `since`. Stops early once older PRs appear.
 

@@ -132,6 +132,7 @@ def test_post_ingest_pipeline_runs_unify_then_entity_links(monkeypatch):
     from yoku.pipeline import entity_links, metrics, pr_to_jira, slack_threads, unify
     from yoku.proactive import baselines as baselines_mod
     from yoku.proactive import judge as judge_mod
+    from yoku.proactive import orchestrator as orch_mod
     from yoku.proactive import signals as signals_mod
 
     order: list[str] = []
@@ -145,6 +146,7 @@ def test_post_ingest_pipeline_runs_unify_then_entity_links(monkeypatch):
     monkeypatch.setattr(baselines_mod, "compute_baselines", lambda: order.append("baselines"))
     monkeypatch.setattr(signals_mod, "run_detectors", lambda: order.append("detectors"))
     monkeypatch.setattr(judge_mod, "judge_signals", lambda: order.append("judge"))
+    monkeypatch.setattr(orch_mod, "run_proactive_loop", lambda: order.append("proactive_loop"))
     monkeypatch.setattr(metrics, "compute_metrics", lambda: order.append("metrics"))
 
     sync_service._run_post_ingest_pipeline()
@@ -163,6 +165,7 @@ def test_post_ingest_pipeline_runs_unify_then_entity_links(monkeypatch):
         "baselines",
         "detectors",
         "judge",
+        "proactive_loop",
         "metrics",
     ]
 
@@ -176,6 +179,7 @@ def test_post_ingest_projection_failure_is_best_effort(monkeypatch, reset_tenant
     from yoku.pipeline import metrics as metrics_mod
     from yoku.proactive import baselines as baselines_mod
     from yoku.proactive import judge as judge_mod
+    from yoku.proactive import orchestrator as orch_mod
     from yoku.proactive import signals as signals_mod
 
     ran: list[str] = []
@@ -187,6 +191,7 @@ def test_post_ingest_projection_failure_is_best_effort(monkeypatch, reset_tenant
     monkeypatch.setattr(baselines_mod, "compute_baselines", lambda: ran.append("baselines"))
     monkeypatch.setattr(signals_mod, "run_detectors", lambda: ran.append("detectors"))
     monkeypatch.setattr(judge_mod, "judge_signals", lambda: ran.append("judge"))
+    monkeypatch.setattr(orch_mod, "run_proactive_loop", lambda: ran.append("proactive_loop"))
     monkeypatch.setattr(metrics_mod, "compute_metrics", lambda: ran.append("metrics"))
 
     def boom():
@@ -208,6 +213,7 @@ def test_post_ingest_projection_failure_is_best_effort(monkeypatch, reset_tenant
         "baselines",
         "detectors",
         "judge",
+        "proactive_loop",
         "metrics",
     ]
 

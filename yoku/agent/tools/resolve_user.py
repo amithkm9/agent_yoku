@@ -18,10 +18,10 @@ def resolve_user(query: str) -> dict:
     to inspect a person's cross-source identities / disambiguate a partial name.
 
     Returns a dict with: email, jira.displayName, jira.accountId, github.login,
-    slack.user_id, slack.display_name, is_bot, match_source. Raises ValueError
-    if no user matches.
+    slack.user_id, slack.display_name, is_bot, match_source — or
+    {"error": ...} when nothing matches (e.g. the query wasn't a person).
     """
     doc = _t._resolve_user_doc(query)
     if not doc:
-        raise ValueError(f"no user matches {query!r}")
+        return {"error": f"no user matches {query!r} — this tool resolves people, not items"}
     return doc

@@ -26,14 +26,19 @@ _MAX_SIGNALS = 100
 
 @router.get("", response_model=InboxResponse)
 async def list_inbox(_: CurrentUser, limit: int = 50) -> InboxResponse:
-    """Matured, unresolved gaps — newest gap first."""
+    """Matured, unresolved gaps — including drafted (shadow) and sent DMs.
+
+    Shadow signals are the human-review surface for the speak-first loop:
+    each carries the exact message yoku would send.
+    """
     limit = max(1, min(limit, _MAX_SIGNALS))
     coll = signals_collection()
-    matured_filter = {"status": "open", "matured_at": {"$ne": None}}
+    active = {"$in": ["open", "shadow", "sent"]}
+    matured_filter = {"status": active, "matured_at": {"$ne": None}}
     rows = list(coll.find(matured_filter, {"_id": 0}).sort([("matured_at", -1)]).limit(limit))
     return InboxResponse(
         signals=[SignalOut(**r) for r in rows],
-        total_open=coll.count_documents({"status": "open"}),
+        total_open=coll.count_documents({"status": active}),
         total_matured=coll.count_documents(matured_filter),
         total_suppressed=coll.count_documents({"status": "judged"}),
     )

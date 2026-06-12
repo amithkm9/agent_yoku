@@ -19,7 +19,9 @@ def test_resolve_user_found(monkeypatch):
 
 
 @pytest.mark.unit
-def test_resolve_user_not_found_raises(monkeypatch):
+def test_resolve_user_not_found_returns_error(monkeypatch):
+    # Tools never raise into the agent loop — errors come back as {"error": ...}
+    # so the agent can adapt (repo convention; a raise killed live runs).
     monkeypatch.setattr(tools, "_resolve_user_doc", lambda _q: None)
-    with pytest.raises(ValueError):
-        tools.resolve_user.invoke({"query": "nobody"})
+    out = tools.resolve_user.invoke({"query": "nobody"})
+    assert "error" in out and "nobody" in out["error"]

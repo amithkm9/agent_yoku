@@ -83,6 +83,82 @@ def search_issues(jql: str, page_size: int = 100) -> Iterator[dict]:
             return
 
 
+@make_retry("jira", _retry_log)
+def _jira_post(url: str, payload: dict[str, Any]) -> requests.Response:
+    cfg = current_jira_config()
+    r = requests.post(url, json=payload, auth=(cfg.email, cfg.token), timeout=30)
+    r.raise_for_status()
+    return r
+
+
+def get_issue(key: str) -> dict:
+    """Fetch one issue in the same field shape `search_issues` yields."""
+    url = f"{current_jira_config().base_url_clean}/rest/api/3/issue/{key}"
+    return _jira_get(url, {"fields": ",".join(_FIELDS)}).json()
+
+
+def get_transitions(key: str) -> list[dict]:
+    """Available workflow transitions for an issue: [{id, name, to_status}]."""
+    url = f"{current_jira_config().base_url_clean}/rest/api/3/issue/{key}/transitions"
+    data = _jira_get(url, {}).json()
+    return [
+        {"id": t["id"], "name": t["name"], "to_status": (t.get("to") or {}).get("name")}
+        for t in data.get("transitions", [])
+    ]
+
+
+def transition_issue(key: str, to_status: str) -> dict:
+    """Move an issue to the named status (matched case-insensitively against
+    the available transitions' target statuses). Raises ValueError when no
+    transition reaches it — the caller surfaces the available options."""
+    available = get_transitions(key)
+    wanted = to_status.strip().lower()
+    match = next(
+        (t for t in available if (t.get("to_status") or t["name"]).lower() == wanted), None
+    )
+    if match is None:
+        names = sorted({t.get("to_status") or t["name"] for t in available})
+        raise ValueError(f"no transition to {to_status!r} for {key}; available: {names}")
+    url = f"{current_jira_config().base_url_clean}/rest/api/3/issue/{key}/transitions"
+    _jira_post(url, {"transition": {"id": match["id"]}})
+    return {"key": key, "transitioned_to": match.get("to_status") or match["name"]}
+
+
+def add_comment(key: str, body: str) -> dict:
+    """Add a plain-text comment (wrapped in minimal ADF) to an issue."""
+    url = f"{current_jira_config().base_url_clean}/rest/api/3/issue/{key}/comment"
+    adf = {
+        "type": "doc",
+        "version": 1,
+        "content": [{"type": "paragraph", "content": [{"type": "text", "text": body}]}],
+    }
+    r = _jira_post(url, {"body": adf})
+    return {"key": key, "comment_id": r.json().get("id")}
+
+
+def create_issue(summary: str, description: str = "", issue_type: str = "Task") -> dict:
+    """Create an issue in the configured project. Returns {key, url}."""
+    cfg = current_jira_config()
+    adf = {
+        "type": "doc",
+        "version": 1,
+        "content": [
+            {"type": "paragraph", "content": [{"type": "text", "text": description or summary}]}
+        ],
+    }
+    payload = {
+        "fields": {
+            "project": {"key": cfg.project},
+            "summary": summary,
+            "description": adf,
+            "issuetype": {"name": issue_type},
+        }
+    }
+    r = _jira_post(f"{cfg.base_url_clean}/rest/api/3/issue", payload)
+    key = r.json().get("key")
+    return {"key": key, "url": f"{cfg.base_url_clean}/browse/{key}"}
+
+
 def _parent_links(parent: dict | None) -> tuple[str | None, str | None]:
     """Derive (epic_key, parent_key) from a team-managed issue's `parent` field.
 

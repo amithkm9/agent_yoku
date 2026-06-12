@@ -62,6 +62,9 @@ class SlackConfig:
     workspace: str
     lookback_days: int = _SLACK_LOOKBACK_DAYS_DEFAULT
     channel_types: str = "public_channel"
+    # Bot-voice extras (Phase 4b) — optional; ingest-only tenants leave them unset.
+    team_id: str | None = None
+    signing_secret: str | None = None
 
 
 _jira: ContextVar[JiraConfig | None] = ContextVar("jira_config", default=None)
@@ -173,4 +176,6 @@ def slack_config_from_dict(d: dict) -> SlackConfig:
         workspace=d["workspace"],
         lookback_days=int(d.get("lookback_days") or _SLACK_LOOKBACK_DAYS_DEFAULT),
         channel_types=d.get("channel_types") or "public_channel",
+        team_id=d.get("team_id") or None,
+        signing_secret=d.get("signing_secret") or None,
     )

@@ -411,7 +411,8 @@ Breadth, not architecture. That is the payoff of building the spine right.
 ## 8. We are here
 
 ```
-[Phase 1 ✓]   [2 Inbox ✓]   [3 Judge+Memory ✓]   [4a Slack identity ✓ | 4b bot ← NEXT]   [5] Speak   [6] Act
+[Phase 1 ✓]   [2 Inbox ✓]   [3 Judge+Memory ✓]   [4a+4b Slack ✓]   [5 Speak ✓]   [6 Act ✓]
+        THE ENGINE IS COMPLETE — what remains is breadth (§4 "after Phase 6") and go-live.
 ```
 
 Phase 1 shipped (build-plan M2): diff-on-upsert events in all four ingest
@@ -430,5 +431,33 @@ One deliberate deviation: the two judgment dimensions are single-shot
 structured LLM calls over pre-gathered evidence, not tool-using sub-agents —
 same epistemics, ~10× cheaper; full sub-agents arrive with Phase 5
 conversations. `get_memory` / `update_memory` are live agent tools. Slack
-identity (Phase 4a) shipped as build-plan M0a. Next: Phase 4b — the Slack
-bot voice (build-plan M6).
+identity (Phase 4a) shipped as build-plan M0a. Phase 4b shipped (build-plan
+M6): outbound voice (`yoku/proactive/messenger.py` — unified-identity
+resolution, bot refusal, dry-run default; `yoku slack-test-dm`) and inbound
+ears (`yoku/routers/slack_events.py` — per-tenant signature verification,
+team_id→tenant routing, event dedupe, bot-echo filtering, into
+`slack_inbound`). Per-tenant app setup: `docs/slack-app-setup.md`; the live
+DM round-trip awaits a workspace app install. Phase 5 shipped (build-plan
+M7): `yoku/proactive/orchestrator.py` + `routing.py` — judged-real signals
+walk dedupe → never-guess routing → quiet hours / per-person daily cap →
+deterministic one-ask message templates → SHADOW by default (drafts on the
+signal + `conversations`, reviewable in the Inbox). Real sends need three
+keys: global `proactive_speak_enabled` ∧ tenant `proactive_send_enabled`
+(Slack settings checkbox, default off) ∧ a stored bot token. Replies from
+`slack_inbound` thread onto awaiting conversations. `who_knows` ownership
+fallback stays unimplemented by design (below the confidence floor → skip).
+Phase 6 shipped (build-plan M8): the two-phase action layer
+(`yoku/actions/executor.py` — propose → approve/reject → execute under
+tenant credentials → `action_log` audit → `sync_one` targeted refresh),
+connector write methods (JIRA transition/comment/create, GitHub PR comment),
+the `propose_action` agent tool (proposes ONLY — execution requires an
+admin in the Proactive tab or `POST /api/actions/{id}/approve`), and
+flag-gated DM approval (`dm_approval_enabled`, default off: an exact
+affirmative reply from the person yoku asked approves that gap's single
+pending action). Action types: transition_ticket, comment_on_jira,
+create_jira_ticket, link_pr_to_ticket, comment_on_pr.
+
+Go-live checklist: install the Slack app (docs/slack-app-setup.md), let
+shadow mode run for a week, then flip the tenant's "Proactive DMs" toggle.
+Everything beyond is breadth — new detectors on the same loop (§4
+"after Phase 6").

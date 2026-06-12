@@ -90,6 +90,7 @@ export interface Signal {
     person?: { normal_for_person?: boolean; reason?: string };
     suppressed_by?: string;
   } | null;
+  proposed_message: string | null;
   first_seen_at: string | null;
   matured_at: string | null;
   last_seen_at: string | null;
@@ -100,6 +101,27 @@ export interface InboxResponse {
   total_open: number;
   total_matured: number;
   total_suppressed: number;
+}
+
+export interface Action {
+  action_id: string;
+  action_type: string;
+  target_key: string;
+  payload: Record<string, unknown>;
+  status: string;
+  proposed_by: string;
+  source: string;
+  signal_id: string | null;
+  proposed_at: string | null;
+  approved_by: string | null;
+  executed_at: string | null;
+  result: Record<string, unknown> | null;
+  error: string | null;
+}
+
+export interface ActionsResponse {
+  actions: Action[];
+  total_proposed: number;
 }
 
 export interface TrendPoint {
@@ -246,6 +268,11 @@ export const api = {
   freshness: () => request<SourceFreshness[]>("/api/stats/freshness"),
 
   listInbox: () => request<InboxResponse>("/api/inbox?limit=100"),
+  listActions: () => request<ActionsResponse>("/api/actions"),
+  approveAction: (id: string) =>
+    request<Action>(`/api/actions/${id}/approve`, { method: "POST" }),
+  rejectAction: (id: string) =>
+    request<Action>(`/api/actions/${id}/reject`, { method: "POST" }),
   trends: (weeks = 12) => request<TrendsResponse>(`/api/stats/trends?weeks=${weeks}`),
   confirmSignal: (id: string) =>
     request<Signal>(`/api/inbox/${id}/confirm`, { method: "POST" }),
@@ -281,6 +308,12 @@ export interface SlackConfigIn {
   bot_token?: string;
   lookback_days: number;
   channel_types: string;
+  /** Bot voice (optional): workspace team ID for inbound event routing. */
+  team_id?: string;
+  /** Bot voice (optional): blank/omitted on edit = keep existing stored secret. */
+  signing_secret?: string;
+  /** Phase 5 go-live: false (default) = shadow mode, drafts only. */
+  proactive_send_enabled?: boolean;
 }
 
 export interface GithubConfigIn {
