@@ -17,22 +17,6 @@ pytestmark = pytest.mark.integration
 _NOW = datetime(2026, 6, 12, 12, 0, tzinfo=UTC)
 
 
-@pytest.fixture
-def tenant(scratch_db):
-    from yoku.db import tenancy
-
-    tid = f"prl_{uuid.uuid4().hex[:8]}"
-    tenancy.set_tenant(tid)
-    yield tid
-    from pymongo import MongoClient
-
-    from yoku.config import settings
-    from yoku.db.tenancy import tenant_db_name
-
-    MongoClient(settings.mongo_uri).drop_database(tenant_db_name(tid))
-    tenancy.set_tenant(None)
-
-
 def _seed_person(user_id="u_p", slack_id="U123"):
     from yoku.db.mongo import ds_unified_users_collection
 

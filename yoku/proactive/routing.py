@@ -44,5 +44,6 @@ def route_target(signal: dict) -> dict | None:
         "user_id": user_id,
         "slack_user_id": slack["user_id"],
         "name": name,
-        "first_name": name.split()[0] if name else "there",
+        # split() guards whitespace-only names ("" or "  " → "there").
+        "first_name": (name.split() or ["there"])[0],
     }

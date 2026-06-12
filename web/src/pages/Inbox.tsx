@@ -3,11 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { Action, api, Signal, User } from "../lib/api";
 import { AppHeader, SparkleIcon } from "../components/AppChrome";
 
-// Human label per detector — what the gap *means*, not its internal name.
-const DETECTOR_LABELS: Record<string, string> = {
-  done_no_pr: "Done, no PR",
-  merged_no_ticket: "Merged, no ticket",
-};
+// Server sends the label from the Detector spec; this is only the fallback
+// for rows written before labels were denormalized.
+function detectorLabel(s: Signal): string {
+  return s.detector_label || s.detector.replace(/_/g, " ");
+}
 
 function itemHref(signal: Signal, jiraBase: string | null): string | null {
   if (signal.url) return signal.url;
@@ -214,7 +214,8 @@ export function Inbox() {
                 className={`filter-chip${filter === det ? " active" : ""}`}
                 onClick={() => setFilter(det)}
               >
-                {DETECTOR_LABELS[det] || det} <span className="filter-count">{n}</span>
+                {(signals ?? []).find((s) => s.detector === det)?.detector_label || det}{" "}
+                <span className="filter-count">{n}</span>
               </button>
             ))}
           </div>
@@ -251,7 +252,7 @@ export function Inbox() {
                   <div className="signal-body">
                     <div className="signal-top">
                       <span className={`signal-chip signal-chip--${s.detector}`}>
-                        {DETECTOR_LABELS[s.detector] || s.detector}
+                        {detectorLabel(s)}
                       </span>
                       {href ? (
                         <a className="signal-key" href={href} target="_blank" rel="noreferrer">

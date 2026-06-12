@@ -66,6 +66,9 @@ class SignalOut(BaseModel):
 
     signal_id: str
     detector: str
+    # Human label from the Detector spec (denormalized at write time) — the
+    # UI renders this so new detectors never need frontend label edits.
+    detector_label: str | None = None
     kind: str
     item_key: str
     title: str | None = None

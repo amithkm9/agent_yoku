@@ -33,35 +33,22 @@ from yoku.db.mongo import (
     signals_collection,
 )
 from yoku.logging import get_logger
+from yoku.utils.dates import parse_iso, week_monday
 
 log = get_logger("metrics")
 
 DEFAULT_WEEKS = 26
 
 
-def _parse_ts(value: str | None) -> datetime | None:
-    if not value:
-        return None
-    try:
-        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
-
-
-def _monday(dt: datetime) -> str:
-    return (dt - timedelta(days=dt.weekday())).date().isoformat()
-
-
 def _weeks_in_window(now: datetime, weeks: int) -> list[str]:
-    last = datetime.fromisoformat(_monday(now)).replace(tzinfo=UTC)
+    last = datetime.fromisoformat(week_monday(now)).replace(tzinfo=UTC)
     return [(last - timedelta(weeks=i)).date().isoformat() for i in range(weeks - 1, -1, -1)]
 
 
 def _weekly_counts(timestamps: list[datetime]) -> dict[str, int]:
     counts: dict[str, int] = {}
     for ts in timestamps:
-        week = _monday(ts)
+        week = week_monday(ts)
         counts[week] = counts.get(week, 0) + 1
     return counts
 
@@ -78,7 +65,7 @@ def compute_metrics(weeks: int = DEFAULT_WEEKS, now: datetime | None = None) -> 
     # --- PRs: opened, merged, cycle time (full history from doc timestamps) ---
     opened: list[datetime] = []
     for d in dc_github_collection().find({"created": {"$gte": cutoff}}, {"created": 1}):
-        if ts := _parse_ts(d.get("created")):
+        if ts := parse_iso(d.get("created")):
             opened.append(ts)
 
     merged: list[datetime] = []
@@ -86,18 +73,18 @@ def compute_metrics(weeks: int = DEFAULT_WEEKS, now: datetime | None = None) -> 
     for d in dc_github_collection().find(
         {"merged_at": {"$gte": cutoff}}, {"merged_at": 1, "created": 1}
     ):
-        m = _parse_ts(d.get("merged_at"))
+        m = parse_iso(d.get("merged_at"))
         if m is None:
             continue
         merged.append(m)
-        c = _parse_ts(d.get("created"))
+        c = parse_iso(d.get("created"))
         if c is not None and m >= c:
-            cycle_days.setdefault(_monday(m), []).append((m - c).total_seconds() / 86_400)
+            cycle_days.setdefault(week_monday(m), []).append((m - c).total_seconds() / 86_400)
 
     # --- Tickets created (full history) ---
     t_created: list[datetime] = []
     for d in dc_jira_collection().find({"created": {"$gte": cutoff}}, {"created": 1}):
-        if ts := _parse_ts(d.get("created")):
+        if ts := parse_iso(d.get("created")):
             t_created.append(ts)
 
     # --- Tickets done: status-transition events (from event capture onward) ---

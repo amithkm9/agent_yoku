@@ -33,14 +33,11 @@ from yoku.db.mongo import (
     ds_unified_users_collection,
 )
 from yoku.logging import get_logger
+from yoku.utils.dates import parse_iso, week_monday
 
 log = get_logger("baselines")
 
 WINDOW_DAYS = 90
-
-
-def _monday(dt: datetime) -> str:
-    return (dt - timedelta(days=dt.weekday())).date().isoformat()
 
 
 def compute_baselines(now: datetime | None = None) -> int:
@@ -93,8 +90,10 @@ def compute_baselines(now: datetime | None = None) -> int:
         if not p.get("jira_keys"):
             s["merged_no_ticket"] += 1
         try:
-            week = _monday(datetime.fromisoformat(p["merged_at"].replace("Z", "+00:00")))
-            s["pr_weeks"][week] = s["pr_weeks"].get(week, 0) + 1
+            merged_ts = parse_iso(p.get("merged_at"))
+            week = week_monday(merged_ts) if merged_ts else None
+            if week:
+                s["pr_weeks"][week] = s["pr_weeks"].get(week, 0) + 1
         except (ValueError, KeyError, TypeError):
             pass
 

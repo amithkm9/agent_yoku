@@ -11,25 +11,31 @@ Callers bind connector credentials; `executor._sync_after` handles that.
 
 from __future__ import annotations
 
-import re
 from datetime import UTC, datetime
 
 from yoku.logging import get_logger
 from yoku.proactive.events import TRACKED_FIELDS, diff_events, write_events
+from yoku.utils.keys import PR_KEY_RE
 
 log = get_logger("sync_one")
-
-_PR_KEY_RE = re.compile(r"^([\w.-]+/[\w.-]+)#(\d+)$")
 
 
 def _strip(key: str) -> str:
     return key.removeprefix("jira/").removeprefix("github/").strip()
 
 
+def is_pr_key(key: str) -> bool:
+    """True when `key` (with or without canonical prefix) is an org/repo#N key."""
+    return bool(PR_KEY_RE.match(_strip(key)))
+
+
 def sync_one(key: str) -> bool:
-    """Refresh one JIRA ticket or GitHub PR by key. Returns True on success."""
+    """Refresh one JIRA ticket or GitHub PR by key. Returns True on success.
+
+    Caller binds the matching connector credentials (see executor._sync_after).
+    """
     raw = _strip(key)
-    if _PR_KEY_RE.match(raw):
+    if PR_KEY_RE.match(raw):
         return _sync_pr(raw)
     return _sync_ticket(raw)
 
@@ -77,7 +83,10 @@ def _sync_ticket(key: str) -> bool:
     if prior.get("linked_prs") and not doc.get("linked_prs"):
         doc["linked_prs"] = prior["linked_prs"]
     _upsert(coll, "dc-jira", doc)
-    _reproject(coll.find_one({"key": key}), SOURCE_MAPPERS["dc-jira"], ds_work_item_collection())
+    stored = coll.find_one({"key": key})
+    if stored is None:  # vanished between upsert and read — nothing to project
+        return False
+    _reproject(stored, SOURCE_MAPPERS["dc-jira"], ds_work_item_collection())
     _invalidate()
     log.info("sync_one refreshed jira/%s", key)
     return True
@@ -88,7 +97,7 @@ def _sync_pr(key: str) -> bool:
     from yoku.db.mongo import dc_github_collection, ds_pull_request_collection
     from yoku.mappers import SOURCE_MAPPERS
 
-    m = _PR_KEY_RE.match(key)
+    m = PR_KEY_RE.match(key)
     repo, number = m.group(1), int(m.group(2))
     pr = get_pull(repo, number)
     doc = pr_to_doc(pr, repo)
@@ -99,9 +108,10 @@ def _sync_pr(key: str) -> bool:
         if jk not in (doc.get("jira_keys") or []):
             doc.setdefault("jira_keys", []).append(jk)
     _upsert(coll, "dc-github", doc)
-    _reproject(
-        coll.find_one({"key": key}), SOURCE_MAPPERS["dc-github"], ds_pull_request_collection()
-    )
+    stored = coll.find_one({"key": key})
+    if stored is None:  # vanished between upsert and read — nothing to project
+        return False
+    _reproject(stored, SOURCE_MAPPERS["dc-github"], ds_pull_request_collection())
     _invalidate()
     log.info("sync_one refreshed github/%s", key)
     return True

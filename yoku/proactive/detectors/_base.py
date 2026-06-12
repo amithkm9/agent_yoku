@@ -14,11 +14,18 @@ judgment); it only nominates. Drafts are dicts:
       "url":          "https://…",              # optional deep link
     }
 
-`maturation_days` is the hysteresis window: a signal is only surfaced once the
-gap has persisted that long (per `gap_age_days` or time since first seen) —
-transient states ("merged ten minutes ago") never reach a human.
-`recent_days` bounds the scan to recently-touched docs so years-old history
-doesn't flood the Inbox on day one.
+The spec owns EVERYTHING downstream stages need to know about the gap type —
+judge and orchestrator read it from here, so adding a detector is one file:
+
+- `label` / `gap_description` — human/UI label and the phrasing the person-
+  judgment prompt uses.
+- `maturation_days` — hysteresis: surface only once the gap persisted this
+  long ("merged ten minutes ago" never reaches a human). `recent_days` bounds
+  the scan so years-old history doesn't flood the Inbox.
+- `baseline_rate_field` / `baseline_n_field` — which per-person baseline
+  stats mean "this pattern is their normal workflow" (None: no baseline tier).
+- `compose` — (signal, target) -> the one-ask DM text; None falls back to a
+  generic nudge.
 """
 
 from __future__ import annotations
@@ -31,7 +38,12 @@ from dataclasses import dataclass
 class Detector:
     name: str
     kind: str  # "drift" for plan-vs-code mismatches
+    label: str
     description: str
+    gap_description: str
     maturation_days: int
     recent_days: int
     fn: Callable[[], list[dict]]
+    baseline_rate_field: str | None = None
+    baseline_n_field: str | None = None
+    compose: Callable[[dict, dict], str] | None = None

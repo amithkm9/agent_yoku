@@ -24,15 +24,18 @@ from datetime import UTC, datetime
 
 from yoku.db.mongo import action_log_collection
 from yoku.logging import get_logger
+from yoku.utils.keys import PR_KEY_RE
 
 log = get_logger("actions")
 
 _JIRA_KEY_RE = re.compile(r"^[A-Z][A-Z0-9]+-\d+$")
-_PR_KEY_RE = re.compile(r"^([\w.-]+/[\w.-]+)#(\d+)$")
 
 
 def _require(payload: dict, *keys: str) -> None:
-    missing = [k for k in keys if not (payload.get(k) or "").strip()]
+    # str() first: LLM-built payloads can carry non-string values; a missing
+    # or blank field must raise ValueError (which callers handle), never
+    # AttributeError into the agent loop.
+    missing = [k for k in keys if not str(payload.get(k) or "").strip()]
     if missing:
         raise ValueError(f"payload missing required field(s): {missing}")
 
@@ -107,7 +110,7 @@ def _run_link_pr_to_ticket(target: str, payload: dict) -> dict:
 def _run_comment_on_pr(target: str, payload: dict) -> dict:
     from yoku.connectors.github.client import comment_on_pr
 
-    m = _PR_KEY_RE.match(_norm_key(target, "github"))
+    m = PR_KEY_RE.match(_norm_key(target, "github"))
     if not m:
         raise ValueError(f"target {target!r} is not an org/repo#N PR key")
     return comment_on_pr(m.group(1), int(m.group(2)), payload["body"])
@@ -119,8 +122,12 @@ def _validate_jira_target(target: str) -> None:
 
 
 def _validate_pr_target(target: str) -> None:
-    if not _PR_KEY_RE.match(_norm_key(target, "github")):
+    if not PR_KEY_RE.match(_norm_key(target, "github")):
         raise ValueError(f"target {target!r} is not an org/repo#N PR key")
+
+
+def _no_target(target: str) -> None:
+    """Creation actions have no pre-existing target — nothing to validate."""
 
 
 #: type -> (connector whose creds the runner needs, target validator,
@@ -142,7 +149,7 @@ ACTION_TYPES: dict[str, dict] = {
     },
     "create_jira_ticket": {
         "connector": "jira",
-        "validate_target": lambda t: None,  # created, no pre-existing target
+        "validate_target": _no_target,
         "required": ("summary",),
         "run": _run_create_jira_ticket,
         "description": "Create a JIRA ticket in the configured project.",
@@ -296,16 +303,23 @@ def _bound_connector(name: str):
 
 
 def _sync_after(row: dict, result: dict) -> None:
-    """Best-effort targeted refresh so the next answer reflects the change."""
-    try:
-        from yoku.pipeline.sync_one import sync_one
+    """Best-effort targeted refresh so the next answer reflects the change.
 
-        targets = [row["target_key"]]
-        if row["action_type"] == "create_jira_ticket" and result.get("key"):
-            targets = [result["key"]]
-        if row["action_type"] == "link_pr_to_ticket" and row["payload"].get("pr_key"):
-            targets.append(row["payload"]["pr_key"])
-        for t in targets:
-            sync_one(t)
-    except Exception:
-        log.exception("post-action sync_one failed (next scheduled sync will catch up)")
+    Each target binds ITS OWN connector (a ticket refresh needs JIRA creds, a
+    PR refresh needs GitHub creds) — the action's binding has already exited,
+    and e.g. link_pr_to_ticket runs under JIRA but must refresh a PR too.
+    """
+    targets = [row["target_key"]]
+    if row["action_type"] == "create_jira_ticket" and result.get("key"):
+        targets = [result["key"]]
+    if row["action_type"] == "link_pr_to_ticket" and row["payload"].get("pr_key"):
+        targets.append(row["payload"]["pr_key"])
+
+    from yoku.pipeline.sync_one import is_pr_key, sync_one
+
+    for t in targets:
+        try:
+            with _bound_connector("github" if is_pr_key(t) else "jira"):
+                sync_one(t)
+        except Exception:
+            log.exception("post-action sync_one(%s) failed (next scheduled sync will catch up)", t)

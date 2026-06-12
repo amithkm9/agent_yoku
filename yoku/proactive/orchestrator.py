@@ -29,6 +29,8 @@ import time
 import uuid
 from datetime import UTC, datetime
 
+from pymongo.errors import DuplicateKeyError
+
 from yoku.config import settings
 from yoku.db.mongo import (
     conversations_collection,
@@ -42,28 +44,16 @@ log = get_logger("orchestrator")
 
 
 def compose_message(signal: dict, target: dict) -> str:
-    """One short, specific ask. Cite the key; end with a question."""
-    key = signal["item_key"].split("/", 1)[-1]
-    title = (signal.get("title") or "").strip()
-    if len(title) > 80:
-        title = title[:79].rstrip() + "…"
-    quoted = f' ("{title}")' if title else ""
-    evidence = signal.get("evidence") or {}
-    first = target["first_name"]
+    """One short, specific ask, citing the key — each Detector owns its
+    template; signals from a since-removed detector get the generic nudge."""
+    from yoku.proactive.detectors import discover_detectors
 
-    if signal["detector"] == "done_no_pr":
-        status = evidence.get("status") or "done"
-        return (
-            f"Hey {first} — {key}{quoted} is marked {status}, but I can't find a "
-            f"PR linked to it. Did the code ship somewhere I'm not seeing?"
-        )
-    if signal["detector"] == "merged_no_ticket":
-        return (
-            f"Hey {first} — {key}{quoted} merged without a ticket reference. "
-            f"Is there a ticket I should link it to, or was this untracked work?"
-        )
+    spec = next((d for d in discover_detectors() if d.name == signal["detector"]), None)
+    if spec is not None and spec.compose is not None:
+        return spec.compose(signal, target)
+    key = signal["item_key"].split("/", 1)[-1]
     return (
-        f"Hey {first} — I noticed a gap on {key}{quoted} "
+        f"Hey {target['first_name']} — I noticed a gap on {key} "
         f"({signal['detector']}). Can you take a look?"
     )
 
@@ -198,7 +188,13 @@ def run_proactive_loop(now: datetime | None = None) -> dict[str, int]:
             )
             counts["shadowed"] += 1
 
-        convos.insert_one(convo)
+        try:
+            convos.insert_one(convo)
+        except DuplicateKeyError:
+            # A concurrent run (scheduler + on-demand sync) won the race for
+            # this gap — the unique signal_id index is the real dedupe; the
+            # other run's conversation stands.
+            log.info("conversation for %s already opened by a concurrent run", s["signal_id"])
 
     replies = process_inbound_replies(now)
     counts["replies_threaded"] = replies

@@ -75,6 +75,7 @@ export interface SourceFreshness {
 export interface Signal {
   signal_id: string;
   detector: string;
+  detector_label: string | null;
   kind: string;
   item_key: string;
   title: string | null;

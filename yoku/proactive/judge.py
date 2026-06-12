@@ -43,20 +43,10 @@ from yoku.proactive.memory import is_pattern_suppressed
 log = get_logger("judge")
 
 # Baseline tier: at this rate (with enough history) the pattern IS the
-# person's workflow — suppress without burning an LLM call.
+# person's workflow — suppress without burning an LLM call. Which baseline
+# fields apply per gap type is owned by each Detector spec.
 BASELINE_SUPPRESS_RATE = 0.8
 BASELINE_MIN_N = 5
-
-#: detector -> the baseline rate field that captures "how often is this
-#: pattern normal for this person".
-_BASELINE_RATE_FIELD = {
-    "done_no_pr": "done_no_pr_rate",
-    "merged_no_ticket": "merged_no_ticket_rate",
-}
-_BASELINE_N_FIELD = {
-    "done_no_pr": "done_no_pr_n",
-    "merged_no_ticket": "merged_no_ticket_n",
-}
 
 # (kind, prompt) -> parsed JSON verdict. Injectable so tests never hit OpenAI.
 LlmFn = Callable[[str, str], dict]
@@ -95,11 +85,6 @@ lean NORMAL — when in doubt, yoku stays quiet.
 
 Respond with JSON only:
 {{"normal_for_person": true/false, "reason": "<one short sentence>"}}"""
-
-_GAP_DESCRIPTIONS = {
-    "done_no_pr": "their ticket is done-state with no linked PR",
-    "merged_no_ticket": "their PR merged with no ticket referenced",
-}
 
 
 def _openai_judge(kind: str, prompt: str) -> dict:
@@ -203,8 +188,15 @@ def judge_signals(
             },
         )
 
+    from yoku.proactive.detectors import discover_detectors
+
+    # Detector specs own the per-gap-type judgment facts (baseline fields,
+    # gap phrasing). Signals from a since-removed detector judge generically.
+    specs = {d.name: d for d in discover_detectors()}
+
     for s in candidates:
         detector = s["detector"]
+        spec = specs.get(detector)
         user_id = s.get("person_user_id")
 
         # Tier 0 — human override: a confirmed label outranks every automated
@@ -222,10 +214,10 @@ def judge_signals(
 
         # Tier 2 — baseline: the pattern is this person's documented norm.
         baseline = get_baseline(user_id)
-        rate_field = _BASELINE_RATE_FIELD.get(detector)
+        rate_field = spec.baseline_rate_field if spec else None
         if baseline and rate_field:
             rate = baseline.get(rate_field)
-            n = baseline.get(_BASELINE_N_FIELD[detector]) or 0
+            n = baseline.get(spec.baseline_n_field) or 0
             if rate is not None and rate >= BASELINE_SUPPRESS_RATE and n >= BASELINE_MIN_N:
                 _settle(
                     s,
@@ -259,7 +251,7 @@ def judge_signals(
                     "person",
                     _PERSON_PROMPT.format(
                         detector=detector,
-                        gap_description=_GAP_DESCRIPTIONS.get(detector, detector),
+                        gap_description=spec.gap_description if spec else detector,
                         evidence=json.dumps(_person_evidence(s)),
                     ),
                 )

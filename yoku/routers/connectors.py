@@ -87,27 +87,28 @@ async def list_connectors(_: AdminUser) -> list[ConnectorStatus]:
     return [_status_doc(name, configured.get(name)) for name in cc.SUPPORTED_CONNECTORS]
 
 
-def _resolve_token(name: str, incoming: str | None) -> str:
-    """Either use the new token, or fall back to the previously stored one.
-
-    Raises 400 if neither is available (first-time setup with no token).
+def _keep_existing_secret(
+    name: str, field: str, incoming: str | None, *, required: bool = False
+) -> str | None:
+    """Blank-on-edit semantics for stored secrets: use the new value, else
+    fall back to what's stored under `field`. Raises 400 when a required
+    secret is missing on first-time setup.
     """
     if incoming:
         return incoming
-    existing = cc.get_config_decrypted(name) or {}
-    token = existing.get("token")
-    if not token:
+    existing = (cc.get_config_decrypted(name) or {}).get(field)
+    if not existing and required:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
-            f"{name}: token is required for first-time setup",
+            f"{name}: {field} is required for first-time setup",
         )
-    return token
+    return existing
 
 
 @router.put("/jira", response_model=ConnectorStatus)
 async def upsert_jira(payload: JiraConfigIn, admin: AdminUser) -> ConnectorStatus:
     """Store JIRA creds for the current tenant. Token is encrypted at rest."""
-    token = _resolve_token("jira", payload.token)
+    token = _keep_existing_secret("jira", "token", payload.token, required=True)
     cc.upsert_config(
         name="jira",
         config={
@@ -124,7 +125,7 @@ async def upsert_jira(payload: JiraConfigIn, admin: AdminUser) -> ConnectorStatu
 @router.put("/github", response_model=ConnectorStatus)
 async def upsert_github(payload: GithubConfigIn, admin: AdminUser) -> ConnectorStatus:
     """Store GitHub creds for the current tenant. Token is encrypted at rest."""
-    token = _resolve_token("github", payload.token)
+    token = _keep_existing_secret("github", "token", payload.token, required=True)
     cc.upsert_config(
         name="github",
         config={
@@ -142,12 +143,10 @@ async def upsert_github(payload: GithubConfigIn, admin: AdminUser) -> ConnectorS
 async def upsert_slack(payload: SlackConfigIn, admin: AdminUser) -> ConnectorStatus:
     """Store Slack creds for the current tenant. Bot token + signing secret
     are encrypted at rest."""
-    bot_token = _resolve_token("slack", payload.bot_token)
-    # Signing secret is optional (ingest-only tenants don't need the bot
-    # voice); blank on edit keeps the previously stored value.
-    existing = cc.get_config_decrypted("slack") or {}
+    bot_token = _keep_existing_secret("slack", "bot_token", payload.bot_token, required=True)
+    # Signing secret is optional (ingest-only tenants don't need the bot voice).
     secrets = {"bot_token": bot_token}
-    signing_secret = payload.signing_secret or existing.get("signing_secret")
+    signing_secret = _keep_existing_secret("slack", "signing_secret", payload.signing_secret)
     if signing_secret:
         secrets["signing_secret"] = signing_secret
     cc.upsert_config(

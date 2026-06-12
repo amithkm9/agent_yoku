@@ -74,6 +74,26 @@ def _reset_rate_limiter():
 
 
 @pytest.fixture
+def tenant(scratch_db):
+    """Bind a fresh, uniquely named tenant for one integration test.
+
+    Yields the tenant id; drops the tenant db and clears the binding on
+    teardown. The single shared implementation for every integration suite.
+    """
+    from pymongo import MongoClient
+
+    from yoku.config import settings
+    from yoku.db import tenancy
+    from yoku.db.tenancy import tenant_db_name
+
+    tid = f"t_{uuid.uuid4().hex[:10]}"
+    tenancy.set_tenant(tid)
+    yield tid
+    MongoClient(settings.mongo_uri).drop_database(tenant_db_name(tid))
+    tenancy.set_tenant(None)
+
+
+@pytest.fixture
 def isolated_index(monkeypatch):
     """Reset the per-tenant index cache + tenant context between tests.
 

@@ -69,6 +69,14 @@ def run_detectors(now: datetime | None = None) -> dict[str, dict]:
         drafts = det.fn()
         found_keys: set[str] = set()
         counts = {"found": len(drafts), "new": 0, "reopened": 0, "self_healed": 0}
+        # One bulk read instead of a find_one per draft (the N is per-detector
+        # candidate volume — hundreds on a busy tenant).
+        existing_by_key = {
+            row["item_key"]: row
+            for row in coll.find(
+                {"detector": det.name}, {"item_key": 1, "status": 1, "matured_at": 1}
+            )
+        }
 
         for d in drafts:
             item_key = d["item_key"]
@@ -83,13 +91,11 @@ def run_detectors(now: datetime | None = None) -> dict[str, dict]:
                 "evidence": d.get("evidence") or {},
                 "confidence": d.get("confidence", 0.5),
                 "url": d.get("url"),
+                "detector_label": det.label,
                 "last_seen_at": now,
             }
 
-            existing = coll.find_one(
-                {"detector": det.name, "item_key": item_key},
-                {"status": 1, "matured_at": 1},
-            )
+            existing = existing_by_key.get(item_key)
             if existing is None:
                 coll.insert_one(
                     {
@@ -146,15 +152,26 @@ def run_detectors(now: datetime | None = None) -> dict[str, dict]:
         )
         # Auto-resolve signals whose gap is no longer observed — including
         # judge-rejected and spoken-about ones, so every path records how it
-        # ended (a healed `sent` gap is the best outcome there is).
+        # ended. Two distinct outcomes, because they teach different lessons:
+        #   aged_out     the item slid past the detector's recency window with
+        #                the gap still open — NOT a fix, just out of scope.
+        #   self_healed  the gap genuinely closed (a healed `sent` gap is the
+        #                best outcome there is).
+        gone = {
+            "detector": det.name,
+            "status": {"$in": ["open", "judged", "shadow", "sent"]},
+            "item_key": {"$nin": sorted(found_keys)},
+        }
+        window_floor = (now - timedelta(days=det.recent_days)).strftime("%Y-%m-%d")
+        aged = coll.update_many(
+            {**gone, "evidence.updated": {"$lt": window_floor}},
+            {"$set": {"status": "resolved", "resolution": "aged_out", "resolved_at": now}},
+        )
         healed = coll.update_many(
-            {
-                "detector": det.name,
-                "status": {"$in": ["open", "judged", "shadow", "sent"]},
-                "item_key": {"$nin": sorted(found_keys)},
-            },
+            gone,  # whatever remains vanished while still inside the window
             {"$set": {"status": "resolved", "resolution": "self_healed", "resolved_at": now}},
         )
+        counts["aged_out"] = aged.modified_count
         counts["self_healed"] = healed.modified_count
         stats[det.name] = counts
 

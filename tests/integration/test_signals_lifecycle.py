@@ -6,28 +6,11 @@ dismissal is sticky across re-runs, and a healed gap records self_healed.
 
 from __future__ import annotations
 
-import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
 
 pytestmark = pytest.mark.integration
-
-
-@pytest.fixture
-def tenant(scratch_db):
-    from yoku.db import tenancy
-
-    tid = f"sig_{uuid.uuid4().hex[:8]}"
-    tenancy.set_tenant(tid)
-    yield tid
-    from pymongo import MongoClient
-
-    from yoku.config import settings
-    from yoku.db.tenancy import tenant_db_name
-
-    MongoClient(settings.mongo_uri).drop_database(tenant_db_name(tid))
-    tenancy.set_tenant(None)
 
 
 def _iso_days_ago(days: int) -> str:
@@ -125,6 +108,31 @@ def test_healed_gap_records_self_healed_and_can_reopen(tenant):
     assert stats["done_no_pr"]["reopened"] == 1
     s = signals_collection().find_one({"detector": "done_no_pr"})
     assert s["status"] == "open" and s["resolution"] is None
+
+
+@pytest.mark.integration
+def test_aging_out_of_window_is_not_self_healing(tenant):
+    """An unfixed gap sliding past the recency window records `aged_out` —
+    the outcome stream must not count it as a fix."""
+    from yoku.db.mongo import dc_jira_collection, signals_collection
+    from yoku.proactive.signals import run_detectors
+
+    coll = dc_jira_collection()
+    coll.insert_one(_done_ticket(days_old=10))
+    run_detectors()
+
+    # Days pass without anyone touching the ticket: its `updated` (mirrored
+    # into the signal's evidence at detection) is now older than the moving
+    # 14-day window floor — out of scope, but the gap was never fixed.
+    from yoku.db.mongo import signals_collection as _signals
+
+    coll.update_one({"key": "AS-1"}, {"$set": {"updated": _iso_days_ago(20)}})
+    _signals().update_one({}, {"$set": {"evidence.updated": _iso_days_ago(20)}})
+    stats = run_detectors()
+    assert stats["done_no_pr"]["aged_out"] == 1
+    assert stats["done_no_pr"]["self_healed"] == 0
+    s = signals_collection().find_one({"detector": "done_no_pr"})
+    assert s["resolution"] == "aged_out"
 
 
 @pytest.mark.integration

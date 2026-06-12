@@ -66,11 +66,14 @@ def rollup_threads() -> dict[str, int]:
         if r.get("channel_id") and r.get("thread_ts"):
             replies_by_parent.setdefault(f"{r['channel_id']}/{r['thread_ts']}", []).append(r)
 
+    # One bulk read for all thread parents instead of a find_one per thread.
+    parents = {d["key"]: d for d in coll.find({"key": {"$in": list(replies_by_parent)}}, _PROJ)}
+
     updated = 0
     orphans = 0
     ops: list[UpdateOne] = []
     for parent_key, replies in replies_by_parent.items():
-        parent = coll.find_one({"key": parent_key}, _PROJ)
+        parent = parents.get(parent_key)
         if parent is None:
             orphans += 1
             continue

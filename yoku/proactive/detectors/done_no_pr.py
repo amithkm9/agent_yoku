@@ -12,21 +12,10 @@ from datetime import UTC, datetime, timedelta
 from yoku.constants import DEFAULT_DONE_STATUSES
 from yoku.db.mongo import dc_jira_collection
 from yoku.proactive.detectors._base import Detector
+from yoku.utils.dates import days_since
 
 _RECENT_DAYS = 14
 _MATURATION_DAYS = 3
-
-
-def _gap_age_days(updated: str | None, now: datetime) -> int:
-    if not updated:
-        return 0
-    try:
-        ts = datetime.fromisoformat(updated)
-    except ValueError:
-        return 0
-    if ts.tzinfo is None:
-        ts = ts.replace(tzinfo=UTC)
-    return max(0, (now - ts).days)
 
 
 def detect() -> list[dict]:
@@ -59,7 +48,7 @@ def detect() -> list[dict]:
                 "evidence": {
                     "status": t.get("status"),
                     "updated": t.get("updated"),
-                    "gap_age_days": _gap_age_days(t.get("updated"), now),
+                    "gap_age_days": days_since(t.get("updated"), now),
                 },
                 "confidence": 0.7,
                 "url": t.get("url"),
@@ -68,11 +57,29 @@ def detect() -> list[dict]:
     return drafts
 
 
+def compose(signal: dict, target: dict) -> str:
+    key = signal["item_key"].removeprefix("jira/")
+    title = (signal.get("title") or "").strip()
+    if len(title) > 80:
+        title = title[:79].rstrip() + "…"
+    quoted = f' ("{title}")' if title else ""
+    status = (signal.get("evidence") or {}).get("status") or "done"
+    return (
+        f"Hey {target['first_name']} — {key}{quoted} is marked {status}, but I "
+        f"can't find a PR linked to it. Did the code ship somewhere I'm not seeing?"
+    )
+
+
 DETECTOR = Detector(
     name="done_no_pr",
     kind="drift",
+    label="Done, no PR",
     description="Ticket marked complete with no linked PR — claimed done, no code.",
+    gap_description="their ticket is done-state with no linked PR",
     maturation_days=_MATURATION_DAYS,
     recent_days=_RECENT_DAYS,
     fn=detect,
+    baseline_rate_field="done_no_pr_rate",
+    baseline_n_field="done_no_pr_n",
+    compose=compose,
 )

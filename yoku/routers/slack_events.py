@@ -53,15 +53,19 @@ def _find_tenant_for_team(team_id: str) -> tuple[str, str] | None:
     from yoku.pipeline.sync_service import list_tenant_ids
 
     fresh: dict[str, tuple[str, str]] = {}
-    for tenant_id in list_tenant_ids():
-        tenancy.set_tenant(tenant_id)
-        decrypted = cc.get_config_decrypted("slack") or {}
-        cfg = (cc.get_config("slack") or {}).get("config") or {}
-        t_id = cfg.get("team_id")
-        secret = decrypted.get("signing_secret")
-        if t_id and secret:
-            fresh[t_id] = (tenant_id, secret)
-    tenancy.set_tenant(None)  # the handler binds the routed tenant explicitly
+    try:
+        for tenant_id in list_tenant_ids():
+            tenancy.set_tenant(tenant_id)
+            decrypted = cc.get_config_decrypted("slack") or {}
+            cfg = (cc.get_config("slack") or {}).get("config") or {}
+            t_id = cfg.get("team_id")
+            secret = decrypted.get("signing_secret")
+            if t_id and secret:
+                fresh[t_id] = (tenant_id, secret)
+    finally:
+        # Never leak a scan tenant into the request; the handler binds the
+        # routed tenant explicitly after this returns.
+        tenancy.set_tenant(None)
     _team_cache = fresh
     _team_cache_at = now
     return _team_cache.get(team_id)
