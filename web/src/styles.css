@@ -1606,6 +1606,41 @@ code.signal-key {
   margin-bottom: 2px;
 }
 
+.signal-commitment,
+.signal-belief {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+.signal-commitment {
+  color: var(--text);
+  font-weight: 500;
+}
+.signal-belief {
+  color: var(--text-muted);
+  font-style: italic;
+}
+.signal-commitment-icon,
+.signal-belief-icon {
+  font-style: normal;
+  flex-shrink: 0;
+}
+.signal-belief-conf {
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+  padding: 1px 6px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
 .field-checkbox .checkbox-row {
   display: flex;
   align-items: flex-start;

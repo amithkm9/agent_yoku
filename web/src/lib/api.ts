@@ -92,6 +92,14 @@ export interface Signal {
     suppressed_by?: string;
   } | null;
   proposed_message: string | null;
+  commitment: {
+    text?: string;
+    due?: string | null;
+    made_at?: string | null;
+    followups?: number;
+    source?: string;
+  } | null;
+  person_beliefs: { claim: string; confidence: number; evidence_count: number }[];
   first_seen_at: string | null;
   matured_at: string | null;
   last_seen_at: string | null;

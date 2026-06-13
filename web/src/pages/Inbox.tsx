@@ -30,6 +30,12 @@ function initials(name: string | null): string {
   return ((parts[0]?.[0] || "") + (parts[1]?.[0] || "")).toUpperCase() || "?";
 }
 
+function shortDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
 function gapAge(signal: Signal): string {
   const days = Number(signal.evidence.gap_age_days ?? NaN);
   if (Number.isFinite(days)) {
@@ -293,6 +299,28 @@ export function Inbox() {
                           {s.status === "sent" ? "yoku said:" : "yoku would say:"}
                         </span>
                         “{s.proposed_message}”
+                      </div>
+                    )}
+                    {s.commitment?.text && (
+                      <div className="signal-commitment" title="A fix this person promised">
+                        <span className="signal-commitment-icon">🤝</span>
+                        Promised to {s.commitment.text}
+                        {s.commitment.due ? ` · due ${shortDate(s.commitment.due)}` : ""}
+                        {s.commitment.followups
+                          ? ` · chased ${s.commitment.followups}×`
+                          : ""}
+                      </div>
+                    )}
+                    {s.person_beliefs.length > 0 && (
+                      <div
+                        className="signal-belief"
+                        title="What yoku has learned about how this person works"
+                      >
+                        <span className="signal-belief-icon">🧠</span>
+                        yoku has learned: “{s.person_beliefs[0].claim}”
+                        <span className="signal-belief-conf">
+                          {Math.round(s.person_beliefs[0].confidence * 100)}% sure
+                        </span>
                       </div>
                     )}
                     <div className="signal-meta muted">

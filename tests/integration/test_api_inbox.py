@@ -101,5 +101,54 @@ def test_inbox_lists_only_matured_and_verdicts_stick(client):
 
 
 @pytest.mark.integration
+def test_inbox_surfaces_commitment_and_beliefs(client):
+    from datetime import UTC, datetime
+
+    from yoku.db import tenancy
+
+    tenant = f"inbox_{uuid.uuid4().hex[:6]}"
+    token = _signup(client, tenant)
+    try:
+        tenancy.set_tenant(tenant)
+        from yoku.db.mongo import beliefs_collection, signals_collection
+
+        signals_collection().insert_one(
+            {
+                "signal_id": "sig1",
+                "detector": "done_no_pr",
+                "kind": "drift",
+                "item_key": "jira/AS-1",
+                "title": "Add rate limiting",
+                "person_user_id": "u1",
+                "person_name": "Priya",
+                "status": "sent",
+                "matured_at": datetime.now(UTC),
+                "verdict": {"real": True},
+                "commitment": {"text": "link the PR", "due": "2026-06-20", "followups": 1},
+            }
+        )
+        beliefs_collection().insert_one(
+            {
+                "user_id": "u1",
+                "pattern": "done_no_pr",
+                "kind": "normal_workflow",
+                "claim": "spikes don't get PRs",
+                "confidence": 0.7,
+                "evidence_count": 2,
+            }
+        )
+
+        body = client.get("/api/inbox", headers=_auth(token)).json()
+        sig = next(s for s in body["signals"] if s["signal_id"] == "sig1")
+        assert sig["commitment"]["text"] == "link the PR"
+        assert sig["commitment"]["due"] == "2026-06-20"
+        assert sig["person_beliefs"][0]["claim"] == "spikes don't get PRs"
+        assert sig["person_beliefs"][0]["confidence"] == 0.7
+    finally:
+        _drop(tenant)
+        tenancy.set_tenant(None)
+
+
+@pytest.mark.integration
 def test_inbox_requires_auth(client):
     assert client.get("/api/inbox").status_code == 401

@@ -81,6 +81,12 @@ class SignalOut(BaseModel):
     verdict: dict | None = None  # judge outcome: real, item/person reasons
     # The DM the proactive loop drafted (shadow) or sent for this gap.
     proposed_message: str | None = None
+    # A fix the person promised in a reply (memory engine Phase B/D): text, due,
+    # made_at, followups. Present only once a promise was captured for this gap.
+    commitment: dict | None = None
+    # Consolidated beliefs about this person relevant to this gap type (Phase C),
+    # enriched by the inbox router — context for why yoku may stay quiet.
+    person_beliefs: list[dict] = []
     first_seen_at: datetime | None = None
     matured_at: datetime | None = None
     last_seen_at: datetime | None = None
