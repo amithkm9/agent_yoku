@@ -153,17 +153,19 @@ def _run_post_ingest_pipeline() -> None:
     _best_effort("entity_links", build_entity_links)
     from yoku.pipeline.metrics import compute_metrics
     from yoku.proactive.baselines import compute_baselines
+    from yoku.proactive.beliefs import consolidate_beliefs
     from yoku.proactive.judge import judge_signals
     from yoku.proactive.orchestrator import run_proactive_loop
     from yoku.proactive.reply_understanding import understand_replies
 
     # Proactive stages close the pipeline — they read what everything above
-    # just wrote. Baselines feed the judge's person dimension; the judge runs
-    # over what detectors found; the speak-first loop shadows/sends for
-    # judged-real gaps and threads inbound replies; reply understanding then
-    # reads those replies to suppress/learn; metrics come last so `signals_open`
-    # reflects this run.
+    # just wrote. Baselines and consolidated beliefs feed the judge's person
+    # dimension; the judge runs over what detectors found; the speak-first loop
+    # shadows/sends for judged-real gaps and threads inbound replies; reply
+    # understanding then reads those replies to suppress/learn; metrics come
+    # last so `signals_open` reflects this run.
     _best_effort("baselines", compute_baselines)
+    _best_effort("beliefs", consolidate_beliefs)
     _best_effort("detectors", run_detectors)
     _best_effort("judge", judge_signals)
     _best_effort("proactive_loop", run_proactive_loop)

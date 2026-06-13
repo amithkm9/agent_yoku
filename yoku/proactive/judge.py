@@ -78,10 +78,14 @@ Gap type: {detector} ({gap_description})
 Evidence about the person:
 {evidence}
 
-High historical rates of the same pattern mean this is simply how they work \
-(e.g. a PM or designer whose tickets never have PRs) — that is NORMAL. A low \
-historical rate with a sudden occurrence is UNUSUAL. When evidence is thin, \
-lean NORMAL — when in doubt, yoku stays quiet.
+`baseline_90d` are their activity stats; `learned_beliefs` are things yoku has \
+learned from past dismissals and the person's own explanations (e.g. "spikes \
+don't get PRs"), each with a confidence. A high-confidence belief matching this \
+gap is strong evidence it is NORMAL for them — defer to it. High historical \
+rates of the same pattern likewise mean this is simply how they work (e.g. a PM \
+or designer whose tickets never have PRs) — NORMAL. A low rate with a sudden \
+occurrence is UNUSUAL. When evidence is thin, lean NORMAL — when in doubt, yoku \
+stays quiet.
 
 Respond with JSON only:
 {{"normal_for_person": true/false, "reason": "<one short sentence>"}}"""
@@ -133,11 +137,26 @@ def _item_evidence(signal: dict) -> dict:
 
 
 def _person_evidence(signal: dict) -> dict:
-    baseline = get_baseline(signal.get("person_user_id")) or {}
+    from yoku.proactive.beliefs import get_beliefs
+
+    user_id = signal.get("person_user_id")
+    baseline = get_baseline(user_id) or {}
     baseline.pop("computed_at", None)
+    # Beliefs relevant to this gap type, plus the person's strongest others —
+    # consolidated from their episode history (Phase C).
+    beliefs = get_beliefs(user_id, pattern=signal.get("detector"))
     return {
         "person": signal.get("person_name") or "unknown",
         "baseline_90d": baseline or "no history",
+        "learned_beliefs": [
+            {
+                "claim": b["claim"],
+                "confidence": b["confidence"],
+                "evidence_count": b["evidence_count"],
+            }
+            for b in beliefs
+        ]
+        or "none",
     }
 
 

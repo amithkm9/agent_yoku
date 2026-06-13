@@ -335,6 +335,23 @@ def episodes_collection() -> Collection:
     )
 
 
+def beliefs_collection() -> Collection:
+    """Consolidated per-person beliefs — episodic memory distilled (Phase C).
+
+    One row per (user_id, pattern): a durable claim ("spikes don't get PRs")
+    with a recency-weighted confidence, derived from the episode stream each
+    sync. Engine-internal; read by the judge's person dimension. Recomputed
+    wholesale by `yoku.proactive.beliefs`.
+    """
+    return _ensure(
+        _db()["beliefs"],
+        [
+            IndexModel([("user_id", ASCENDING), ("pattern", ASCENDING)], unique=True),
+            IndexModel("user_id"),
+        ],
+    )
+
+
 # ---------------------------------------------------------------------------
 # Internal dc-* accessor map — for pipeline/embed code that reads raw collections
 DC_COLLECTIONS = {

@@ -131,6 +131,7 @@ def test_post_ingest_pipeline_runs_unify_then_entity_links(monkeypatch):
     from yoku.pipeline import embed as embed_mod
     from yoku.pipeline import entity_links, metrics, pr_to_jira, slack_threads, unify
     from yoku.proactive import baselines as baselines_mod
+    from yoku.proactive import beliefs as beliefs_mod
     from yoku.proactive import judge as judge_mod
     from yoku.proactive import orchestrator as orch_mod
     from yoku.proactive import reply_understanding as reply_mod
@@ -145,6 +146,7 @@ def test_post_ingest_pipeline_runs_unify_then_entity_links(monkeypatch):
     monkeypatch.setattr(unify, "unify_all", lambda: order.append("unify_docs"))
     monkeypatch.setattr(entity_links, "build_entity_links", lambda: order.append("entity_links"))
     monkeypatch.setattr(baselines_mod, "compute_baselines", lambda: order.append("baselines"))
+    monkeypatch.setattr(beliefs_mod, "consolidate_beliefs", lambda: order.append("beliefs"))
     monkeypatch.setattr(signals_mod, "run_detectors", lambda: order.append("detectors"))
     monkeypatch.setattr(judge_mod, "judge_signals", lambda: order.append("judge"))
     monkeypatch.setattr(orch_mod, "run_proactive_loop", lambda: order.append("proactive_loop"))
@@ -156,9 +158,9 @@ def test_post_ingest_pipeline_runs_unify_then_entity_links(monkeypatch):
     sync_service._run_post_ingest_pipeline()
 
     # Thread rollup precedes embed so re-rolled parents re-embed in this pass;
-    # the proactive chain (baselines → detectors → judge → speak) runs, reply
-    # understanding reads the replies the speak loop threaded, then metrics close
-    # the pipeline (metrics snapshot the post-judgment signal state).
+    # the proactive chain (baselines → beliefs → detectors → judge → speak) runs,
+    # reply understanding reads the replies the speak loop threaded, then metrics
+    # close the pipeline (metrics snapshot the post-judgment signal state).
     assert order == [
         "slack_threads",
         "embed",
@@ -168,6 +170,7 @@ def test_post_ingest_pipeline_runs_unify_then_entity_links(monkeypatch):
         "unify_docs",
         "entity_links",
         "baselines",
+        "beliefs",
         "detectors",
         "judge",
         "proactive_loop",
@@ -184,6 +187,7 @@ def test_post_ingest_projection_failure_is_best_effort(monkeypatch, reset_tenant
     from yoku.pipeline import entity_links, pr_to_jira, slack_threads, unify
     from yoku.pipeline import metrics as metrics_mod
     from yoku.proactive import baselines as baselines_mod
+    from yoku.proactive import beliefs as beliefs_mod
     from yoku.proactive import judge as judge_mod
     from yoku.proactive import orchestrator as orch_mod
     from yoku.proactive import reply_understanding as reply_mod
@@ -196,6 +200,7 @@ def test_post_ingest_projection_failure_is_best_effort(monkeypatch, reset_tenant
     monkeypatch.setattr(pr_to_jira, "main", lambda: ran.append("link"))
     monkeypatch.setattr(backfill, "main", lambda: ran.append("backfill"))
     monkeypatch.setattr(baselines_mod, "compute_baselines", lambda: ran.append("baselines"))
+    monkeypatch.setattr(beliefs_mod, "consolidate_beliefs", lambda: ran.append("beliefs"))
     monkeypatch.setattr(signals_mod, "run_detectors", lambda: ran.append("detectors"))
     monkeypatch.setattr(judge_mod, "judge_signals", lambda: ran.append("judge"))
     monkeypatch.setattr(orch_mod, "run_proactive_loop", lambda: ran.append("proactive_loop"))
@@ -219,6 +224,7 @@ def test_post_ingest_projection_failure_is_best_effort(monkeypatch, reset_tenant
         "backfill",
         "entity_links",
         "baselines",
+        "beliefs",
         "detectors",
         "judge",
         "proactive_loop",
