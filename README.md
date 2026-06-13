@@ -1,13 +1,69 @@
-# Agent Yoku
+<div align="center">
 
-**One agent that watches your team's work across JIRA, GitHub, and Slack —
-answers when asked, and speaks first when something is off.**
+# ✳︎ Agent Yoku
+
+### One AI teammate that watches your team's work across JIRA, GitHub & Slack — answers when asked, speaks up when something's off, and remembers what people tell it.
+
+<br/>
+
+![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
+![React](https://img.shields.io/badge/React_18-61DAFB?logo=react&logoColor=black)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
+![MongoDB](https://img.shields.io/badge/MongoDB-47A248?logo=mongodb&logoColor=white)
+![Tests](https://img.shields.io/badge/tests-525%20passing-2ea44f)
+
+[What it is](#-what-it-is) · [See it in action](#-see-it-in-action) · [The four layers](#the-four-layers-that-drift-apart) · [Features](#-features) · [Memory engine](#-the-memory-engine--a-teammate-that-remembers) · [How it works](#-how-it-works) · [Quickstart](#-quickstart)
+
+</div>
 
 ---
 
-## The problem
+## ✶ What it is
 
-Engineering work lives in layers, and the layers drift apart:
+Engineering work is scattered across tools that don't talk to each other. The **plan** lives in JIRA, the **code** lives in GitHub, the **conversation** lives in Slack — and no single tool sees all three. So work quietly drifts out of sync until standup, or the sprint review, or an incident.
+
+**yoku is the agent that sees all of it at once.** It ingests your team's tickets, pull requests, and Slack messages into one unified picture, then does two things:
+
+- **Reactive** — answer any question across your sources. *"Which PRs implement AS‑1234?"* · *"Who actually knows the auth code?"* · *"What shipped last week?"* — every claim cited, one click from the source.
+- **Proactive** — notice gaps before you do. A ticket marked **Done with no PR**. A PR **merged with no ticket**. yoku detects the drift, decides if it's worth raising, and drafts one short, specific nudge to the *one* person who can fix it.
+
+What makes it different from a dashboard or a chatbot: **yoku has a memory.** When someone replies *"that's a spike, we don't open PRs for those,"* yoku understands it, stops nagging, and remembers it — so it judges the *next* gap smarter. It's less a tool, more a teammate.
+
+> **Built to be safe by default.** yoku ships in *shadow mode*: it drafts messages into a review Inbox and sends nothing until you flip a per‑team switch. Every write‑back (closing a ticket, linking a PR) is proposal‑gated — the agent proposes, a human approves, everything is audit‑logged.
+
+---
+
+## 📸 See it in action
+
+### Chat — ask anything across JIRA, GitHub & Slack
+A planning agent answers questions over your unified work, with inline citations and live source counts.
+
+![Chat home](docs/screenshots/chat.png)
+
+### Proactive Inbox — yoku speaks first when something's off
+Cross‑source gaps, triaged. Each card shows what yoku would say, the promise the person made (🤝), and what yoku has learned about them (🧠). Confirm or dismiss — every click teaches it.
+
+![Proactive Inbox](docs/screenshots/proactive-inbox.png)
+
+### "What yoku knows" — the memory engine, made visible
+A profile per person: the beliefs yoku formed (with confidence), what they're on the hook for, and the full interaction timeline — nudges, replies, follow‑ups.
+
+![People / memory view](docs/screenshots/people.png)
+
+### Trends — engineering metrics, recomputed every sync
+Merge velocity, PR cycle time (median + p90), ticket throughput, open‑gap count. The same numbers are queryable in chat.
+
+![Trends dashboard](docs/screenshots/trends.png)
+
+### Settings — connect your sources in minutes
+Per‑team connectors for JIRA, GitHub & Slack. Tokens are encrypted at rest and never leave the tenant.
+
+![Settings / connectors](docs/screenshots/settings.png)
+
+---
+
+## The four layers that drift apart
 
 ```
 INTENT        what was planned       (tickets, specs, Slack decisions)
@@ -21,56 +77,60 @@ Every team knows the symptoms:
 - A ticket is marked **Done with no PR behind it** — claimed finished, no code.
 - A **PR merges but nothing tracks it** — code shipped, invisible to planning.
 - A decision lands in Slack and **never becomes a ticket**.
-- "Who actually knows this system?" takes three Slack messages to answer.
-- Status questions ("what shipped last week?", "is anyone blocked on X?")
-  mean opening three tools and stitching the answer together by hand.
+- *"Who actually knows this system?"* takes three Slack messages to answer.
 
-No single tool sees all four layers, so nobody notices the drift until
-standup — or the sprint review. Yoku's job is to see all four layers at once
-and keep them lined up.
+No single tool sees all four layers, so nobody notices the drift until it's expensive. **yoku's whole job is to see all four at once and keep them lined up.**
 
-## What yoku does
+---
 
-**Reactive — ask anything across your sources.** A planning agent answers
-questions over the unified picture: point lookups ("tell me about AS-1234"),
-cross-source joins ("which PRs implement this ticket?"), people questions
-("who knows the auth code?"), and trends ("how has merge velocity changed?")
-— every claim cited with its key, one click from the source.
+## ✨ Features
 
-**Proactive — yoku notices gaps before you do.** After every sync, a
-background engine:
+| | Feature | What it does |
+|---|---|---|
+| 💬 | **Cross‑source chat** | A `deepagents` planning agent answers point lookups, cross‑source joins, people questions, and trends — every claim cited with its key. |
+| 🛰️ | **Proactive gap engine** | Detects cross‑source drift after every sync, with maturation windows so transient states never page anyone. |
+| 🧠 | **Tiered judgment** | Human verdicts → per‑person memory → deterministic baselines → a two‑dimension LLM check that must *agree* a gap is real. *Judgment before noise.* |
+| 🤝 | **Memory engine** | Learns from Slack replies, forms durable beliefs, tracks commitments, and follows up on promises. ([deep dive](docs/memory-engine.md)) |
+| 👥 | **People view** | "What yoku knows" — beliefs, commitments, and the interaction timeline for every person. |
+| 📊 | **Trends dashboard** | Weekly engineering metrics, recomputed each sync and queryable in chat. |
+| 💬 | **Slack bot voice** | DMs out, replies & @mentions in (signed events). Shadow‑mode by default. |
+| ✅ | **Proposal‑gated write‑back** | Transition a ticket, link a PR, comment, create a ticket — agent proposes, human approves, fully audit‑logged. |
+| 🌗 | **Polished UI** | Streaming answers, dark mode, full keyboard a11y, responsive — React + Vite + TS. |
 
-1. **Detects** cross-source drift (done-without-PR, merged-without-ticket) —
-   with maturation windows so transient states never page anyone.
-2. **Judges** each gap through cost-tiered filters: human verdicts override
-   everything, per-person memory suppresses patterns people have dismissed,
-   deterministic baselines suppress "that's just how they work" (a PM whose
-   tickets never have PRs isn't slipping), and only the ambiguous remainder
-   reaches a two-dimension LLM judgment that must *agree* the gap is real.
-3. **Speaks** — drafts one short, specific Slack DM to the one person who can
-   fix it ("AS-4396 is marked Done, but I can't find a PR linked to it — did
-   the code ship somewhere I'm not seeing?"). Ships in **shadow mode** by
-   default: drafts land in a review Inbox, and nothing is sent until a
-   per-tenant flag is flipped.
-4. **Acts** — on approval, yoku closes the loop: transition the ticket, link
-   the PR, comment, create a ticket. Every action is **proposal-gated**
-   (the agent can only propose; a human approves) and fully audit-logged.
+---
 
-**Trends** — weekly engineering metrics (merge velocity, PR cycle time
-median + p90, ticket throughput, open-gap count) computed from the same data,
-rendered as a dashboard and queryable in chat.
+## 🧠 The memory engine — a teammate that remembers
 
-The principles behind the proactive side: *judgment before noise* (every
-stage is a chance to stay quiet), *a teammate, not a dashboard* (one clear
-ask, citing the key — never a report), and *when in doubt, skip*.
+Most ops agents are stateless: every run, they re‑reason from scratch and re‑nag about the same things. yoku closes the loop in four phases — it *learns from what people tell it*:
 
-## How it works
+```
+yoku nudges Priya about a Done ticket with no PR
+   └─ Priya replies on Slack: "that's a spike, we don't open PRs for those"
+        └─ yoku UNDERSTANDS the reply  → settles this gap, records the lesson
+             └─ CONSOLIDATES it into a belief (confidence 0.7, decays over time)
+                  └─ next time a spike of Priya's looks like a gap → yoku stays quiet
+   └─ or Priya replies "good catch, I'll link it Friday"
+        └─ yoku REMEMBERS the promise → chases it once if Friday passes
+```
+
+| Phase | What it adds |
+|---|---|
+| **A — Episodic spine** | Every interaction (nudge, reply, confirm, dismiss, follow‑up) becomes a timestamped episode. |
+| **B — Reply understanding** | An LLM reads each Slack reply → suppresses the gap, captures a commitment, or learns a workflow rule. |
+| **C — Belief consolidation** | Episodes distil into durable per‑person beliefs with recency‑weighted confidence, fed into the judge. |
+| **D — Follow‑ups + recall** | Lapsed promises get one gentle chase; the chat agent can recall a person's full history. |
+
+A natural‑language explanation in Slack now measurably shapes how yoku judges the *next* gap — and it works from a single conversation. → **[Read the full design: `docs/memory-engine.md`](docs/memory-engine.md)**
+
+---
+
+## 🏗️ How it works
 
 ```
  ┌──────────────┐    JWT      ┌─────────────────────┐   invoke   ┌──────────────────┐
  │  React UI    │ ──────────▶ │  FastAPI            │ ─────────▶ │ deepagent        │
- │  chat·inbox  │             │  (uvicorn :8000)    │            │ + 11 tools       │
- │  trends      │             │  + tenant ContextVar │            │ + registries     │
+ │  chat·inbox  │             │  (uvicorn :8000)    │            │ + 12 tools       │
+ │  people·trends│            │  + tenant ContextVar │            │ + registries     │
  └──────────────┘             └──────┬──────────────┘            └────────┬─────────┘
                                      │ db per tenant                      │
                                      ▼                                    ▼
@@ -79,69 +139,49 @@ ask, citing the key — never a report), and *when in doubt, skip*.
  │  dc-*  raw connector docs (jira, github, slack, users)                           │
  │  ds-*  canonical layer (work-item, pull-request, conversation, entity-links,     │
  │        unified-users, metrics)                                                   │
- │  engine: events · signals · baselines · person_memory · conversations ·          │
- │          action_log · slack_inbound                                              │
+ │  engine: events · signals · baselines · person_memory · beliefs · episodes ·     │
+ │          conversations · action_log · slack_inbound                              │
  └──────────────────────────────────────────────────────────────────────────────────┘
         ▲                                                   │
-        │ ingest → embed → unify → link → detect →          ▼
-        │ judge → speak → metrics      (hourly APScheduler + on-demand + sync_one)
+        │ ingest → embed → unify → link → detect → judge →  ▼
+        │ speak → understand → consolidate → metrics  (hourly + on-demand)
  ┌──────┴───────┐
  │ JIRA · GitHub │  ◀── write-back: transition / comment / create / link
  │ · Slack       │  ◀── bot voice: DMs out, replies + @mentions in (signed events)
  └───────────────┘
 ```
 
-**Schema-driven by design.** Three registries are the single source of truth —
-the agent tools read everything from them, nothing about a collection is
-hardcoded in the tool layer:
+**Schema‑driven by design.** Three registries are the single source of truth — the agent's tools read everything from them, nothing about a collection is hardcoded:
 
-- **Pydantic models** (`yoku/schemas/`) — each collection's description and
-  fields (with `display`/`filterable` metadata).
-- **Source registry** (`yoku/agent/sources.py`) — key shapes and routing.
-- **Relationship registry** (`yoku/schemas/relationships.yaml`) — cross-source joins.
+- **Pydantic models** (`yoku/schemas/`) — each collection's description + fields (with `display`/`filterable` metadata).
+- **Source registry** (`yoku/agent/sources.py`) — key shapes and routing per source.
+- **Relationship registry** (`yoku/schemas/relationships.yaml`) — cross‑source joins.
 
-Connectors, agent tools, and gap detectors are all **auto-discovered** —
-onboarding a new source or gap type is a new file plus registry entries,
-never an edit to tools or prompts. Recipe: `docs/adding-a-connector.md`.
+Connectors, agent tools, and gap detectors are all **auto‑discovered** — onboarding a new source or gap type is a new file plus registry entries, never an edit to tools or prompts. Recipe: [`docs/adding-a-connector.md`](docs/adding-a-connector.md).
 
-## Project layout
+### Project layout
 
 ```
 yoku/
-├── config.py · constants.py · auth.py · main.py · cli.py
-├── connectors/            # one folder per source (auto-discovered)
-│   ├── jira/  github/  slack/        # client + ingest (+ users, write methods)
-│   └── base.py · _runtime.py         # contract, per-tenant config binding
-├── schemas/                # Pydantic models = collection contracts (+ relationships.yaml)
-├── mappers/                # dc-* → canonical ds-* projection
-├── pipeline/               # embed · unify · entity_links · pr_to_jira · metrics
-│   ├── slack_threads.py    #   thread rollup (whole discussions, one embedding)
-│   ├── sync_service.py     #   full per-tenant refresh orchestration
-│   ├── sync_one.py         #   targeted single-doc refresh (post-action)
-│   └── scheduler.py        #   hourly auto-sync loop
-├── proactive/              # the gap engine
-│   ├── events.py           #   diff-on-upsert change stream
-│   ├── detectors/          #   auto-discovered gap detectors (one file each)
-│   ├── signals.py          #   signal lifecycle: maturation, dismissal, healing
-│   ├── baselines.py        #   per-person "normal workflow" stats
-│   ├── memory.py           #   dismissals + learned patterns per person
-│   ├── judge.py            #   tiered judgment (human > memory > baseline > LLM)
-│   ├── routing.py          #   gap → the one right person (never guess)
-│   ├── orchestrator.py     #   speak-first loop, shadow mode, reply threading
-│   └── messenger.py        #   Slack DM primitive (dry-run default)
-├── actions/                # write-back: propose → approve → execute → audit
-├── agent/                  # deepagent + auto-discovered tools + registries
-├── routers/                # FastAPI: auth · chat · sessions · inbox · actions ·
-│                           #   stats/trends · connectors · slack events
-├── eval/                   # retrieval + answer-quality harnesses
-├── db/                     # tenant-aware mongo accessors · tenancy · unified users
-└── utils/                  # retry, dates, keys, jira-key extraction
-web/                        # React (Vite + TS): chat · proactive inbox · trends · settings
-docs/                       # vision, proactive design, build plan, connector recipe
-tests/                      # 480+ unit + integration tests
+├── connectors/   # one folder per source (auto-discovered): jira · github · slack
+├── schemas/      # Pydantic models = collection contracts (+ relationships.yaml)
+├── mappers/      # raw dc-* → canonical ds-* projection
+├── pipeline/     # embed · unify · entity_links · metrics · sync orchestration · scheduler
+├── proactive/    # the engine: events · detectors · signals · baselines · judge · routing
+│   ├── episodes.py · reply_understanding.py · beliefs.py   # the memory engine (A–D)
+│   └── orchestrator.py                                     # speak-first loop + follow-ups
+├── actions/      # write-back: propose → approve → execute → audit
+├── agent/        # deepagent + auto-discovered tools + registries
+├── routers/      # FastAPI: auth · chat · sessions · inbox · people · actions · stats · …
+├── eval/  db/  utils/  middleware/
+web/              # React (Vite + TS): chat · proactive inbox · people · trends · settings
+docs/             # vision, memory engine, connector recipe, screenshots
+tests/            # 525 unit + integration tests
 ```
 
-## Quickstart
+---
+
+## 🚀 Quickstart
 
 ```bash
 # 1. Mongo running locally
@@ -167,88 +207,72 @@ make web-install  # one-time npm install
 make web          # http://localhost:5173   (React UI)
 ```
 
-Sign in with the exact tenant name you created. Connect JIRA / GitHub / Slack
-per tenant in **Settings**; enable the Slack bot voice (DMs + replies) with
-`docs/slack-app-setup.md`.
+Sign in with the workspace name you created. Connect JIRA / GitHub / Slack per workspace in **Settings**; enable the Slack bot voice with [`docs/slack-app-setup.md`](docs/slack-app-setup.md).
 
-### Auto-sync and the proactive loop
+### Auto‑sync & safety rails
 
-A background scheduler re-runs the full pipeline for every configured tenant:
-ingest → thread rollup → embed → unify users → link → backfill → canonical
-projection → entity links → **baselines → detectors → judge → speak →
-metrics**. Controlled by `AUTO_SYNC_ENABLED` (default true) and
-`SYNC_INTERVAL_MINUTES` (default 60); always off under `ENV=test|ci`.
-
-Safety rails for the speaking/acting side (all default-safe):
+A background scheduler re‑runs the full pipeline for every configured tenant: ingest → embed → unify → link → **detect → judge → speak → understand → consolidate → metrics**. Everything that can talk to a human is default‑safe:
 
 | Control | Default | Meaning |
 |---|---|---|
-| shadow mode | on | drafts go to the Inbox, not Slack |
-| `proactive_send_enabled` (per tenant) | off | the go-live flag, in Slack settings |
-| `PROACTIVE_SPEAK_ENABLED` | on | global kill switch for real DMs |
+| shadow mode | **on** | drafts go to the Inbox, not Slack |
+| `proactive_send_enabled` (per tenant) | off | the go‑live flag, in Slack settings |
 | `PROACTIVE_DAILY_DM_CAP` | 1 | max yoku DMs per person per day |
-| `PROACTIVE_QUIET_UTC` | unset | e.g. `20-06`: no DMs in the window |
-| `JUDGE_BUDGET_PER_RUN` | 20 | LLM-judged signals per sync (cost cap) |
-| `DM_APPROVAL_ENABLED` | off | affirmative DM replies may approve that gap's action |
-| write-back | proposal-gated | agent proposes; an admin approves; everything audit-logged |
+| `JUDGE_BUDGET_PER_RUN` | 20 | LLM‑judged signals per sync (cost cap) |
+| write‑back | proposal‑gated | agent proposes; an admin approves; everything audit‑logged |
 
-## CLI
+---
+
+## 🖥️ CLI
 
 ```
 yoku --tenant <id> <command>
 
-  ingest jira|jira-users|github|github-users|slack-export …
-  refresh-all          full pipeline (ingest → … → judge → speak → metrics)
-  embed · link · unify-users · unify · backfill-pr-emails
-  chat "<question>"    one-shot agent query
-  slack-test-dm <person> [--send]   verify the bot voice (dry-run default)
-  status · consistency · list-connectors
-  auth create-user|list-users
-  api                  launch FastAPI on :8000
+  ingest jira|github|slack-export …     refresh-all
+  embed · link · unify · backfill        chat "<question>"   (one-shot agent query)
+  slack-test-dm <person> [--send]        status · consistency · doctor
+  auth create-user|list-users            api    (launch FastAPI on :8000)
 ```
 
-## Auth + multi-tenancy
+## 🔐 Auth & multi‑tenancy
 
-One mongo cluster, one database per tenant (`yoku_<tenant>`), auto-created on
-first signup. The JWT carries the tenant id; every authenticated request binds
-a tenant `ContextVar` that all storage accessors read — cross-tenant access is
-impossible by construction. Connector tokens and the Slack signing secret are
-encrypted at rest. Passwords are bcrypt-hashed.
+One MongoDB cluster, **one database per tenant** (`yoku_<tenant>`), auto‑created on first signup. The JWT carries the tenant id; every request binds a tenant `ContextVar` that all storage reads — **cross‑tenant access is impossible by construction**. Connector tokens and the Slack signing secret are encrypted at rest; passwords are bcrypt‑hashed.
 
-## Quality gates
+## ✅ Quality gates
 
 ```bash
 make fmt            # autoflake + ruff --fix + black
 make lint           # ruff + black --check
-make test           # pytest (480+ tests; integration needs local mongo)
-make web-lint       # TypeScript checks
-make web-build      # production build
-make schemas        # regenerate JSON Schema docs
+make test           # pytest (525 tests; integration needs local mongo)
+make web-lint       # TypeScript checks      make web-build   # production build
 make agent-smoke    # 5-query agent regression suite   (hits OpenAI)
-make eval           # answer-quality eval on the golden set (hits OpenAI)
-make retrieval-eval # retrieval hit-rate / MRR on live data
+make eval           # answer-quality eval on the golden set
 ```
 
-CI runs on every push and PR. Run `make agent-smoke` after touching agent
-behavior; `make eval` after prompt/tool/model changes.
+CI runs on every push and PR.
 
-## Docker
+## 🐳 Docker
 
 ```bash
 docker build -t yoku .
 docker run --rm -p 8000:8000 --env-file .env yoku
-# batch ingest:
-docker run --rm --env-file .env yoku python -m yoku.cli refresh-all
+docker run --rm --env-file .env yoku python -m yoku.cli refresh-all   # batch ingest
 ```
 
-## Docs
+## 📚 Docs
 
 | Doc | What it is |
 |---|---|
-| `vision.md` | why yoku exists — the north star |
-| `docs/yoku_agent.md` | the proactive engine's design contract (all 6 phases shipped) |
-| `docs/memory-engine.md` | how yoku learns from replies and follows through — the 4-phase memory engine |
-| `docs/build-plan.md` | the milestone sequence the build followed |
-| `docs/adding-a-connector.md` | onboard a new source end to end |
-| `docs/slack-app-setup.md` | enable the Slack bot voice for a tenant |
-| `docs/feature-roadmap.md` | the original deep-dive on candidate features |
+| [`vision.md`](vision.md) | why yoku exists — the north star |
+| [`docs/memory-engine.md`](docs/memory-engine.md) | how yoku learns from replies and follows through |
+| [`docs/yoku_agent.md`](docs/yoku_agent.md) | the proactive engine's design contract |
+| [`docs/adding-a-connector.md`](docs/adding-a-connector.md) | onboard a new source end to end |
+| [`docs/slack-app-setup.md`](docs/slack-app-setup.md) | enable the Slack bot voice |
+| [`docs/build-plan.md`](docs/build-plan.md) · [`docs/feature-roadmap.md`](docs/feature-roadmap.md) | the milestone sequence & candidate features |
+
+<div align="center">
+<br/>
+
+**yoku** — *judgment before noise · a teammate, not a dashboard · when in doubt, skip.*
+
+</div>
