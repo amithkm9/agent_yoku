@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Link, NavLink } from "react-router-dom";
-import { api, User } from "../lib/api";
+import { Link, NavLink, useNavigate } from "react-router-dom";
+import { api, setToken, User } from "../lib/api";
 
 export function AppBrand({ subtitle = "Home" }: { subtitle?: string }) {
   return (
@@ -20,6 +20,7 @@ export function AppBrand({ subtitle = "Home" }: { subtitle?: string }) {
  *  pills with active states, live gap-count badge, signed-in identity. */
 export function AppHeader({ user, subtitle }: { user: User; subtitle: string }) {
   const [gaps, setGaps] = useState<number | null>(null);
+  const nav = useNavigate();
 
   useEffect(() => {
     api
@@ -27,6 +28,11 @@ export function AppHeader({ user, subtitle }: { user: User; subtitle: string }) 
       .then((r) => setGaps(r.total_matured))
       .catch(() => setGaps(null));
   }, []);
+
+  function logout() {
+    setToken(null);
+    nav("/login");
+  }
 
   return (
     <header className="settings-header">
@@ -62,8 +68,13 @@ export function AppHeader({ user, subtitle }: { user: User; subtitle: string }) 
         )}
       </nav>
       <div className="who">
-        <div className="user-name">{user.name || user.email}</div>
-        <div className="user-tenant">tenant: {user.tenant_id}</div>
+        <div className="who-identity">
+          <div className="user-name">{user.name || user.email}</div>
+          <div className="user-tenant">workspace: {user.tenant_id}</div>
+        </div>
+        <button type="button" className="header-logout" onClick={logout}>
+          Log out
+        </button>
       </div>
     </header>
   );

@@ -14,7 +14,7 @@
 
   /* Text */
   --text: #1a1825;
-  --text-muted: #6b6880;
+  --text-muted: #5d5a72; /* darkened for WCAG AA on the off-white bg (~5:1) */
 
   /* Brand / accent */
   --primary: #6d5efc;
@@ -1666,4 +1666,194 @@ code.signal-key {
 .signal-chip--action {
   background: #fff4e0;
   color: var(--warning);
+}
+
+/* ───────────────────────── Accessibility & polish (Batch 1) ───────────────── */
+
+/* Visible keyboard focus everywhere — keyboard users can finally see where
+   they are. Mouse clicks don't trigger :focus-visible, so this is unobtrusive. */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: inherit;
+}
+
+/* Respect users who ask the OS to reduce motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Error banner: announce to AT, and a real dismiss button (not a whole-div click). */
+.banner.error {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.banner.error > span {
+  flex: 1;
+}
+.banner-close {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+  opacity: 0.7;
+}
+.banner-close:hover {
+  opacity: 1;
+}
+
+/* Live streaming status — animated typing dots so a slow agent reads as working. */
+.turn-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.status-dots {
+  display: inline-flex;
+  gap: 3px;
+}
+.status-dots i {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--primary);
+  display: inline-block;
+  animation: status-bounce 1.2s ease-in-out infinite;
+}
+.status-dots i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.status-dots i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes status-bounce {
+  0%, 60%, 100% { opacity: 0.35; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-3px); }
+}
+
+/* Stop button while streaming. */
+.stop-button {
+  background: var(--bg-elevated);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+}
+.stop-button:hover {
+  background: var(--bg-subtle);
+}
+.stop-glyph {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--danger);
+  display: inline-block;
+}
+
+/* First-run / empty-workspace panel on the chat hero. */
+.first-run {
+  margin-top: 8px;
+  padding: 28px 26px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 16px;
+  background: var(--bg-elevated);
+  text-align: center;
+  max-width: 520px;
+}
+.first-run h2 {
+  margin: 0 0 8px;
+  font-size: 19px;
+}
+.first-run p {
+  margin: 0 auto 16px;
+  color: var(--text-muted);
+  max-width: 420px;
+  line-height: 1.5;
+}
+.first-run-cta {
+  display: inline-block;
+  text-decoration: none;
+}
+.first-run-note {
+  margin-bottom: 0 !important;
+  font-size: 13px;
+}
+
+/* Undo toast (deferred dismiss in the Inbox). */
+.undo-toast {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  border-radius: 12px;
+  background: var(--text);
+  color: #fff;
+  box-shadow: var(--shadow-md);
+}
+.undo-toast > span {
+  flex: 1;
+  font-size: 13px;
+}
+.undo-btn {
+  border: none;
+  background: transparent;
+  color: #b9acff;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.undo-btn:hover {
+  color: #fff;
+}
+
+/* Log out from the shared header (reachable on every full-width page). */
+.who {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.header-logout {
+  border: 1px solid var(--border-strong);
+  background: var(--bg-elevated);
+  color: var(--text);
+  border-radius: 9px;
+  padding: 7px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.header-logout:hover {
+  background: var(--bg-subtle);
+}
+
+/* Responsive chat: the 280px sidebar would swallow a phone — stack it above the
+   conversation below 760px with a height-capped recents list. */
+@media (max-width: 760px) {
+  .chat-shell {
+    grid-template-columns: 1fr;
+    height: auto;
+    min-height: 100vh;
+  }
+  .sidebar {
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .session-list {
+    max-height: 180px;
+    overflow-y: auto;
+  }
+  .home-hero {
+    padding: 24px 16px;
+  }
 }

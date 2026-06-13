@@ -227,10 +227,12 @@ export const api = {
     request<void>(`/api/sessions/${id}`, { method: "DELETE" }),
 
   // Streamed turn: invokes onEvent("tool"|"answer"|"error", data) as SSE arrives.
+  // Pass an AbortSignal to cancel cleanly (navigation, session switch, Stop).
   postChatStream: async (
     session_id: string,
     query: string,
-    onEvent: (event: string, data: Record<string, unknown>) => void
+    onEvent: (event: string, data: Record<string, unknown>) => void,
+    signal?: AbortSignal
   ): Promise<void> => {
     const headers = new Headers({ "Content-Type": "application/json" });
     const token = getToken();
@@ -240,6 +242,7 @@ export const api = {
       method: "POST",
       headers,
       body: JSON.stringify({ session_id, query }),
+      signal,
     });
     if (r.status === 401) {
       setToken(null);
@@ -267,7 +270,18 @@ export const api = {
           if (line.startsWith("event:")) event = line.slice(6).trim();
           else if (line.startsWith("data:")) data += line.slice(5).trim();
         }
-        if (data) onEvent(event, JSON.parse(data) as Record<string, unknown>);
+        if (data) {
+          // Guard ONLY the parse — a stray non-JSON frame (heartbeat/comment) is
+          // skipped rather than killing the turn. onEvent runs outside the try so
+          // a legitimate backend "error" event still propagates its real message.
+          let parsed: Record<string, unknown> | null = null;
+          try {
+            parsed = JSON.parse(data) as Record<string, unknown>;
+          } catch {
+            parsed = null;
+          }
+          if (parsed) onEvent(event, parsed);
+        }
         sep = buf.indexOf("\n\n");
       }
     }

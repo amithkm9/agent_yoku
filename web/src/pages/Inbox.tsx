@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Action, api, Signal, User } from "../lib/api";
 import { AppHeader, SparkleIcon } from "../components/AppChrome";
@@ -58,6 +58,10 @@ export function Inbox() {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pendingActions, setPendingActions] = useState<Action[]>([]);
+  // Dismiss is sticky server-side, so we defer the call 5s and offer Undo —
+  // the row vanishes immediately but nothing is committed until the timer fires.
+  const [pendingUndo, setPendingUndo] = useState<Signal | null>(null);
+  const undoTimer = useRef<number | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -97,24 +101,61 @@ export function Inbox() {
     [signals, filter]
   );
 
+  const commitDismiss = useCallback((sig: Signal) => {
+    api.dismissSignal(sig.signal_id).catch(() => void refresh());
+  }, [refresh]);
+
+  // Flush any queued dismiss immediately (on a second dismiss, or unmount).
+  const flushUndo = useCallback(() => {
+    if (undoTimer.current) {
+      window.clearTimeout(undoTimer.current);
+      undoTimer.current = null;
+    }
+    setPendingUndo((p) => {
+      if (p) commitDismiss(p);
+      return null;
+    });
+  }, [commitDismiss]);
+
+  useEffect(() => () => flushUndo(), [flushUndo]); // commit on unmount
+
+  function dismissWithUndo(signal: Signal) {
+    flushUndo(); // commit any prior pending dismiss first
+    setSignals((list) => (list ?? []).filter((s) => s.signal_id !== signal.signal_id));
+    setTotals((t) => ({
+      ...t,
+      open: Math.max(0, t.open - 1),
+      matured: Math.max(0, t.matured - 1),
+    }));
+    setPendingUndo(signal);
+    undoTimer.current = window.setTimeout(() => {
+      commitDismiss(signal);
+      setPendingUndo(null);
+      undoTimer.current = null;
+    }, 5000);
+  }
+
+  function undoDismiss() {
+    if (undoTimer.current) {
+      window.clearTimeout(undoTimer.current);
+      undoTimer.current = null;
+    }
+    setPendingUndo(null);
+    void refresh(); // nothing was committed; restore exact server state
+  }
+
   async function verdict(signal: Signal, action: "confirm" | "dismiss") {
+    if (action === "dismiss") {
+      dismissWithUndo(signal);
+      return;
+    }
     setBusy(signal.signal_id);
     setError(null);
     try {
-      if (action === "confirm") {
-        const updated = await api.confirmSignal(signal.signal_id);
-        setSignals((list) =>
-          (list ?? []).map((s) => (s.signal_id === signal.signal_id ? updated : s))
-        );
-      } else {
-        await api.dismissSignal(signal.signal_id);
-        setSignals((list) => (list ?? []).filter((s) => s.signal_id !== signal.signal_id));
-        setTotals((t) => ({
-          ...t,
-          open: Math.max(0, t.open - 1),
-          matured: Math.max(0, t.matured - 1),
-        }));
-      }
+      const updated = await api.confirmSignal(signal.signal_id);
+      setSignals((list) =>
+        (list ?? []).map((s) => (s.signal_id === signal.signal_id ? updated : s))
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       await refresh(); // fall back to server truth
@@ -144,8 +185,16 @@ export function Inbox() {
       <AppHeader user={user} subtitle="Proactive" />
 
       <main className="settings-main inbox-main">
+        {pendingUndo && (
+          <div className="undo-toast" role="status">
+            <span>Dismissed “{pendingUndo.title || pendingUndo.item_key}”.</span>
+            <button type="button" className="undo-btn" onClick={undoDismiss}>
+              Undo
+            </button>
+          </div>
+        )}
         {error && (
-          <div className="banner error" onClick={() => setError(null)}>
+          <div className="banner error" role="alert" onClick={() => setError(null)}>
             {error}
           </div>
         )}

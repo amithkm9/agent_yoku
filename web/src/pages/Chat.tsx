@@ -46,10 +46,32 @@ function extractText(content: unknown): string {
 }
 
 interface ChatTurn {
+  id: string; // stable key + lets a streaming callback target its own turn
   question: string;
   answer: string;
   toolCalls: ChatResponse["tool_calls"];
   status?: string; // live progress while streaming (cleared once the answer lands)
+}
+
+// Map raw tool names to human verbs so the streaming trace reads like a
+// teammate working, not like an internal API log.
+const TOOL_LABELS: Record<string, string> = {
+  semantic_search: "Searching across sources",
+  mongo_query: "Querying records",
+  mongo_count: "Counting records",
+  list_collections: "Scanning collections",
+  describe_collection: "Reading the schema",
+  describe_collections: "Reading the schema",
+  resolve_user: "Resolving a person",
+  who_knows: "Finding who knows this",
+  get_memory: "Recalling what it knows",
+  update_memory: "Updating its memory",
+  recall_history: "Recalling history",
+  propose_action: "Drafting an action",
+};
+
+function humanTool(name: string): string {
+  return TOOL_LABELS[name] || `Running ${name}`;
 }
 
 type AnswerBlock =
@@ -349,6 +371,12 @@ export function Chat() {
   const [syncing, setSyncing] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const streamRef = useRef<AbortController | null>(null);
+
+  const abortStream = useCallback(() => {
+    streamRef.current?.abort();
+    streamRef.current = null;
+  }, []);
 
   useEffect(() => {
     document.title = "Agent Yoku";
@@ -361,6 +389,7 @@ export function Chat() {
       .listInbox()
       .then((r) => setGapCount(r.total_matured))
       .catch(() => setGapCount(0));
+    return () => abortStream(); // cancel any in-flight stream on unmount
   }, []);
 
   useEffect(() => {
@@ -384,6 +413,8 @@ export function Chat() {
   }, [activeSession]);
 
   async function selectSession(id: string) {
+    abortStream(); // don't let a prior stream patch the session we're leaving
+    setBusy(false);
     setActiveSession(id);
     try {
       const detail = await api.getSession(id);
@@ -394,10 +425,16 @@ export function Chat() {
   }
 
   async function newSession() {
-    const r = await api.createSession();
-    await refresh();
-    selectSession(r.session_id);
-    setHistory([]);
+    abortStream();
+    setBusy(false);
+    try {
+      const r = await api.createSession();
+      await refresh();
+      selectSession(r.session_id);
+      setHistory([]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
   }
 
   async function triggerSync(source: string) {
@@ -424,18 +461,23 @@ export function Chat() {
   }
 
   async function deleteSession(id: string) {
-    if (!confirm("Delete this session?")) return;
-    await api.deleteSession(id);
-    if (id === activeSession) {
-      setActiveSession(null);
-      setHistory([]);
+    if (!confirm("Delete this chat? This can't be undone.")) return;
+    try {
+      await api.deleteSession(id);
+      if (id === activeSession) {
+        abortStream();
+        setActiveSession(null);
+        setHistory([]);
+      }
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
     }
-    await refresh();
   }
 
   async function send(text?: string) {
     const q = (text ?? draft).trim();
-    if (!q) return;
+    if (!q || busy) return;
     let sid = activeSession;
     if (!sid) {
       const r = await api.createSession();
@@ -445,39 +487,85 @@ export function Chat() {
     setDraft("");
     setBusy(true);
     setError(null);
-    const pending: ChatTurn = { question: q, answer: "…", toolCalls: [], status: "thinking…" };
+
+    abortStream();
+    const controller = new AbortController();
+    streamRef.current = controller;
+    const turnId =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `t-${Date.now()}`;
+    const pending: ChatTurn = {
+      id: turnId,
+      question: q,
+      answer: "…",
+      toolCalls: [],
+      status: "Thinking…",
+    };
     setHistory((h) => [...h, pending]);
 
-    const patchLast = (patch: Partial<ChatTurn>) =>
-      setHistory((h) => h.map((t, i) => (i === h.length - 1 ? { ...t, ...patch } : t)));
+    // Patch this turn by id (not by index) so a slow stream never lands on
+    // another turn after the user navigates or starts a new chat.
+    const patchTurn = (patch: Partial<ChatTurn>) =>
+      setHistory((h) => h.map((t) => (t.id === turnId ? { ...t, ...patch } : t)));
+    const trace: string[] = [];
 
     try {
-      await api.postChatStream(sid, q, (event, data) => {
-        if (event === "tool") {
-          patchLast({ status: `running ${String(data.name ?? "tool")}…` });
-        } else if (event === "answer") {
-          patchLast({
-            answer: String(data.answer ?? ""),
-            toolCalls: (data.tool_calls ?? []) as ChatTurn["toolCalls"],
-            status: undefined,
-          });
-        } else if (event === "error") {
-          throw new Error(String(data.detail ?? "stream error"));
-        }
-      });
+      await api.postChatStream(
+        sid,
+        q,
+        (event, data) => {
+          if (event === "tool") {
+            const label = humanTool(String(data.name ?? "tool"));
+            if (trace[trace.length - 1] !== label) trace.push(label);
+            patchTurn({ status: `${label}…` });
+          } else if (event === "answer") {
+            patchTurn({
+              answer: String(data.answer ?? ""),
+              toolCalls: (data.tool_calls ?? []) as ChatTurn["toolCalls"],
+              status: undefined,
+            });
+          } else if (event === "error") {
+            throw new Error(String(data.detail ?? "stream error"));
+          }
+        },
+        controller.signal
+      );
       await refresh();
     } catch (e) {
+      if (controller.signal.aborted) return; // cancelled — leave gracefully
       setError(e instanceof Error ? e.message : String(e));
-      setHistory((h) => h.slice(0, -1));
+      setHistory((h) => h.filter((t) => t.id !== turnId));
     } finally {
-      setBusy(false);
+      // Don't clear busy if we were aborted by a newer action that owns it now.
+      if (!controller.signal.aborted) setBusy(false);
+      if (streamRef.current === controller) streamRef.current = null;
     }
+  }
+
+  function stop() {
+    abortStream();
+    setBusy(false);
+    // Finalize whatever turn was streaming.
+    setHistory((h) =>
+      h.map((t) =>
+        t.status
+          ? { ...t, status: undefined, answer: t.answer === "…" ? "_(stopped)_" : t.answer }
+          : t
+      )
+    );
   }
 
   function logout() {
     setToken(null);
     nav("/login");
   }
+
+  const noData =
+    counts != null &&
+    counts.jira_tickets === 0 &&
+    counts.github_prs === 0 &&
+    counts.slack_messages === 0;
 
   return (
     <div className="chat-shell">
@@ -511,7 +599,16 @@ export function Chat() {
             <li
               key={s.session_id}
               className={s.session_id === activeSession ? "active" : ""}
+              role="button"
+              tabIndex={0}
+              aria-current={s.session_id === activeSession}
               onClick={() => void selectSession(s.session_id)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  void selectSession(s.session_id);
+                }
+              }}
             >
               <div className="title">{s.title || "Untitled chat"}</div>
               <div className="meta">
@@ -519,6 +616,7 @@ export function Chat() {
               </div>
               <button
                 className="del"
+                aria-label={`Delete chat "${s.title || "Untitled chat"}"`}
                 onClick={(e) => {
                   e.stopPropagation();
                   void deleteSession(s.session_id);
@@ -529,7 +627,7 @@ export function Chat() {
             </li>
           ))}
           {sessions.length === 0 && (
-            <li className="empty">No sessions yet</li>
+            <li className="empty">No chats yet — ask yoku anything to begin.</li>
           )}
         </ul>
 
@@ -551,8 +649,16 @@ export function Chat() {
 
       <main className="chat-main">
         {error && (
-          <div className="banner error" onClick={() => setError(null)}>
-            {error}
+          <div className="banner error" role="alert">
+            <span>{error}</span>
+            <button
+              type="button"
+              className="banner-close"
+              aria-label="Dismiss error"
+              onClick={() => setError(null)}
+            >
+              ×
+            </button>
           </div>
         )}
 
@@ -602,22 +708,41 @@ export function Chat() {
                 </div>
               </form>
 
-              <div className="hero-chips">
-                {SUGGESTIONS.map((s) => (
-                  <button
-                    key={s.label}
-                    type="button"
-                    className="hero-chip"
-                    onClick={() => void send(s.prompt)}
-                    disabled={busy}
-                  >
-                    {s.icon}
-                    <span>{s.label}</span>
-                  </button>
-                ))}
-              </div>
+              {noData ? (
+                <div className="first-run">
+                  <h2>Let's connect your first source</h2>
+                  <p>
+                    yoku answers questions across JIRA, GitHub, and Slack — and watches for gaps
+                    between them. Connect a source to bring in your team's work.
+                  </p>
+                  {user?.is_admin ? (
+                    <Link to="/settings" className="primary first-run-cta">
+                      Connect a source
+                    </Link>
+                  ) : (
+                    <p className="first-run-note">
+                      Ask your workspace admin to connect a source, then come back and ask anything.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="hero-chips">
+                  {SUGGESTIONS.map((s) => (
+                    <button
+                      key={s.label}
+                      type="button"
+                      className="hero-chip"
+                      onClick={() => void send(s.prompt)}
+                      disabled={busy}
+                    >
+                      {s.icon}
+                      <span>{s.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
 
-              {counts && (
+              {counts && !noData && (
                 <div className="hero-counts">
                   {(
                     [
@@ -696,8 +821,8 @@ export function Chat() {
         ) : (
           <>
             <div className="messages">
-              {history.map((turn, i) => (
-            <div key={i} className="turn">
+              {history.map((turn) => (
+            <div key={turn.id} className="turn">
               <div className="msg user">{turn.question}</div>
               {turn.toolCalls.length > 0 && (
                 <details className="tool-trace">
@@ -721,7 +846,14 @@ export function Chat() {
               )}
               <div className="msg ai">
                 {turn.status ? (
-                  <div className="turn-status">{turn.status}</div>
+                  <div className="turn-status" role="status" aria-live="polite">
+                    <span className="status-dots" aria-hidden="true">
+                      <i />
+                      <i />
+                      <i />
+                    </span>
+                    <span>{turn.status}</span>
+                  </div>
                 ) : (
                   <AnswerContent text={turn.answer} jiraBase={user?.jira_base_url ?? null} />
                 )}
@@ -754,10 +886,22 @@ export function Chat() {
               aria-label="Message composer"
             />
             <div className="composer-actions">
-              <button className="primary send-button" type="submit" disabled={busy || !draft.trim()}>
-                <SendIcon />
-                <span>Send</span>
-              </button>
+              {busy ? (
+                <button
+                  type="button"
+                  className="send-button stop-button"
+                  onClick={stop}
+                  aria-label="Stop generating"
+                >
+                  <span className="stop-glyph" aria-hidden="true" />
+                  <span>Stop</span>
+                </button>
+              ) : (
+                <button className="primary send-button" type="submit" disabled={!draft.trim()}>
+                  <SendIcon />
+                  <span>Send</span>
+                </button>
+              )}
             </div>
           </div>
         </form>
@@ -803,6 +947,7 @@ function messagesToTurns(messages: PersistedMessage[]): ChatTurn[] {
     );
 
     turns.push({
+      id: `turn-${msgs[0]?.turn_seq ?? turns.length}`,
       question: human ? extractText(human.content) : "",
       answer: finalAi ? extractText(finalAi.content) : "",
       toolCalls,
