@@ -190,6 +190,23 @@ def run_proactive_loop(now: datetime | None = None) -> dict[str, int]:
 
         try:
             convos.insert_one(convo)
+            # Episodic memory: yoku just spoke (really or in shadow). Recorded
+            # only when this run actually opened the conversation, so a
+            # concurrent run losing the insert race below doesn't double-count.
+            from yoku.proactive.episodes import KIND_SENT, record_episode
+
+            real = convo["state"] == "awaiting_reply"
+            record_episode(
+                kind=KIND_SENT,
+                text=message,
+                person_user_id=target["user_id"],
+                signal_id=s["signal_id"],
+                item_key=s["item_key"],
+                detector=s["detector"],
+                source="slack" if real else "engine",
+                outcome="sent" if real else "shadow",
+                now=now,
+            )
         except DuplicateKeyError:
             # A concurrent run (scheduler + on-demand sync) won the race for
             # this gap — the unique signal_id index is the real dedupe; the
@@ -261,6 +278,20 @@ def process_inbound_replies(now: datetime | None = None) -> int:
                 },
             )
             threaded += 1
+            # Episodic memory: the person answered. Phase B will parse this text
+            # into an outcome; Phase A just captures it verbatim.
+            from yoku.proactive.episodes import KIND_REPLY, SOURCE_SLACK, record_episode
+
+            record_episode(
+                kind=KIND_REPLY,
+                text=row.get("text") or "",
+                person_user_id=convo.get("person_user_id"),
+                signal_id=convo.get("signal_id"),
+                item_key=convo.get("item_key"),
+                detector=convo.get("detector"),
+                source=SOURCE_SLACK,
+                now=now,
+            )
             _maybe_approve_pending_action(convo, row.get("text") or "")
         # Mark processed either way: a DM with no awaiting conversation is
         # ordinary chat with the bot, not a reply — Phase 6 may route those

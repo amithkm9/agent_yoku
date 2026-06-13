@@ -188,6 +188,12 @@ def label_signal(signal_id: str, label: str, user_id: str) -> dict | None:
     the whole pattern for them (Phase 3).
     Returns the updated signal, or None if the id is unknown.
     """
+    from yoku.proactive.episodes import (
+        KIND_CONFIRM,
+        KIND_DISMISSAL,
+        SOURCE_INBOX,
+        record_episode,
+    )
     from yoku.proactive.memory import record_dismissal
 
     now = datetime.now(UTC)
@@ -204,5 +210,22 @@ def label_signal(signal_id: str, label: str, user_id: str) -> dict | None:
             pattern=doc["detector"],
             item_key=doc["item_key"],
             by=user_id,
+        )
+    # Episodic memory: every human verdict is something that happened. Confirms
+    # never reach person_memory (only dismissals suppress), but both belong in
+    # the episode stream that later phases learn from.
+    if doc and label in ("confirmed", "dismissed"):
+        verb = "Confirmed" if label == "confirmed" else "Dismissed"
+        title = f" — {doc.get('title')}" if doc.get("title") else ""
+        record_episode(
+            kind=KIND_CONFIRM if label == "confirmed" else KIND_DISMISSAL,
+            text=f"{verb} {doc['detector']} on {doc['item_key']}{title}",
+            person_user_id=doc.get("person_user_id"),
+            signal_id=doc.get("signal_id"),
+            item_key=doc.get("item_key"),
+            detector=doc.get("detector"),
+            source=SOURCE_INBOX,
+            outcome=label,
+            now=now,
         )
     return doc

@@ -314,6 +314,27 @@ def slack_inbound_collection() -> Collection:
     )
 
 
+def episodes_collection() -> Collection:
+    """Episodic memory — the timestamped record of what actually happened.
+
+    One row per concrete interaction (yoku spoke, a person replied, a human
+    confirmed/dismissed a gap). Engine-internal — deliberately off
+    ALLOWED_COLLECTIONS; later phases consolidate it into beliefs and let the
+    reactive agent recall a person's history. Written best-effort by
+    `yoku.proactive.episodes`.
+    """
+    return _ensure(
+        _db()["episodes"],
+        [
+            IndexModel("episode_id", unique=True),
+            IndexModel([("person_user_id", ASCENDING), ("ts", DESCENDING)]),
+            IndexModel("signal_id"),
+            IndexModel("kind"),
+            IndexModel([("ts", DESCENDING)]),
+        ],
+    )
+
+
 # ---------------------------------------------------------------------------
 # Internal dc-* accessor map — for pipeline/embed code that reads raw collections
 DC_COLLECTIONS = {
