@@ -241,18 +241,26 @@ engine writes.
 
 ## The whole loop, end to end
 
-```
- detect gap ──► judge (reads beliefs) ──► speak ──► person replies on Slack
-     ▲                                                      │
-     │                                            understand the reply
-     │                                            ├─ explains  → settle + teach memory
-     │                                            ├─ promise   → record commitment
-     │                                            └─ dispute   → settle this gap
-     │                                                      │
- consolidate beliefs ◄── episodes ◄────────────────────────┘
-     │                       ▲
-     │                       └── follow up if a promise lapses (Phase D)
-     └──────────────► recall_history exposes all of it to the chat agent
+```mermaid
+flowchart LR
+    D["detect gap"] --> J["judge<br/>(reads beliefs)"]
+    J --> S["speak<br/>(nudge / shadow)"]
+    S --> R["person replies<br/>on Slack"]
+    R --> U{"understand<br/>the reply (B)"}
+    U -->|explains| T["settle gap + teach memory"]
+    U -->|promise| M["record commitment"]
+    U -->|dispute| X["settle this gap"]
+    T --> E[("episodes · A")]
+    M --> E
+    X --> E
+    E --> C["consolidate beliefs · C"]
+    C --> J
+    M --> FU["follow up if a<br/>promise lapses (D)"]
+    FU --> S
+    E --> RH["recall_history<br/>→ chat agent & People view"]
+
+    classDef mem fill:#eef,stroke:#88a;
+    class E,C mem;
 ```
 
 ---

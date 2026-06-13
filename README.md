@@ -74,14 +74,19 @@ No single tool sees all four layers, so nobody notices the drift until it's expe
 
 Most ops agents are stateless: every run, they re‑reason from scratch and re‑nag about the same things. yoku closes the loop in four phases — it *learns from what people tell it*:
 
-```
-yoku nudges Priya about a Done ticket with no PR
-   └─ Priya replies on Slack: "that's a spike, we don't open PRs for those"
-        └─ yoku UNDERSTANDS the reply  → settles this gap, records the lesson
-             └─ CONSOLIDATES it into a belief (confidence 0.7, decays over time)
-                  └─ next time a spike of Priya's looks like a gap → yoku stays quiet
-   └─ or Priya replies "good catch, I'll link it Friday"
-        └─ yoku REMEMBERS the promise → chases it once if Friday passes
+```mermaid
+flowchart TD
+    N["yoku nudges Priya<br/>(Done ticket, no PR)"] --> R{"Priya replies<br/>on Slack"}
+    R -->|"'that's a spike,<br/>we don't open PRs'"| U["Understand → settle this gap"]
+    U --> C["Consolidate a belief<br/>confidence 0.7, decays over time"]
+    C --> Q["Next similar gap of Priya's<br/>→ yoku stays quiet 🤫"]
+    R -->|"'good catch,<br/>I'll link it Friday'"| P["Remember the promise 🤝"]
+    P --> F["Friday passes, still no PR<br/>→ one gentle follow-up 🔔"]
+
+    classDef quiet fill:#e6f7f1,stroke:#0a8f6c;
+    classDef chase fill:#fff4e0,stroke:#b4791f;
+    class Q quiet;
+    class F chase;
 ```
 
 | Phase | What it adds |
@@ -97,30 +102,32 @@ A natural‑language explanation in Slack now measurably shapes how yoku judges 
 
 ## 🏗️ How it works
 
+```mermaid
+flowchart TB
+    UI["🖥️ React UI<br/>chat · inbox · people · trends"]
+    API["⚙️ FastAPI :8000<br/>tenant ContextVar"]
+    AGENT["🤖 deepagent<br/>12 tools + registries"]
+    DB[("🍃 MongoDB — one DB per tenant<br/>raw dc-* · canonical ds-* · engine collections")]
+    ENGINE["🛰️ Proactive + 🧠 Memory engine<br/>detect · judge · speak · learn"]
+    SRC["🔌 JIRA · GitHub · Slack"]
+
+    UI -->|JWT| API
+    API -->|invoke| AGENT
+    API --> DB
+    AGENT --> DB
+    SRC -->|"ingest → embed → unify → link"| DB
+    DB --> ENGINE
+    ENGINE -->|"draft nudges & proposals"| API
+    ENGINE -->|"DMs out · proposal-gated write-back"| SRC
+
+    classDef store fill:#eef,stroke:#88a;
+    class DB store;
 ```
- ┌──────────────┐    JWT      ┌─────────────────────┐   invoke   ┌──────────────────┐
- │  React UI    │ ──────────▶ │  FastAPI            │ ─────────▶ │ deepagent        │
- │  chat·inbox  │             │  (uvicorn :8000)    │            │ + 12 tools       │
- │  people·trends│            │  + tenant ContextVar │            │ + registries     │
- └──────────────┘             └──────┬──────────────┘            └────────┬─────────┘
-                                     │ db per tenant                      │
-                                     ▼                                    ▼
- ┌──────────────────────────────────────────────────────────────────────────────────┐
- │ MongoDB — yoku_<tenant>                                                          │
- │  dc-*  raw connector docs (jira, github, slack, users)                           │
- │  ds-*  canonical layer (work-item, pull-request, conversation, entity-links,     │
- │        unified-users, metrics)                                                   │
- │  engine: events · signals · baselines · person_memory · beliefs · episodes ·     │
- │          conversations · action_log · slack_inbound                              │
- └──────────────────────────────────────────────────────────────────────────────────┘
-        ▲                                                   │
-        │ ingest → embed → unify → link → detect → judge →  ▼
-        │ speak → understand → consolidate → metrics  (hourly + on-demand)
- ┌──────┴───────┐
- │ JIRA · GitHub │  ◀── write-back: transition / comment / create / link
- │ · Slack       │  ◀── bot voice: DMs out, replies + @mentions in (signed events)
- └───────────────┘
-```
+
+> One MongoDB cluster, **one database per tenant**. `dc-*` are raw connector docs;
+> `ds-*` are the canonical layer (work-item, pull-request, conversation, entity-links,
+> unified-users, metrics); engine collections hold `events`, `signals`, `baselines`,
+> `episodes`, `beliefs`, `conversations`, `action_log`, `slack_inbound`.
 
 **Schema‑driven by design.** Three registries are the single source of truth — the agent's tools read everything from them, nothing about a collection is hardcoded:
 
