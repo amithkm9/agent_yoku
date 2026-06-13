@@ -13,7 +13,7 @@
 ![MongoDB](https://img.shields.io/badge/MongoDB-47A248?logo=mongodb&logoColor=white)
 ![Tests](https://img.shields.io/badge/tests-525%20passing-2ea44f)
 
-[What it is](#-what-it-is) · [See it in action](#-see-it-in-action) · [The four layers](#the-four-layers-that-drift-apart) · [Features](#-features) · [Memory engine](#-the-memory-engine--a-teammate-that-remembers) · [How it works](#-how-it-works) · [Quickstart](#-quickstart)
+[What it is](#-what-it-is) · [The four layers](#the-four-layers-that-drift-apart) · [Features](#-features) · [Memory engine](#-the-memory-engine--a-teammate-that-remembers) · [How it works](#-how-it-works) · [Quickstart](#-quickstart)
 
 </div>
 
@@ -31,35 +31,6 @@ Engineering work is scattered across tools that don't talk to each other. The **
 What makes it different from a dashboard or a chatbot: **yoku has a memory.** When someone replies *"that's a spike, we don't open PRs for those,"* yoku understands it, stops nagging, and remembers it — so it judges the *next* gap smarter. It's less a tool, more a teammate.
 
 > **Built to be safe by default.** yoku ships in *shadow mode*: it drafts messages into a review Inbox and sends nothing until you flip a per‑team switch. Every write‑back (closing a ticket, linking a PR) is proposal‑gated — the agent proposes, a human approves, everything is audit‑logged.
-
----
-
-## 📸 See it in action
-
-### Chat — ask anything across JIRA, GitHub & Slack
-A planning agent answers questions over your unified work, with inline citations and live source counts.
-
-![Chat home](docs/screenshots/chat.png)
-
-### Proactive Inbox — yoku speaks first when something's off
-Cross‑source gaps, triaged. Each card shows what yoku would say, the promise the person made (🤝), and what yoku has learned about them (🧠). Confirm or dismiss — every click teaches it.
-
-![Proactive Inbox](docs/screenshots/proactive-inbox.png)
-
-### "What yoku knows" — the memory engine, made visible
-A profile per person: the beliefs yoku formed (with confidence), what they're on the hook for, and the full interaction timeline — nudges, replies, follow‑ups.
-
-![People / memory view](docs/screenshots/people.png)
-
-### Trends — engineering metrics, recomputed every sync
-Merge velocity, PR cycle time (median + p90), ticket throughput, open‑gap count. The same numbers are queryable in chat.
-
-![Trends dashboard](docs/screenshots/trends.png)
-
-### Settings — connect your sources in minutes
-Per‑team connectors for JIRA, GitHub & Slack. Tokens are encrypted at rest and never leave the tenant.
-
-![Settings / connectors](docs/screenshots/settings.png)
 
 ---
 
@@ -175,7 +146,7 @@ yoku/
 ├── routers/      # FastAPI: auth · chat · sessions · inbox · people · actions · stats · …
 ├── eval/  db/  utils/  middleware/
 web/              # React (Vite + TS): chat · proactive inbox · people · trends · settings
-docs/             # vision, memory engine, connector recipe, screenshots
+docs/             # vision, memory engine, connector recipe
 tests/            # 525 unit + integration tests
 ```
 
