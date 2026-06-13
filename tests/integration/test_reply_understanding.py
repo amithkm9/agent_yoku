@@ -210,6 +210,62 @@ def test_budget_and_idempotency(tenant):
 
 
 @pytest.mark.integration
+def test_repromise_preserves_followup_count(tenant):
+    """A second promise must not reset the follow-up counter (which would defeat
+    MAX_FOLLOWUPS and let yoku nag repeatedly)."""
+    from yoku.db.mongo import signals_collection
+    from yoku.proactive.reply_understanding import understand_replies
+
+    sid, _ = _seed_reply(reply_text="ok Monday now")
+    signals_collection().update_one(
+        {"signal_id": sid},
+        {"$set": {"commitment": {"text": "link it", "due": "2026-06-10", "followups": 1}}},
+    )
+    understand_replies(
+        llm=_llm(
+            {
+                "outcome": "promises",
+                "learned_pattern": None,
+                "commitment": {"text": "link it Monday", "due": "2026-06-16"},
+                "reason": "re-promised",
+            }
+        ),
+        budget=10,
+    )
+    sig = signals_collection().find_one({"signal_id": sid}, {"_id": 0})
+    assert sig["commitment"]["text"] == "link it Monday"  # updated
+    assert sig["commitment"]["followups"] == 1  # preserved, not reset to 0
+
+
+@pytest.mark.integration
+def test_explanation_teaches_memory_even_if_signal_already_healed(tenant):
+    """A general 'this is normal' lesson is person-level — it must reach memory
+    even when the specific gap self-healed before the reply was understood."""
+    from yoku.db.mongo import signals_collection
+    from yoku.proactive.memory import get_memory
+    from yoku.proactive.reply_understanding import understand_replies
+
+    sid, _ = _seed_reply(reply_text="we never open PRs for spikes", status="resolved")
+    understand_replies(
+        llm=_llm(
+            {
+                "outcome": "explains_as_normal",
+                "learned_pattern": "spikes don't get PRs",
+                "commitment": None,
+                "reason": "workflow",
+            }
+        ),
+        budget=10,
+    )
+    # Person memory learned the rule despite the signal already being settled.
+    mem = get_memory("u1")
+    assert any(d["pattern"] == "done_no_pr" and d["by"] == "reply" for d in mem["dismissals"])
+    # The healed signal itself is left untouched.
+    sig = signals_collection().find_one({"signal_id": sid}, {"_id": 0})
+    assert sig["status"] == "resolved"
+
+
+@pytest.mark.integration
 def test_unknown_outcome_is_coerced_to_other(tenant):
     from yoku.proactive.episodes import get_episodes
     from yoku.proactive.reply_understanding import understand_replies

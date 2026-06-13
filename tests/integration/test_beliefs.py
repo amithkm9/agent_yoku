@@ -76,7 +76,7 @@ def test_repeated_dismissals_form_a_generic_belief(tenant):
 
     b = get_beliefs("u1")[0]
     assert b["pattern"] == "merged_no_ticket"
-    assert "dismissed as not a gap" in b["claim"]
+    assert "treated as normal" in b["claim"]
     assert b["confidence"] >= 0.4
     assert b["evidence_count"] == 2
 
@@ -150,6 +150,23 @@ def test_consolidation_is_idempotent(tenant):
     second = consolidate_beliefs(now=NOW)
     assert first == second
     assert len(get_beliefs("u1")) == 1  # no duplicate rows
+
+
+@pytest.mark.integration
+def test_recompute_removes_beliefs_whose_evidence_aged_out(tenant):
+    """A belief must disappear once its evidence falls outside the window — the
+    upsert+stale-delete recompute drops it instead of leaving it stale."""
+    from datetime import timedelta
+
+    from yoku.proactive.beliefs import consolidate_beliefs, get_beliefs
+
+    _explain("u1", "done_no_pr", "spikes don't get PRs")
+    consolidate_beliefs(now=NOW)
+    assert len(get_beliefs("u1")) == 1
+
+    # 200 days later the lone explanation is outside the 180-day window.
+    consolidate_beliefs(now=NOW + timedelta(days=200))
+    assert get_beliefs("u1") == []
 
 
 @pytest.mark.integration

@@ -247,6 +247,7 @@ docker run --rm --env-file .env yoku python -m yoku.cli refresh-all
 |---|---|
 | `vision.md` | why yoku exists — the north star |
 | `docs/yoku_agent.md` | the proactive engine's design contract (all 6 phases shipped) |
+| `docs/memory-engine.md` | how yoku learns from replies and follows through — the 4-phase memory engine |
 | `docs/build-plan.md` | the milestone sequence the build followed |
 | `docs/adding-a-connector.md` | onboard a new source end to end |
 | `docs/slack-app-setup.md` | enable the Slack bot voice for a tenant |

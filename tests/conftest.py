@@ -16,6 +16,10 @@ os.environ.setdefault("JIRA_EMAIL", "test@example.com")
 os.environ.setdefault("JIRA_TOKEN", "test-token")
 os.environ.setdefault("GITHUB_TOKEN", "test-token")
 os.environ.setdefault("OPENAI_API_KEY", "test-key")
+# Keep tests hermetic against a developer's real .env: pin the dev JWT secret so
+# the secret-guard test exercises the default-secret path. Set before yoku.config
+# imports — load_dotenv() won't override an already-present env var.
+os.environ.setdefault("JWT_SECRET", "change-me-in-prod-please-32-chars-min")
 
 
 @pytest.fixture(scope="session")

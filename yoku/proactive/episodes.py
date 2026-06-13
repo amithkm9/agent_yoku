@@ -11,6 +11,7 @@ This module is that spine. It writes one `episodes` row per interaction:
     reply      the person answered on Slack
     dismissal  a human said "not a gap" in the Inbox
     confirm    a human said "real gap" in the Inbox
+    followup   yoku chased a lapsed commitment (Phase D)
 
 Later phases consume this stream: reply-understanding enriches `reply` episodes
 (Phase B), consolidation distils episodes into durable beliefs the judge reads
@@ -126,6 +127,29 @@ def set_understanding(episode_id: str, understanding: dict) -> None:
         )
     except Exception:
         log.exception("episodes: failed to stamp understanding on %s", episode_id)
+
+
+def record_understanding_failure(episode_id: str, now: datetime, max_attempts: int = 3) -> None:
+    """Count a failed reply-understanding attempt; after `max_attempts` drain the
+    episode from the queue with a fallback marker, so one poison reply that errors
+    every run can't starve the budget ahead of newer replies. Best-effort."""
+    try:
+        coll = episodes_collection()
+        doc = coll.find_one({"episode_id": episode_id}, {"_id": 0, "understand_attempts": 1})
+        attempts = ((doc or {}).get("understand_attempts") or 0) + 1
+        if attempts >= max_attempts:
+            coll.update_one(
+                {"episode_id": episode_id},
+                {
+                    "$set": {
+                        "understanding": {"outcome": "other", "error": True, "understood_at": now}
+                    }
+                },
+            )
+        else:
+            coll.update_one({"episode_id": episode_id}, {"$inc": {"understand_attempts": 1}})
+    except Exception:
+        log.exception("episodes: failed to record understanding failure for %s", episode_id)
 
 
 def replies_needing_understanding(limit: int = 50) -> list[dict]:

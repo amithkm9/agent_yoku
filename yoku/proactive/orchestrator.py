@@ -193,7 +193,12 @@ def run_proactive_loop(now: datetime | None = None) -> dict[str, int]:
             # Episodic memory: yoku just spoke (really or in shadow). Recorded
             # only when this run actually opened the conversation, so a
             # concurrent run losing the insert race below doesn't double-count.
-            from yoku.proactive.episodes import KIND_SENT, record_episode
+            from yoku.proactive.episodes import (
+                KIND_SENT,
+                SOURCE_ENGINE,
+                SOURCE_SLACK,
+                record_episode,
+            )
 
             real = convo["state"] == "awaiting_reply"
             record_episode(
@@ -203,7 +208,7 @@ def run_proactive_loop(now: datetime | None = None) -> dict[str, int]:
                 signal_id=s["signal_id"],
                 item_key=s["item_key"],
                 detector=s["detector"],
-                source="slack" if real else "engine",
+                source=SOURCE_SLACK if real else SOURCE_ENGINE,
                 outcome="sent" if real else "shadow",
                 now=now,
             )
@@ -255,6 +260,9 @@ def _maybe_approve_pending_action(convo: dict, reply_text: str) -> None:
 # after it was made; each commitment is chased at most this many times.
 COMMITMENT_GRACE_DAYS = 2
 MAX_FOLLOWUPS = 1
+# Per-run cursor caps so a backlog can't fan out unbounded work in one sync.
+_FOLLOWUP_BUDGET_PER_RUN = 50
+_INBOUND_BUDGET_PER_RUN = 200
 
 
 def _commitment_due(commitment: dict, now: datetime) -> bool:
@@ -300,14 +308,23 @@ def run_commitment_followups(now: datetime | None = None) -> dict[str, int]:
 
     signals = signals_collection()
     convos = conversations_collection()
-    counts = {"due": 0, "sent": 0, "shadowed": 0, "skipped_no_target": 0, "errors": 0}
+    counts = {
+        "due": 0,
+        "sent": 0,
+        "shadowed": 0,
+        "skipped_no_target": 0,
+        "deferred": 0,
+        "errors": 0,
+    }
     can_send, slack_cfg = _tenant_send_enabled()
     quiet = _in_quiet_hours(now)
 
-    # Still-live signals (spoken about, not yet resolved/dismissed) carrying a
-    # commitment. The detector resolves healed gaps before this runs, so a
-    # `sent`/`shadow` status here means the fix hasn't landed.
-    candidates = signals.find({"status": {"$in": ["sent", "shadow"]}, "commitment": {"$ne": None}})
+    # Only signals actually DM'd (status "sent") can carry a real promise — a
+    # commitment comes from a Slack reply, which only threads onto a delivered
+    # nudge. Shadow-mode drafts were never seen by the person, so never chased.
+    candidates = signals.find({"status": "sent", "commitment": {"$ne": None}}).limit(
+        _FOLLOWUP_BUDGET_PER_RUN
+    )
     for s in candidates:
         commitment = s.get("commitment") or {}
         if commitment.get("followups", 0) >= MAX_FOLLOWUPS:
@@ -322,7 +339,13 @@ def run_commitment_followups(now: datetime | None = None) -> dict[str, int]:
             continue
 
         message = compose_followup(s, commitment, target)
-        sending = can_send and not quiet
+        # Respect the same guardrails as the speak loop: never exceed the
+        # per-person daily DM cap, and stay out of quiet hours.
+        sending = (
+            can_send
+            and not quiet
+            and _sends_today(target["user_id"], now) < settings.proactive_daily_dm_cap
+        )
         state = "sent"
         if sending:
             try:
@@ -358,7 +381,12 @@ def run_commitment_followups(now: datetime | None = None) -> dict[str, int]:
                 "$set": {"last_message_at": now},
             },
         )
-        from yoku.proactive.episodes import KIND_FOLLOWUP, record_episode
+        from yoku.proactive.episodes import (
+            KIND_FOLLOWUP,
+            SOURCE_ENGINE,
+            SOURCE_SLACK,
+            record_episode,
+        )
 
         record_episode(
             kind=KIND_FOLLOWUP,
@@ -367,7 +395,7 @@ def run_commitment_followups(now: datetime | None = None) -> dict[str, int]:
             signal_id=s["signal_id"],
             item_key=s["item_key"],
             detector=s["detector"],
-            source="slack" if state == "sent" else "engine",
+            source=SOURCE_SLACK if state == "sent" else SOURCE_ENGINE,
             outcome=state,
             now=now,
         )
@@ -383,7 +411,11 @@ def process_inbound_replies(now: datetime | None = None) -> int:
     inbound = slack_inbound_collection()
     threaded = 0
 
-    for row in inbound.find({"processed": False, "event_type": "dm"}).sort("received_at", 1):
+    for row in (
+        inbound.find({"processed": False, "event_type": "dm"})
+        .sort("received_at", 1)
+        .limit(_INBOUND_BUDGET_PER_RUN)
+    ):
         convo = convos.find_one(
             {"slack_user_id": row.get("slack_user_id"), "state": "awaiting_reply"},
             sort=[("opened_at", -1)],

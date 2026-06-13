@@ -242,6 +242,8 @@ def signals_collection() -> Collection:
             IndexModel([("detector", ASCENDING), ("item_key", ASCENDING)], unique=True),
             IndexModel("signal_id", unique=True),
             IndexModel([("status", ASCENDING), ("matured_at", DESCENDING)]),
+            # recall_history / followups look up signals by person.
+            IndexModel("person_user_id", sparse=True),
         ],
     )
 
@@ -293,6 +295,8 @@ def conversations_collection() -> Collection:
         [
             IndexModel("signal_id", unique=True),
             IndexModel([("person_user_id", ASCENDING), ("opened_at", DESCENDING)]),
+            # process_inbound_replies threads a reply by the sender's slack id.
+            IndexModel([("slack_user_id", ASCENDING), ("state", ASCENDING)]),
             IndexModel("state"),
         ],
     )
@@ -329,7 +333,9 @@ def episodes_collection() -> Collection:
             IndexModel("episode_id", unique=True),
             IndexModel([("person_user_id", ASCENDING), ("ts", DESCENDING)]),
             IndexModel("signal_id"),
-            IndexModel("kind"),
+            # Serves the belief-consolidation window scan and the
+            # replies-needing-understanding queue (both filter kind + range/sort ts).
+            IndexModel([("kind", ASCENDING), ("ts", ASCENDING)]),
             IndexModel([("ts", DESCENDING)]),
         ],
     )

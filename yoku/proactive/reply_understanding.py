@@ -35,7 +35,11 @@ from datetime import UTC, datetime
 from yoku.config import settings
 from yoku.db.mongo import conversations_collection, signals_collection
 from yoku.logging import get_logger
-from yoku.proactive.episodes import replies_needing_understanding, set_understanding
+from yoku.proactive.episodes import (
+    record_understanding_failure,
+    replies_needing_understanding,
+    set_understanding,
+)
 from yoku.proactive.memory import record_dismissal, record_pattern
 
 log = get_logger("reply_understanding")
@@ -115,74 +119,109 @@ def _normalize(raw: dict) -> dict:
     outcome = raw.get("outcome")
     if outcome not in OUTCOMES:
         outcome = "other"
+    # A commitment is only meaningful for a promised fix — drop a stray one the
+    # model may attach to other outcomes so no reader trusts it.
     commitment = raw.get("commitment")
-    if not isinstance(commitment, dict) or not commitment.get("text"):
+    if (
+        outcome not in ("will_fix", "promises")
+        or not isinstance(commitment, dict)
+        or not commitment.get("text")
+    ):
         commitment = None
     pattern = raw.get("learned_pattern")
     if not isinstance(pattern, str) or not pattern.strip():
         pattern = None
+    reason = raw.get("reason")
     return {
         "outcome": outcome,
         "learned_pattern": pattern.strip() if pattern else None,
         "commitment": commitment,
-        "reason": raw.get("reason"),
+        "reason": reason if isinstance(reason, str) else None,
     }
+
+
+def _settle_signal(
+    coll, signal_id: str, resolution: str, reason: str | None, now: datetime
+) -> None:
+    """Land a signal in the sticky `dismissed` state so the detector won't reopen
+    it (it reopens merely `resolved` signals while the gap is still observed)."""
+    coll.update_one(
+        {"signal_id": signal_id},
+        {
+            "$set": {
+                "status": "dismissed",
+                "resolution": resolution,
+                "resolved_at": now,
+                "verdict": {
+                    "real": False,
+                    "suppressed_by": "reply",
+                    "reason": reason,
+                    "judged_at": now,
+                },
+            }
+        },
+    )
 
 
 def _apply_effects(episode: dict, understanding: dict, now: datetime) -> None:
     """Act on a parsed reply: suppress + learn, or record a commitment.
 
-    Only ever touches a still-live signal — a human verdict or a self-heal that
-    already settled it wins.
+    Signal-level effects only touch a still-live signal (a human verdict or
+    self-heal that already settled it wins). Person-level learning from an
+    `explains_as_normal` reply fires regardless — "this is how I work" is
+    item-independent, so it must survive even if this particular gap healed.
     """
-    signal_id = episode.get("signal_id")
-    if not signal_id:
-        return
-    coll = signals_collection()
-    sig = coll.find_one({"signal_id": signal_id}, {"_id": 0, "status": 1})
-    if not sig or sig.get("status") not in ("open", "shadow", "sent"):
-        return
-
     outcome = understanding["outcome"]
     person = episode.get("person_user_id")
     detector = episode.get("detector")
     item_key = episode.get("item_key")
     note = understanding.get("learned_pattern")
+    signal_id = episode.get("signal_id")
 
-    if outcome in ("disputes_gap", "explains_as_normal"):
-        resolution = "explained" if outcome == "explains_as_normal" else "disputed"
-        coll.update_one(
-            {"signal_id": signal_id},
-            {
-                "$set": {
-                    "status": "dismissed",  # sticky — the detector won't reopen it
-                    "resolution": resolution,
-                    "resolved_at": now,
-                    "verdict": {
-                        "real": False,
-                        "suppressed_by": "reply",
-                        "reason": note or understanding.get("reason"),
-                        "judged_at": now,
-                    },
-                }
-            },
-        )
-        if person:
-            # A general "this is normal" feeds the judge's existing dismissal
-            # counter so future occurrences for this person suppress cheaply.
-            if outcome == "explains_as_normal" and detector:
-                record_dismissal(
-                    user_id=person, pattern=detector, item_key=item_key or "", by="reply", note=note
-                )
+    coll = signals_collection()
+    sig = (
+        coll.find_one({"signal_id": signal_id}, {"_id": 0, "status": 1, "commitment": 1})
+        if signal_id
+        else None
+    )
+    live = bool(sig) and sig.get("status") in ("open", "shadow", "sent")
+
+    if outcome == "explains_as_normal":
+        # Person-level lesson — recorded even if THIS signal already healed, so a
+        # general workflow rule still teaches memory for future occurrences. The
+        # dismissal counter feeds the judge's tier-1 suppression.
+        if person and detector:
+            record_dismissal(
+                user_id=person, pattern=detector, item_key=item_key or "", by="reply", note=note
+            )
             if note:
                 record_pattern(person, note=note, by="reply", pattern=detector)
+        if live:
+            _settle_signal(coll, signal_id, "explained", note or understanding.get("reason"), now)
+
+    elif outcome == "disputes_gap":
+        # Item-specific: settle just this gap, no general suppression.
+        if live:
+            _settle_signal(coll, signal_id, "disputed", note or understanding.get("reason"), now)
 
     elif outcome in ("will_fix", "promises"):
         commitment = understanding.get("commitment")
-        if commitment:
+        if commitment and live:
+            # Preserve the running follow-up count so a re-promise can't reset it
+            # and defeat MAX_FOLLOWUPS.
+            prior = (sig or {}).get("commitment") or {}
             coll.update_one(
                 {"signal_id": signal_id},
-                {"$set": {"commitment": {**commitment, "made_at": now, "source": "reply"}}},
+                {
+                    "$set": {
+                        "commitment": {
+                            **commitment,
+                            "made_at": now,
+                            "source": "reply",
+                            "followups": prior.get("followups", 0),
+                        }
+                    }
+                },
             )
 
 
@@ -216,12 +255,15 @@ def understand_replies(
                 today=now.date().isoformat(),
             )
             understanding = _normalize(llm(prompt))
+            # Stamp and act under one guard: a failure in either must not abort
+            # the rest of the batch, and the episode stays queued for retry.
+            set_understanding(ep["episode_id"], {**understanding, "understood_at": now})
+            _apply_effects(ep, understanding, now)
         except Exception:
             log.exception("reply understanding failed for episode %s", ep.get("episode_id"))
             counts["errors"] += 1
+            record_understanding_failure(ep["episode_id"], now)  # drain after repeated failures
             continue
-        set_understanding(ep["episode_id"], {**understanding, "understood_at": now})
-        _apply_effects(ep, understanding, now)
         counts["understood"] += 1
 
     log.info("reply understanding done %s elapsed=%.1fs", counts, time.monotonic() - t0)

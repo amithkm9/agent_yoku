@@ -131,6 +131,33 @@ def test_healed_gap_is_not_chased(tenant):
 
 
 @pytest.mark.integration
+def test_followup_respects_daily_dm_cap(tenant, monkeypatch):
+    """Even with send keys present, a person already at the daily DM cap gets a
+    shadowed follow-up, never a real one."""
+    from yoku.db.mongo import conversations_collection
+    from yoku.proactive import orchestrator
+    from yoku.proactive.orchestrator import run_commitment_followups
+
+    monkeypatch.setattr(orchestrator, "_tenant_send_enabled", lambda: (True, {"bot_token": "x"}))
+    _seed(commitment={"text": "link the PR", "due": "2026-06-10", "made_at": NOW})
+    # A real DM already went out to this person today → at the default cap of 1.
+    conversations_collection().insert_one(
+        {
+            "conversation_id": "c_today",
+            "signal_id": "other",
+            "person_user_id": "u1",
+            "state": "awaiting_reply",
+            "opened_at": NOW,
+        }
+    )
+
+    counts = run_commitment_followups(now=NOW)
+    assert counts["due"] == 1
+    assert counts["sent"] == 0
+    assert counts["shadowed"] == 1  # cap hit → shadowed, not sent
+
+
+@pytest.mark.integration
 def test_disabled_flag_is_a_noop(tenant, monkeypatch):
     from yoku.config import settings
     from yoku.proactive.orchestrator import run_commitment_followups

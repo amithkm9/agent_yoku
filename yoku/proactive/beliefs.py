@@ -25,11 +25,15 @@ recompute each sync (engine-internal collection), so stale beliefs never linger.
 from __future__ import annotations
 
 import time
+import uuid
 from collections import defaultdict
 from datetime import UTC, datetime, timedelta
 
+from pymongo import UpdateOne
+
 from yoku.db.mongo import beliefs_collection, episodes_collection
 from yoku.logging import get_logger
+from yoku.proactive.episodes import KIND_CONFIRM, KIND_DISMISSAL, KIND_REPLY
 
 log = get_logger("beliefs")
 
@@ -43,12 +47,16 @@ W_EXPLAIN = 1.0
 W_DISMISS = 0.6
 W_CONFIRM = 1.0
 
+# Saturating confidence curve: confidence = net / (net + scale). With scale 1.0,
+# net=1 → 0.50, net=3 → 0.75 — diminishing returns so evidence never hits 1.0.
+_CONFIDENCE_SCALE = 1.0
+
 # A belief must clear this confidence to be stored — keeps one stale signal from
 # hardening into a fact. Tuned so: 1 recent explanation (0.50) or 2 recent
 # dismissals (0.55) qualify; a single dismissal (0.38) or decayed evidence do not.
 MIN_CONFIDENCE = 0.4
 
-_BELIEF_KINDS = ("reply", "dismissal", "confirm")
+_BELIEF_KINDS = (KIND_REPLY, KIND_DISMISSAL, KIND_CONFIRM)
 
 
 def _recency(ts: datetime | None, now: datetime) -> float:
@@ -62,6 +70,15 @@ def _recency(ts: datetime | None, now: datetime) -> float:
     return 0.5 ** (age_days / HALFLIFE_DAYS)
 
 
+def _later(a: datetime | None, b: datetime | None) -> datetime | None:
+    """The more recent of two timestamps, tolerating either being None."""
+    if a is None:
+        return b
+    if b is None:
+        return a
+    return max(a, b)
+
+
 def consolidate_beliefs(now: datetime | None = None) -> dict[str, int]:
     """Recompute every person's beliefs from the recent episode stream.
 
@@ -70,6 +87,7 @@ def consolidate_beliefs(now: datetime | None = None) -> dict[str, int]:
     now = now or datetime.now(UTC)
     t0 = time.monotonic()
     cutoff = now - timedelta(days=WINDOW_DAYS)
+    run_token = uuid.uuid4().hex
 
     cursor = episodes_collection().find(
         {
@@ -78,7 +96,9 @@ def consolidate_beliefs(now: datetime | None = None) -> dict[str, int]:
             "detector": {"$ne": None},
             "kind": {"$in": list(_BELIEF_KINDS)},
         },
-        {"_id": 0},
+        # Only the fields consolidation reads — keeps the cursor light as the
+        # episode stream grows (reply `text` can be up to 2 KB each).
+        {"_id": 0, "kind": 1, "detector": 1, "person_user_id": 1, "ts": 1, "understanding": 1},
     )
 
     # (user_id, pattern) -> accumulating evidence.
@@ -95,7 +115,7 @@ def consolidate_beliefs(now: datetime | None = None) -> dict[str, int]:
         r = _recency(ts, now)
         g = groups[(uid, pattern)]
 
-        if kind == "reply":
+        if kind == KIND_REPLY:
             understanding = ep.get("understanding") or {}
             if understanding.get("outcome") != "explains_as_normal":
                 continue  # only explicit "this is normal" replies form beliefs
@@ -104,12 +124,12 @@ def consolidate_beliefs(now: datetime | None = None) -> dict[str, int]:
             note = understanding.get("learned_pattern")
             if note:
                 g["notes"].append((ts, note))
-            g["last"] = ts if g["last"] is None or (ts and ts > g["last"]) else g["last"]
-        elif kind == "dismissal":
+            g["last"] = _later(g["last"], ts)
+        elif kind == KIND_DISMISSAL:
             g["support"] += W_DISMISS * r
             g["count"] += 1
-            g["last"] = ts if g["last"] is None or (ts and ts > g["last"]) else g["last"]
-        elif kind == "confirm":
+            g["last"] = _later(g["last"], ts)
+        elif kind == KIND_CONFIRM:
             g["against"] += W_CONFIRM * r
 
     docs = []
@@ -117,7 +137,7 @@ def consolidate_beliefs(now: datetime | None = None) -> dict[str, int]:
         net = g["support"] - g["against"]
         if net <= 0 or g["count"] == 0:
             continue
-        confidence = round(net / (net + 1.0), 2)
+        confidence = round(net / (net + _CONFIDENCE_SCALE), 2)
         if confidence < MIN_CONFIDENCE:
             continue
         notes = [
@@ -126,7 +146,9 @@ def consolidate_beliefs(now: datetime | None = None) -> dict[str, int]:
                 g["notes"], key=lambda x: x[0] or datetime.min.replace(tzinfo=UTC), reverse=True
             )
         ]
-        claim = notes[0] if notes else f"{g['count']} '{pattern}' signal(s) dismissed as not a gap"
+        # Prefer the person's own most-recent words; the fallback stays neutral
+        # because the group may mix dismissals and note-less explanations.
+        claim = notes[0] if notes else f"{g['count']} prior '{pattern}' signal(s) treated as normal"
         docs.append(
             {
                 "user_id": uid,
@@ -137,13 +159,26 @@ def consolidate_beliefs(now: datetime | None = None) -> dict[str, int]:
                 "evidence_count": g["count"],
                 "last_evidence_at": g["last"],
                 "computed_at": now,
+                "_run": run_token,
             }
         )
 
+    # Upsert-by-key then drop anything not refreshed this run (decayed below the
+    # floor, or its evidence aged out). No global delete, so a concurrent judge /
+    # Inbox read never sees an empty collection mid-recompute. `_run` is an exact
+    # token, sidestepping mongo's millisecond datetime truncation.
     coll = beliefs_collection()
-    coll.delete_many({})
     if docs:
-        coll.insert_many(docs)
+        coll.bulk_write(
+            [
+                UpdateOne(
+                    {"user_id": d["user_id"], "pattern": d["pattern"]}, {"$set": d}, upsert=True
+                )
+                for d in docs
+            ],
+            ordered=False,
+        )
+    coll.delete_many({"_run": {"$ne": run_token}})
 
     counts = {"beliefs": len(docs), "people": len({d["user_id"] for d in docs})}
     log.info("beliefs consolidated %s elapsed=%.1fs", counts, time.monotonic() - t0)

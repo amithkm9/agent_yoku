@@ -66,24 +66,25 @@ def recall_history(person: str, limit: int = 20) -> dict:
         }
         for b in get_beliefs(user_id)
     ]
+    # Include settled signals too (status surfaced) so the agent can answer both
+    # "what is X on the hook for?" and "did they do what they promised?".
     commitments = [
         {
             "item_key": s.get("item_key"),
             "detector": s.get("detector"),
+            "status": s.get("status"),
             **{
                 k: v
                 for k, v in (s.get("commitment") or {}).items()
                 if k in ("text", "due", "made_at", "followups")
             },
         }
-        for s in signals_collection().find(
-            {
-                "person_user_id": user_id,
-                "commitment": {"$ne": None},
-                "status": {"$in": ["open", "sent", "shadow"]},
-            },
-            {"_id": 0, "item_key": 1, "detector": 1, "commitment": 1},
+        for s in signals_collection()
+        .find(
+            {"person_user_id": user_id, "commitment": {"$ne": None}},
+            {"_id": 0, "item_key": 1, "detector": 1, "status": 1, "commitment": 1},
         )
+        .limit(25)
     ]
     name = (who.get("jira") or {}).get("displayName") or (who.get("github") or {}).get("login")
     return bson_safe(
