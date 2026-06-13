@@ -126,6 +126,14 @@ class Settings(BaseSettings):
     # default — approval then happens only in the web UI / API.
     dm_approval_enabled: bool = False
 
+    # Reply understanding (memory engine Phase B) — the LLM tier that reads a
+    # person's Slack reply to a nudge and extracts what it means (acknowledged /
+    # will-fix / disputes / explains-as-normal / a dated promise). Feeds the
+    # episode stream, person memory, and commitment tracking. Budgeted like the
+    # judge; deferred replies are picked up next run.
+    reply_understanding_enabled: bool = True
+    reply_understanding_budget_per_run: int = 20
+
     @property
     def is_default_jwt_secret(self) -> bool:
         """True when the built-in dev secret is still in use (unsafe in prod)."""

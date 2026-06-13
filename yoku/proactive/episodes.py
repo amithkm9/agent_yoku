@@ -113,6 +113,37 @@ def record_episode(
     return episode_id
 
 
+def set_understanding(episode_id: str, understanding: dict) -> None:
+    """Attach a reply's parsed understanding to its episode (Phase B).
+
+    Best-effort — a stamping failure must not break the understanding loop.
+    """
+    try:
+        episodes_collection().update_one(
+            {"episode_id": episode_id},
+            {"$set": {"understanding": understanding}},
+        )
+    except Exception:
+        log.exception("episodes: failed to stamp understanding on %s", episode_id)
+
+
+def replies_needing_understanding(limit: int = 50) -> list[dict]:
+    """Reply episodes not yet parsed by the understanding loop, oldest first.
+
+    A queue mirroring the judge's "unjudged matured signals" pattern, so the
+    work drains across syncs under a budget.
+    """
+    return list(
+        episodes_collection()
+        .find(
+            {"kind": KIND_REPLY, "understanding": {"$exists": False}},
+            {"_id": 0, "embedding": 0},
+        )
+        .sort([("ts", 1)])
+        .limit(int(limit))
+    )
+
+
 def get_episodes(
     *,
     person_user_id: str | None = None,
