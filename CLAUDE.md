@@ -21,7 +21,7 @@ hardcoded in the tool layer:
 So: **to add or change a data source, edit the registries — never the tools or
 prompts.** `filter` / `get` / `linked` / `semantic_search` / `list_collections`
 all derive from the registries and cover a new source automatically. If you find
-yourself editing `yoku/agent/tools.py` to teach the agent about a
+yourself editing `yoku/agent/tools/` to teach the agent about a
 collection, stop — you're in the wrong layer.
 
 To add a connector, follow the recipe: `docs/adding-a-connector.md`.
@@ -29,13 +29,20 @@ To add a connector, follow the recipe: `docs/adding-a-connector.md`.
 ## Layout (the parts you'll touch)
 
 - `yoku/connectors/<source>/` — one folder per external source (auto-discovered)
-- `yoku/schemas/` — Pydantic DTOs = collection schemas
-- `yoku/agent/` — the deepagent: `tools.py`, `sources.py`,
+- `yoku/schemas/` — Pydantic DTOs = collection schemas (+ `relationships.yaml`)
+- `yoku/agent/` — the deepagent: `tools/` (auto-discovered), `sources.py`,
   `schema_registry.py`, `agent.py`
+- `yoku/pipeline/` — ingest → embed → unify → link → metrics + sync/scheduler
+- `yoku/proactive/` — the gap engine + memory engine (`episodes.py`,
+  `reply_understanding.py`, `beliefs.py`, `judge.py`, `orchestrator.py` …)
+- `yoku/actions/` — proposal-gated write-back (propose → approve → execute → audit)
 - `yoku/routers/` — FastAPI routes  ·  `yoku/db/mongo.py` — tenant-aware accessors
 - `yoku/cli.py` — Click CLI (`yoku …`)
 - `web/` — React (Vite + TS) frontend
 - `tests/` — pytest
+
+The memory engine (how yoku learns from replies and follows through) is its own
+doc: `docs/memory-engine.md`.
 
 ## Commands
 

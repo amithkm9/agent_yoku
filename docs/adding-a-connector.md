@@ -9,13 +9,13 @@ whenToUse: Use when onboarding any new external source into yoku — pulling its
 A connector pulls **one** external source into Mongo and registers it so the
 agent can query it. Because the toolkit is schema-driven, onboarding a source is
 **a model + a SourceSpec + relationship entries** — you do **not** edit
-`yoku/agent/tools.py`, the agent prompt, or any tool description.
+`yoku/agent/tools/`, the agent prompt, or any tool description.
 
 ## Mental model
 
 ```
 external API ──(connector)──▶ Mongo collection ──(registries)──▶ agent tools
-                client.py        models/<x>.py        sources.py
+                client.py        schemas/<x>.py       sources.py
                 ingest.py        schema_registry      relationships.yaml
 ```
 
@@ -46,12 +46,12 @@ the new source the moment it's registered.
    directory to feed `resolve_user` / `who_knows`.
 6. **CLI** — add an ingest subcommand in `yoku/cli.py`.
 7. **Register the collection** in
-   `yoku/storage/mongo.py::ALLOWED_COLLECTIONS`.
-8. **Model** — add a Pydantic model in `yoku/models/`. This is the
+   `yoku/db/mongo.py::ALLOWED_COLLECTIONS`.
+8. **Model** — add a Pydantic model in `yoku/schemas/`. This is the
    collection's contract:
    - the **class docstring** becomes the collection description the agent sees;
    - each field carries a `description`, and `display` / `filterable` metadata
-     (see `models/_fields`).
+     (see `schemas/_fields`).
    Then map the collection name → model in
    `yoku/agent/schema_registry.py::COLLECTION_MODELS`.
 9. **Source registry** — add a `SourceSpec` to
@@ -61,7 +61,7 @@ the new source the moment it's registered.
    `key_example`, `sort_field` (recency, default `"updated"`), and `embeddable`
    (default `True` — whether it joins the semantic index).
 10. **Relationships** *(if it links to existing data)* — add an entry to
-    `yoku/agent/relationships.yaml` so `linked` can join it. Each entry is
+    `yoku/schemas/relationships.yaml` so `linked` can join it. Each entry is
     `entity1`/`entity2` (collection names) + a `join` with `local_field` (the
     field on `entity1` holding `entity2` keys) and `foreign_field` (the matched
     field on `entity2`). Example: a `slack_messages` doc whose `jira_keys`
@@ -82,7 +82,7 @@ the new source the moment it's registered.
 
 ## Do NOT
 
-- Edit `yoku/agent/tools.py` to teach it about the collection — the tools
+- Edit `yoku/agent/tools/` to teach it about the collection — the tools
   are source-agnostic by design.
 - Add the collection's description or fields to a prompt — they come from the
   model.

@@ -121,7 +121,12 @@ on first write like every other collection in `yoku/db/mongo.py`.
 | `baselines`     | 3     | Per-person rolling activity stats (p10/p50/p90) for anomaly judging.  |
 | `conversations` | 5     | Open/closed Slack threads yoku started, deduped per gap.             |
 | `action_log`    | 6     | Audit of every proposed / executed / rejected write-back.            |
-| `commitments`   | 7+    | Promises extracted from Slack/PR comments, tracked for follow-up.     |
+| `episodes`      | mem   | One row per interaction (sent / reply / confirm / dismissal / followup). |
+| `beliefs`       | mem   | Consolidated per-person beliefs with recency-weighted confidence.    |
+
+> **mem** = the memory engine (shipped after Phase 6). Commitments turned out to
+> live *on the `signals` row* (`signal.commitment`), not in a separate
+> collection. See [`memory-engine.md`](memory-engine.md) for the full design.
 
 Indicative shapes (refined per phase):
 
@@ -325,8 +330,10 @@ a clean dependency DAG; build in order.
 Once the engine exists, advanced capabilities are **just new detectors** on the
 same loop — no new plumbing:
 
+- ✅ **Commitment tracking — SHIPPED** as the memory engine (Phases A–D): yoku
+  reads Slack replies, learns durable beliefs about each person, captures
+  promises, and chases lapsed ones. Full design: [`memory-engine.md`](memory-engine.md).
 - Behavioral baselines / "went quiet" anomalies (extends Phase 3 baselines).
-- Commitment tracking — Slack/PR promises → follow-up (`commitments`).
 - Decision capture — Slack decisions implying untracked work → propose a ticket.
 - Predictive risk — deadline/dependency slippage via the `ds-entity-links` graph.
 - Bus-factor / knowledge-silo alerts via ownership concentration over time.
@@ -459,5 +466,9 @@ create_jira_ticket, link_pr_to_ticket, comment_on_pr.
 
 Go-live checklist: install the Slack app (docs/slack-app-setup.md), let
 shadow mode run for a week, then flip the tenant's "Proactive DMs" toggle.
-Everything beyond is breadth — new detectors on the same loop (§4
-"after Phase 6").
+
+**The first breadth has shipped: the memory engine (Phases A–D).** yoku now
+reads Slack replies, forms durable per-person beliefs that feed the judge,
+captures promised fixes, and follows up on lapsed ones — and surfaces all of it
+in the React "People" view (`GET /api/people`). It rides the same loop, exactly
+as §4 predicted. Full design: [`memory-engine.md`](memory-engine.md).
