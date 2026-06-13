@@ -80,6 +80,7 @@ export interface Signal {
   item_key: string;
   title: string | null;
   person_name: string | null;
+  person_user_id: string | null;
   evidence: Record<string, unknown>;
   confidence: number;
   url: string | null;
@@ -110,6 +111,39 @@ export interface InboxResponse {
   total_open: number;
   total_matured: number;
   total_suppressed: number;
+}
+
+export interface PersonSummary {
+  user_id: string;
+  name: string;
+  email: string | null;
+  belief_count: number;
+  open_commitments: number;
+  last_interaction_at: string | null;
+}
+
+export interface PersonMemory {
+  user_id: string;
+  name: string;
+  email: string | null;
+  beliefs: { pattern: string; claim: string; confidence: number; evidence_count: number }[];
+  commitments: {
+    item_key: string | null;
+    detector: string | null;
+    status: string | null;
+    text: string | null;
+    due: string | null;
+    made_at: string | null;
+    followups: number | null;
+  }[];
+  episodes: {
+    kind: string;
+    text: string | null;
+    detector: string | null;
+    item_key: string | null;
+    outcome: string | null;
+    ts: string | null;
+  }[];
 }
 
 export interface Action {
@@ -291,6 +325,9 @@ export const api = {
   freshness: () => request<SourceFreshness[]>("/api/stats/freshness"),
 
   listInbox: () => request<InboxResponse>("/api/inbox?limit=100"),
+
+  listPeople: () => request<{ people: PersonSummary[] }>("/api/people"),
+  getPerson: (id: string) => request<PersonMemory>(`/api/people/${encodeURIComponent(id)}`),
   listActions: () => request<ActionsResponse>("/api/actions"),
   approveAction: (id: string) =>
     request<Action>(`/api/actions/${id}/approve`, { method: "POST" }),

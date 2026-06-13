@@ -15,7 +15,17 @@ from yoku.logging import get_logger
 from yoku.middleware import RateLimit, RequestContext
 from yoku.middleware.exception_handler import register_exception_handlers
 from yoku.middleware.request_logger import RequestLogger
-from yoku.routers import actions, auth, chat, connectors, inbox, sessions, slack_events, stats
+from yoku.routers import (
+    actions,
+    auth,
+    chat,
+    connectors,
+    inbox,
+    people,
+    sessions,
+    slack_events,
+    stats,
+)
 
 log = get_logger("api.main")
 
@@ -84,6 +94,7 @@ def create_app() -> FastAPI:
     app.include_router(stats.router, prefix="/api")
     app.include_router(connectors.router, prefix="/api")
     app.include_router(inbox.router, prefix="/api")
+    app.include_router(people.router, prefix="/api")
     app.include_router(slack_events.router, prefix="/api")
     app.include_router(actions.router, prefix="/api")
 

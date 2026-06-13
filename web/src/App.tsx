@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { Login } from "./pages/Login";
 import { Chat } from "./pages/Chat";
 import { Inbox } from "./pages/Inbox";
+import { People } from "./pages/People";
 import { Settings } from "./pages/Settings";
 import { Trends } from "./pages/Trends";
 import { getToken } from "./lib/api";
@@ -43,6 +44,22 @@ export function App() {
         element={
           <RequireAuth>
             <Trends />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/people"
+        element={
+          <RequireAuth>
+            <People />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/people/:id"
+        element={
+          <RequireAuth>
+            <People />
           </RequireAuth>
         }
       />

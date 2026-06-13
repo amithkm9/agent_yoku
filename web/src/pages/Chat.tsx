@@ -19,6 +19,7 @@ import {
 } from "../lib/api";
 import {
   AppBrand,
+  PeopleIcon,
   SendIcon,
   SettingsIcon,
   SparkleIcon,
@@ -582,6 +583,10 @@ export function Chat() {
             <SparkleIcon className="nav-icon" />
             <span>Proactive</span>
             {gapCount > 0 && <span className="count-badge">{gapCount}</span>}
+          </Link>
+          <Link to="/people" className="side-nav-item">
+            <PeopleIcon />
+            <span>People</span>
           </Link>
           <Link to="/trends" className="side-nav-item">
             <TrendsIcon />

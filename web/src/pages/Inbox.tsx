@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Action, api, Signal, User } from "../lib/api";
 import { AppHeader, SparkleIcon } from "../components/AppChrome";
 
@@ -301,9 +301,19 @@ export function Inbox() {
               const href = itemHref(s, user.jira_base_url);
               return (
                 <li key={s.signal_id} className="signal-row">
-                  <span className="signal-avatar" title={s.person_name || "Unassigned"}>
-                    {initials(s.person_name)}
-                  </span>
+                  {s.person_user_id ? (
+                    <Link
+                      to={`/people/${s.person_user_id}`}
+                      className="signal-avatar signal-avatar--link"
+                      title={`What yoku knows about ${s.person_name || "this person"}`}
+                    >
+                      {initials(s.person_name)}
+                    </Link>
+                  ) : (
+                    <span className="signal-avatar" title={s.person_name || "Unassigned"}>
+                      {initials(s.person_name)}
+                    </span>
+                  )}
                   <div className="signal-body">
                     <div className="signal-top">
                       <span className={`signal-chip signal-chip--${s.detector}`}>

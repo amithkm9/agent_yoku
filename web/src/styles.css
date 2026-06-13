@@ -1973,3 +1973,293 @@ code.signal-key {
 :root[data-theme="dark"] .undo-toast {
   background: #2b2937;
 }
+
+/* ───────────────────────── People / "What yoku knows" ───────────────────── */
+.people-main {
+  max-width: 1040px;
+}
+.people-intro {
+  margin-bottom: 18px;
+}
+.people-intro h2 {
+  margin: 0 0 4px;
+  font-family: var(--serif);
+  font-size: 26px;
+  font-weight: 600;
+}
+.people-intro p {
+  margin: 0;
+}
+
+.people-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 64px 24px;
+  text-align: center;
+}
+.people-empty-spark {
+  width: 30px;
+  height: 30px;
+  color: var(--primary);
+}
+
+.people-grid {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+/* Left: person list */
+.people-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  position: sticky;
+  top: 16px;
+}
+.person-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  text-align: left;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  cursor: pointer;
+}
+.person-row:hover {
+  background: var(--bg-subtle);
+}
+.person-row.active {
+  background: var(--bg-elevated);
+  border-color: var(--border);
+  box-shadow: var(--shadow);
+}
+.person-avatar {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-weight: 700;
+  font-size: 13px;
+}
+.person-avatar.lg {
+  width: 48px;
+  height: 48px;
+  font-size: 17px;
+}
+.person-row-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.person-row-name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.person-row-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Right: detail */
+.person-detail {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--bg-elevated);
+  padding: 22px 24px;
+  box-shadow: var(--shadow);
+  min-height: 320px;
+}
+.person-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-bottom: 18px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.person-head h3 {
+  margin: 0;
+  font-size: 20px;
+}
+.person-section {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border);
+}
+.person-section:last-child {
+  border-bottom: none;
+}
+.person-section-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+.person-none {
+  margin: 0;
+  font-size: 13px;
+}
+.person-key {
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+/* Beliefs */
+.belief-list,
+.commitment-list,
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.belief-claim {
+  font-size: 14px;
+  font-style: italic;
+  margin-bottom: 6px;
+}
+.belief-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+}
+.belief-bar {
+  width: 90px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--bg-subtle);
+  overflow: hidden;
+}
+.belief-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--accent-grad);
+}
+.belief-conf {
+  font-weight: 700;
+  color: var(--primary);
+}
+.belief-pattern {
+  background: var(--bg-subtle);
+  border-radius: 999px;
+  padding: 1px 8px;
+  text-transform: capitalize;
+  color: var(--text-muted);
+}
+
+/* Commitments */
+.commitment-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.commitment-text {
+  font-weight: 600;
+}
+.commitment-meta {
+  font-size: 12px;
+}
+.commitment-status {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+}
+.commitment-status.status-sent {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+.commitment-status.status-resolved {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+/* Timeline */
+.timeline-item {
+  display: flex;
+  gap: 11px;
+}
+.timeline-icon {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+}
+.timeline-icon.kind-reply {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+.timeline-icon.kind-confirm {
+  background: var(--success-bg);
+  color: var(--success);
+}
+.timeline-icon.kind-followup {
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+.timeline-body {
+  min-width: 0;
+}
+.timeline-text {
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+.timeline-meta {
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+/* Clickable avatar in the Inbox. */
+.signal-avatar--link {
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 100ms ease;
+}
+.signal-avatar--link:hover {
+  transform: scale(1.06);
+  box-shadow: 0 0 0 2px var(--primary-border);
+}
+
+@media (max-width: 820px) {
+  .people-grid {
+    grid-template-columns: 1fr;
+  }
+  .people-list {
+    position: static;
+    flex-direction: row;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+  .person-row {
+    flex-shrink: 0;
+  }
+}

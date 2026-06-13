@@ -76,6 +76,13 @@ export function AppHeader({ user, subtitle }: { user: User; subtitle: string }) 
           {gaps != null && gaps > 0 && <span className="count-badge">{gaps}</span>}
         </NavLink>
         <NavLink
+          to="/people"
+          className={({ isActive }) => `nav-pill${isActive ? " active" : ""}`}
+        >
+          <PeopleIcon />
+          <span>People</span>
+        </NavLink>
+        <NavLink
           to="/trends"
           className={({ isActive }) => `nav-pill${isActive ? " active" : ""}`}
         >
@@ -128,6 +135,21 @@ export function ChatIcon() {
         strokeWidth="1.6"
         strokeLinecap="round"
         strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function PeopleIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="nav-icon" aria-hidden="true">
+      <circle cx="9" cy="8" r="3.1" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M3.5 19a5.5 5.5 0 0 1 11 0" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <path
+        d="M16 5.4a3.1 3.1 0 0 1 0 5.2M17.5 13.6A5.5 5.5 0 0 1 20.5 18.5"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
       />
     </svg>
   );

@@ -73,6 +73,7 @@ class SignalOut(BaseModel):
     item_key: str
     title: str | None = None
     person_name: str | None = None
+    person_user_id: str | None = None  # lets the UI deep-link to the person view
     evidence: dict = {}
     confidence: float = 0.5
     url: str | None = None
@@ -99,6 +100,61 @@ class InboxResponse(BaseModel):
     # Signals the judge or memory/baseline tiers suppressed (status=judged) —
     # surfaced as a count so suppression is transparent, never silent.
     total_suppressed: int = 0
+
+
+# --- People / memory views (the "What yoku knows" surface) ------------------
+
+
+class PersonSummary(BaseModel):
+    """One person yoku has accumulated memory about — the People index row."""
+
+    user_id: str
+    name: str
+    email: str | None = None
+    belief_count: int = 0
+    open_commitments: int = 0
+    last_interaction_at: datetime | None = None
+
+
+class PeopleResponse(BaseModel):
+    people: list[PersonSummary]
+
+
+class BeliefOut(BaseModel):
+    pattern: str
+    claim: str
+    confidence: float
+    evidence_count: int
+
+
+class CommitmentOut(BaseModel):
+    item_key: str | None = None
+    detector: str | None = None
+    status: str | None = None
+    text: str | None = None
+    due: str | None = None
+    made_at: datetime | None = None
+    followups: int | None = None
+
+
+class EpisodeOut(BaseModel):
+    kind: str
+    text: str | None = None
+    detector: str | None = None
+    item_key: str | None = None
+    outcome: str | None = None
+    ts: datetime | None = None
+
+
+class PersonMemoryOut(BaseModel):
+    """Everything yoku knows about one person — beliefs, commitments, timeline."""
+
+    user_id: str
+    name: str
+    email: str | None = None
+    beliefs: list[BeliefOut] = []
+    commitments: list[CommitmentOut] = []
+    episodes: list[EpisodeOut] = []
 
 
 class ActionOut(BaseModel):
