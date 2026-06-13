@@ -1,6 +1,31 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { api, setToken, User } from "../lib/api";
+import { getTheme, setTheme, Theme } from "../lib/theme";
+
+/** Light ↔ Dark toggle: shows the current mode; clicking flips to the other.
+ *  Usable in any chrome (the header and the chat sidebar both render it). */
+export function ThemeToggle() {
+  const [theme, setThemeState] = useState<Theme>(getTheme());
+  const toggle = () => {
+    const next: Theme = theme === "light" ? "dark" : "light";
+    setThemeState(next);
+    setTheme(next);
+  };
+  const label = theme === "light" ? "Light" : "Dark";
+  return (
+    <button
+      type="button"
+      className="theme-toggle"
+      onClick={toggle}
+      title={`${label} mode — click for ${theme === "light" ? "dark" : "light"}`}
+      aria-label={`${label} mode. Click to switch to ${theme === "light" ? "dark" : "light"}.`}
+    >
+      {theme === "light" ? <SunIcon /> : <MoonIcon />}
+      <span>{label}</span>
+    </button>
+  );
+}
 
 export function AppBrand({ subtitle = "Home" }: { subtitle?: string }) {
   return (
@@ -72,6 +97,7 @@ export function AppHeader({ user, subtitle }: { user: User; subtitle: string }) 
           <div className="user-name">{user.name || user.email}</div>
           <div className="user-tenant">workspace: {user.tenant_id}</div>
         </div>
+        <ThemeToggle />
         <button type="button" className="header-logout" onClick={logout}>
           Log out
         </button>
@@ -155,3 +181,31 @@ export function SendIcon() {
     </svg>
   );
 }
+
+function SunIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="nav-icon" aria-hidden="true">
+      <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.6" />
+      <path
+        d="M12 2.5v2.2M12 19.3v2.2M4.6 4.6l1.6 1.6M17.8 17.8l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.6 19.4l1.6-1.6M17.8 6.2l1.6-1.6"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function MoonIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="nav-icon" aria-hidden="true">
+      <path
+        d="M20 14.2A8 8 0 1 1 9.8 4 6.4 6.4 0 0 0 20 14.2Z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+

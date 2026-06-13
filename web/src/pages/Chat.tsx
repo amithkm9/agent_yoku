@@ -22,6 +22,7 @@ import {
   SendIcon,
   SettingsIcon,
   SparkleIcon,
+  ThemeToggle,
   TrendsIcon,
 } from "../components/AppChrome";
 
@@ -638,10 +639,13 @@ export function Chat() {
                 <div className="user-name">{user.name}</div>
               )}
               <div className="account-email">{user.email}</div>
-              <div className="user-tenant">tenant: {user.tenant_id}</div>
-              <button className="account-button block" onClick={logout}>
-                <span>Log out</span>
-              </button>
+              <div className="user-tenant">workspace: {user.tenant_id}</div>
+              <div className="account-actions">
+                <ThemeToggle />
+                <button className="account-button" onClick={logout}>
+                  <span>Log out</span>
+                </button>
+              </div>
             </div>
           </div>
         )}

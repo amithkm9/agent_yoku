@@ -33,6 +33,7 @@
   --success-bg: #e6f7f1;
   --success-border: #b3e6d6;
   --warning: #b4791f;
+  --warning-bg: #fff4e0;
 
   /* Chat bubbles */
   --bubble-user: var(--primary);
@@ -48,6 +49,8 @@
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", sans-serif;
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
   --serif: Georgia, "Times New Roman", ui-serif, serif;
+
+  color-scheme: light;
 }
 
 * {
@@ -95,6 +98,14 @@ button.link {
   color: var(--primary);
   padding: 0;
   text-decoration: underline;
+}
+
+/* Form controls take their text colour from the token so they stay readable in
+   dark mode (browser default would be black on a dark field). */
+input,
+textarea,
+select {
+  color: var(--text);
 }
 
 /* ---------- Auth page ---------- */
@@ -1315,7 +1326,7 @@ code.signal-key {
 }
 
 .signal-chip--confirmed {
-  background: #fff4e0;
+  background: var(--warning-bg);
   color: var(--warning);
 }
 
@@ -1579,8 +1590,8 @@ code.signal-key {
 }
 
 .signal-chip--shadow {
-  background: #f0eefe;
-  color: #6d5efc;
+  background: var(--primary-soft);
+  color: var(--primary);
   border: 1px dashed var(--primary-border);
 }
 .signal-chip--sent {
@@ -1664,7 +1675,7 @@ code.signal-key {
   font-size: 12px;
 }
 .signal-chip--action {
-  background: #fff4e0;
+  background: var(--warning-bg);
   color: var(--warning);
 }
 
@@ -1856,4 +1867,109 @@ code.signal-key {
   .home-hero {
     padding: 24px 16px;
   }
+}
+
+/* ───────────────────────── Theme toggle ───────────────────────── */
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-elevated);
+  color: var(--text);
+  border-radius: 9px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.theme-toggle:hover {
+  background: var(--bg-subtle);
+}
+.theme-toggle .nav-icon {
+  width: 15px;
+  height: 15px;
+}
+.account-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.account-actions .account-button {
+  margin-top: 0;
+  flex: 1;
+}
+.account-actions .theme-toggle {
+  flex-shrink: 0;
+}
+
+/* ───────────────────────── Dark theme ─────────────────────────────
+   Driven by <html data-theme="dark"> (set by lib/theme.ts). Every component
+   reads tokens, so this is mostly a token swap + the few spots that hard-coded
+   light surfaces. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #14131c;
+  --bg-elevated: #1c1b27;
+  --bg-sidebar: #181722;
+  --bg-subtle: #232133;
+  --border: #2c2a3a;
+  --border-strong: #3b3850;
+
+  --text: #ece9f5;
+  --text-muted: #a7a3bd; /* ~5.5:1 on --bg */
+
+  --primary: #8b7dff; /* lifted for contrast on dark surfaces */
+  --primary-hover: #9d90ff;
+  --primary-disabled: #4a4470;
+  --primary-soft: #272247;
+  --primary-border: #3b356a;
+  --on-primary: #ffffff;
+
+  --danger: #ff6b81;
+  --danger-bg: #38202a;
+  --danger-border: #5a2c39;
+  --success: #38d6a6;
+  --success-bg: #15302a;
+  --success-border: #20493f;
+  --warning: #e0a64b;
+  --warning-bg: #352a17;
+
+  --bubble-ai: #1c1b27;
+
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --shadow-md: 0 14px 34px rgba(0, 0, 0, 0.5);
+  --shadow-accent: 0 12px 24px rgba(139, 125, 255, 0.32);
+}
+
+/* Surfaces that hard-coded light values. */
+:root[data-theme="dark"] .composer {
+  background: linear-gradient(180deg, rgba(40, 38, 56, 0.55) 0%, rgba(20, 19, 28, 0.98) 100%);
+}
+:root[data-theme="dark"] .composer textarea:focus {
+  background: rgba(255, 255, 255, 0.05);
+}
+:root[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]),
+:root[data-theme="dark"] select {
+  background: var(--bg-elevated);
+}
+:root[data-theme="dark"] input::placeholder,
+:root[data-theme="dark"] textarea::placeholder {
+  color: var(--text-muted);
+}
+:root[data-theme="dark"] .hero-count-icon--jira {
+  background: #1e2a44;
+  color: #7fb0ff;
+}
+:root[data-theme="dark"] .hero-count-icon--github {
+  background: #2a2a30;
+  color: #cfd3da;
+}
+:root[data-theme="dark"] .hero-count-icon--slack {
+  background: #3a1f2c;
+  color: #ff7aa6;
+}
+:root[data-theme="dark"] .undo-toast {
+  background: #2b2937;
 }
