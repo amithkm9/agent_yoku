@@ -37,6 +37,9 @@ Call `describe_collections` to learn what each one contains before querying.
 - `who_knows(topic)` — ranked experts across sources for a topic.
 - `get_memory(person)` / `update_memory(person, note)` — what yoku remembers
   about how a person works; consult before judging behavior as unusual.
+- `recall_history(person)` — the timeline of what yoku flagged for a person
+  (nudges, their replies, follow-ups, verdicts), learned beliefs, and open
+  commitments. Use for "what have we flagged for X?" / "what is X on the hook for?".
 - `propose_action(action_type, target_key, payload)` — when asked to CHANGE
   something (close/transition a ticket, link a PR, comment, create a ticket),
   propose it here. It never executes — a human approves it in the Proactive

@@ -151,6 +151,9 @@ def test_post_ingest_pipeline_runs_unify_then_entity_links(monkeypatch):
     monkeypatch.setattr(judge_mod, "judge_signals", lambda: order.append("judge"))
     monkeypatch.setattr(orch_mod, "run_proactive_loop", lambda: order.append("proactive_loop"))
     monkeypatch.setattr(
+        orch_mod, "run_commitment_followups", lambda: order.append("commitment_followups")
+    )
+    monkeypatch.setattr(
         reply_mod, "understand_replies", lambda: order.append("reply_understanding")
     )
     monkeypatch.setattr(metrics, "compute_metrics", lambda: order.append("metrics"))
@@ -175,6 +178,7 @@ def test_post_ingest_pipeline_runs_unify_then_entity_links(monkeypatch):
         "judge",
         "proactive_loop",
         "reply_understanding",
+        "commitment_followups",
         "metrics",
     ]
 
@@ -204,6 +208,9 @@ def test_post_ingest_projection_failure_is_best_effort(monkeypatch, reset_tenant
     monkeypatch.setattr(signals_mod, "run_detectors", lambda: ran.append("detectors"))
     monkeypatch.setattr(judge_mod, "judge_signals", lambda: ran.append("judge"))
     monkeypatch.setattr(orch_mod, "run_proactive_loop", lambda: ran.append("proactive_loop"))
+    monkeypatch.setattr(
+        orch_mod, "run_commitment_followups", lambda: ran.append("commitment_followups")
+    )
     monkeypatch.setattr(reply_mod, "understand_replies", lambda: ran.append("reply_understanding"))
     monkeypatch.setattr(metrics_mod, "compute_metrics", lambda: ran.append("metrics"))
 
@@ -229,6 +236,7 @@ def test_post_ingest_projection_failure_is_best_effort(monkeypatch, reset_tenant
         "judge",
         "proactive_loop",
         "reply_understanding",
+        "commitment_followups",
         "metrics",
     ]
 

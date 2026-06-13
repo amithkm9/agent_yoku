@@ -35,12 +35,13 @@ from yoku.logging import get_logger
 
 log = get_logger("episodes")
 
-# Episode kinds — the four interaction points Phase A captures.
+# Episode kinds — the interaction points the engine captures.
 KIND_SENT = "sent"
 KIND_REPLY = "reply"
 KIND_DISMISSAL = "dismissal"
 KIND_CONFIRM = "confirm"
-EPISODE_KINDS = frozenset({KIND_SENT, KIND_REPLY, KIND_DISMISSAL, KIND_CONFIRM})
+KIND_FOLLOWUP = "followup"  # yoku chased a lapsed commitment (Phase D)
+EPISODE_KINDS = frozenset({KIND_SENT, KIND_REPLY, KIND_DISMISSAL, KIND_CONFIRM, KIND_FOLLOWUP})
 
 # Where the episode came from / which channel it travelled over.
 SOURCE_SLACK = "slack"  # a real DM out or a verified reply in

@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import time
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from pymongo.errors import DuplicateKeyError
 
@@ -249,6 +249,131 @@ def _maybe_approve_pending_action(convo: dict, reply_text: str) -> None:
         log.info("DM reply approved action %s", pending[0]["action_id"])
     except Exception:
         log.exception("DM-approved action failed (audit row records it)")
+
+
+# A commitment with no explicit due date is considered lapsed this many days
+# after it was made; each commitment is chased at most this many times.
+COMMITMENT_GRACE_DAYS = 2
+MAX_FOLLOWUPS = 1
+
+
+def _commitment_due(commitment: dict, now: datetime) -> bool:
+    """True when a promised fix is past its (explicit or implied) deadline."""
+    from datetime import date
+
+    due = commitment.get("due")
+    if due:
+        try:
+            return date.fromisoformat(due) <= now.date()
+        except (ValueError, TypeError):
+            pass
+    made = commitment.get("made_at")
+    if made is not None:
+        if made.tzinfo is None:
+            made = made.replace(tzinfo=UTC)
+        return (now - made) >= timedelta(days=COMMITMENT_GRACE_DAYS)
+    return False
+
+
+def compose_followup(signal: dict, commitment: dict, target: dict) -> str:
+    """A gentle, specific chase that remembers what they promised."""
+    key = signal["item_key"].split("/", 1)[-1]
+    what = (commitment.get("text") or "").strip()
+    tail = f" you'd {what}" if what else " you'd sort this"
+    return (
+        f"Hey {target['first_name']} — earlier{tail} on {key}. "
+        f"Still on track, or want me to take it off your plate?"
+    )
+
+
+def run_commitment_followups(now: datetime | None = None) -> dict[str, int]:
+    """Chase commitments whose deadline has passed while the gap is still live.
+
+    A promise made in a reply (Phase B) becomes `signal.commitment`; if the gap
+    has not healed by the due date this nudges once more — yoku remembering what
+    you said you'd do. Same send keys, quiet hours and shadow default as the
+    speak loop; bounded by MAX_FOLLOWUPS so it never becomes nagging.
+    """
+    now = now or datetime.now(UTC)
+    if not settings.commitment_followups_enabled:
+        return {"due": 0, "sent": 0, "shadowed": 0, "disabled": True}
+
+    signals = signals_collection()
+    convos = conversations_collection()
+    counts = {"due": 0, "sent": 0, "shadowed": 0, "skipped_no_target": 0, "errors": 0}
+    can_send, slack_cfg = _tenant_send_enabled()
+    quiet = _in_quiet_hours(now)
+
+    # Still-live signals (spoken about, not yet resolved/dismissed) carrying a
+    # commitment. The detector resolves healed gaps before this runs, so a
+    # `sent`/`shadow` status here means the fix hasn't landed.
+    candidates = signals.find({"status": {"$in": ["sent", "shadow"]}, "commitment": {"$ne": None}})
+    for s in candidates:
+        commitment = s.get("commitment") or {}
+        if commitment.get("followups", 0) >= MAX_FOLLOWUPS:
+            continue
+        if not _commitment_due(commitment, now):
+            continue
+        counts["due"] += 1
+
+        target = route_target(s)
+        if target is None:
+            counts["skipped_no_target"] += 1
+            continue
+
+        message = compose_followup(s, commitment, target)
+        sending = can_send and not quiet
+        state = "sent"
+        if sending:
+            try:
+                from yoku.connectors._runtime import slack_config_from_dict, use_slack
+                from yoku.connectors.slack.client import open_dm, post_message
+
+                with use_slack(slack_config_from_dict(slack_cfg)):
+                    channel = open_dm(target["slack_user_id"])
+                    post_message(channel, message)
+                counts["sent"] += 1
+            except Exception:
+                log.exception("followup send failed for %s — shadowing", s["item_key"])
+                counts["errors"] += 1
+                state = "shadow"
+                counts["shadowed"] += 1
+        else:
+            state = "shadow"
+            counts["shadowed"] += 1
+
+        signals.update_one(
+            {"_id": s["_id"]},
+            {
+                "$set": {
+                    "commitment.followups": commitment.get("followups", 0) + 1,
+                    "commitment.last_followup_at": now,
+                }
+            },
+        )
+        convos.update_one(
+            {"signal_id": s["signal_id"]},
+            {
+                "$push": {"followups": {"message": message, "ts": now, "state": state}},
+                "$set": {"last_message_at": now},
+            },
+        )
+        from yoku.proactive.episodes import KIND_FOLLOWUP, record_episode
+
+        record_episode(
+            kind=KIND_FOLLOWUP,
+            text=message,
+            person_user_id=target["user_id"],
+            signal_id=s["signal_id"],
+            item_key=s["item_key"],
+            detector=s["detector"],
+            source="slack" if state == "sent" else "engine",
+            outcome=state,
+            now=now,
+        )
+
+    log.info("commitment followups %s", counts)
+    return counts
 
 
 def process_inbound_replies(now: datetime | None = None) -> int:

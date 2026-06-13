@@ -15,6 +15,7 @@ _EXPECTED = {
     "mongo_count",
     "mongo_query",
     "propose_action",
+    "recall_history",
     "resolve_user",
     "semantic_search",
     "update_memory",

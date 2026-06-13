@@ -134,6 +134,11 @@ class Settings(BaseSettings):
     reply_understanding_enabled: bool = True
     reply_understanding_budget_per_run: int = 20
 
+    # Commitment follow-ups (memory engine Phase D) — when someone promised a
+    # fix in a reply and the gap is still open past the deadline, yoku chases it
+    # once more. Same send keys / quiet hours / shadow default as the speak loop.
+    commitment_followups_enabled: bool = True
+
     @property
     def is_default_jwt_secret(self) -> bool:
         """True when the built-in dev secret is still in use (unsafe in prod)."""

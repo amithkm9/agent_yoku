@@ -155,7 +155,7 @@ def _run_post_ingest_pipeline() -> None:
     from yoku.proactive.baselines import compute_baselines
     from yoku.proactive.beliefs import consolidate_beliefs
     from yoku.proactive.judge import judge_signals
-    from yoku.proactive.orchestrator import run_proactive_loop
+    from yoku.proactive.orchestrator import run_commitment_followups, run_proactive_loop
     from yoku.proactive.reply_understanding import understand_replies
 
     # Proactive stages close the pipeline — they read what everything above
@@ -170,6 +170,7 @@ def _run_post_ingest_pipeline() -> None:
     _best_effort("judge", judge_signals)
     _best_effort("proactive_loop", run_proactive_loop)
     _best_effort("reply_understanding", understand_replies)
+    _best_effort("commitment_followups", run_commitment_followups)
     _best_effort("metrics", compute_metrics)
 
 
